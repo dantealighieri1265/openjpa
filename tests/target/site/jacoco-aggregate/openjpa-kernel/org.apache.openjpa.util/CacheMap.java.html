@@ -1,0 +1,688 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CacheMap.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.util</a> &gt; <span class="el_source">CacheMap.java</span></div><h1>CacheMap.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.util;
+
+import java.util.AbstractCollection;
+import java.util.AbstractSet;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import org.apache.commons.collections4.Predicate;
+import org.apache.commons.collections4.iterators.FilterIterator;
+import org.apache.commons.collections4.iterators.IteratorChain;
+import org.apache.commons.collections4.map.AbstractReferenceMap.ReferenceStrength;
+import org.apache.openjpa.lib.util.LRUMap;
+import org.apache.openjpa.lib.util.SizedMap;
+import org.apache.openjpa.lib.util.concurrent.ConcurrentHashMap;
+import org.apache.openjpa.lib.util.concurrent.ConcurrentReferenceHashMap;
+
+/**
+ * Fixed-size map that has ability to pin/unpin entries and move overflow to
+ * a backing soft map.
+ *
+ * @author Patrick Linskey
+ * @author Abe White
+ */
+public class CacheMap
+    implements Map {
+
+    /**
+     * The map for non-expired and non-pinned references.
+     */
+    protected final SizedMap cacheMap;
+
+    /**
+     * The map for expired references.
+     */
+    protected final SizedMap softMap;
+
+    /**
+     * The set of objects pinned into the cache.
+     */
+    protected final Map pinnedMap;
+
+    // number of pinned values (not including keys not mapped to values)
+<span class="fc" id="L66">    private int _pinnedSize = 0;</span>
+
+<span class="fc" id="L68">    private final ReentrantReadWriteLock rwl = new ReentrantReadWriteLock(true);</span>
+<span class="fc" id="L69">    private final Lock _readLock = rwl.readLock();</span>
+<span class="fc" id="L70">    private final Lock _writeLock = rwl.writeLock();</span>
+
+    /**
+     * Create a non-LRU (and therefore highly concurrent) cache map with a
+     * size of 1000.
+     */
+    public CacheMap() {
+<span class="nc" id="L77">        this(false, 1000);</span>
+<span class="nc" id="L78">    }</span>
+
+    /**
+     * Create a cache map with a size of 1000.
+     *
+     * @param lru if true, create a LRU cache map otherwise a non-LRU map will be created.
+     */
+    public CacheMap(boolean lru) {
+<span class="fc" id="L86">        this(lru, 1000);</span>
+<span class="fc" id="L87">    }</span>
+
+    /**
+     * Create a cache map with the given properties.
+     */
+    public CacheMap(boolean lru, int max) {
+<span class="fc" id="L93">        this(lru, max, max / 2, .75F);</span>
+<span class="fc" id="L94">    }</span>
+
+    /**
+     * @deprecated use {@link CacheMap#CacheMap(boolean, int, int, float, int)}
+     * instead.
+     */
+    @Deprecated
+    public CacheMap(boolean lru, int max, int size, float load) {
+<span class="fc" id="L102">        this(lru, max, size, load, 16);</span>
+<span class="fc" id="L103">    }</span>
+
+    /**
+     * Create a cache map with the given properties.
+     *
+     * @since 1.1.0
+     */
+    public CacheMap(boolean lru, int max, int size, float load,
+<span class="fc" id="L111">        int concurrencyLevel) {</span>
+<span class="pc bpc" id="L112" title="1 of 2 branches missed.">        if (size &lt; 0)</span>
+<span class="nc" id="L113">            size = 500;</span>
+
+<span class="fc" id="L115">        softMap = new ConcurrentReferenceHashMap(ReferenceStrength.HARD,</span>
+<span class="fc" id="L116">            ReferenceStrength.SOFT, size, load) {</span>
+            @Override
+            public void overflowRemoved(Object key, Object value) {
+<span class="nc" id="L119">                softMapOverflowRemoved(key, value);</span>
+<span class="nc" id="L120">            }</span>
+
+            @Override
+            public void valueExpired(Object key) {
+<span class="nc" id="L124">                softMapValueExpired(key);</span>
+<span class="nc" id="L125">            }</span>
+        };
+<span class="fc" id="L127">        pinnedMap = new ConcurrentHashMap();</span>
+
+<span class="pc bpc" id="L129" title="1 of 2 branches missed.">        if (!lru) {</span>
+<span class="nc" id="L130">            cacheMap = new ConcurrentHashMap(size, load) {</span>
+                
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public void overflowRemoved(Object key, Object value) {
+<span class="nc" id="L136">                    cacheMapOverflowRemoved(key, value);</span>
+<span class="nc" id="L137">                }</span>
+            };
+        } else {
+<span class="fc" id="L140">            cacheMap = new LRUMap(size, load) {</span>
+                
+                private static final long serialVersionUID = 1L;
+
+                @Override
+                public void overflowRemoved(Object key, Object value) {
+<span class="fc" id="L146">                    cacheMapOverflowRemoved(key, value);</span>
+<span class="fc" id="L147">                }</span>
+            };
+        }
+<span class="pc bpc" id="L150" title="1 of 2 branches missed.">        if (max &lt; 0)</span>
+<span class="nc" id="L151">            max = Integer.MAX_VALUE;</span>
+<span class="fc" id="L152">        cacheMap.setMaxSize(max);</span>
+<span class="fc" id="L153">    }</span>
+
+    /**
+     * Called from {@link SizedMap#overflowRemoved} in the cache map.
+     */
+    protected void cacheMapOverflowRemoved(Object key, Object value) {
+<span class="pc bpc" id="L159" title="1 of 2 branches missed.">        if (softMap.size() &lt; softMap.getMaxSize())</span>
+<span class="fc" id="L160">            put(softMap, key, value);</span>
+        else
+<span class="nc" id="L162">            entryRemoved(key, value, true);</span>
+<span class="fc" id="L163">    }</span>
+
+    /**
+     * Called from {@link SizedMap#overflowRemoved} in the soft map.
+     */
+    protected void softMapOverflowRemoved(Object key, Object value) {
+<span class="nc" id="L169">        entryRemoved(key, value, true);</span>
+<span class="nc" id="L170">    }</span>
+
+    /**
+     * Called when a value expires from the soft map.
+     */
+    protected void softMapValueExpired(Object key) {
+<span class="nc" id="L176">        entryRemoved(key, null, true);</span>
+<span class="nc" id="L177">    }</span>
+
+    /**
+     * Put the given entry into the given map. Allows subclasses to
+     * take additional actions.
+     */
+    protected Object put(Map map, Object key, Object value) {
+<span class="fc" id="L184">        return map.put(key, value);</span>
+    }
+
+    /**
+     * Remove the given key from the given map. Allows subclasses to
+     * take additional actions.
+     */
+    protected Object remove(Map map, Object key) {
+<span class="fc" id="L192">        return map.remove(key);</span>
+    }
+
+    /**
+     * Acquire read lock.
+     */
+    public void readLock() {
+<span class="fc" id="L199">        _readLock.lock();</span>
+<span class="fc" id="L200">    }</span>
+
+    /**
+     * Release read lock.
+     */
+    public void readUnlock() {
+<span class="fc" id="L206">        _readLock.unlock();</span>
+<span class="fc" id="L207">    }</span>
+
+    /**
+     * Acquire write lock.
+     */
+    public void writeLock() {
+<span class="fc" id="L213">        _writeLock.lock();</span>
+<span class="fc" id="L214">    }</span>
+
+    /**
+     * Release write lock.
+     */
+    public void writeUnlock() {
+<span class="fc" id="L220">        _writeLock.unlock();</span>
+<span class="fc" id="L221">    }</span>
+
+    /**
+     * Whether this cache map uses LRU eviction.
+     */
+    public boolean isLRU() {
+<span class="nc" id="L227">        return cacheMap instanceof LRUMap;</span>
+    }
+
+    /**
+     * The maximum number of hard references to maintain, or -1 for no limit.
+     */
+    public void setCacheSize(int size) {
+<span class="nc" id="L234">        writeLock();</span>
+        try {
+<span class="nc bnc" id="L236" title="All 2 branches missed.">            cacheMap.setMaxSize((size &lt; 0) ? Integer.MAX_VALUE : size);</span>
+        } finally {
+<span class="nc" id="L238">            writeUnlock();</span>
+        }
+<span class="nc" id="L240">    }</span>
+
+    /**
+     * The maximum number of hard references to maintain, or -1 for no limit.
+     */
+    public int getCacheSize() {
+<span class="nc" id="L246">        int max = cacheMap.getMaxSize();</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        return (max == Integer.MAX_VALUE) ? -1 : max;</span>
+    }
+
+    /**
+     * The maximum number of soft references to maintain, or -1 for no limit.
+     */
+    public void setSoftReferenceSize(int size) {
+<span class="nc" id="L254">        writeLock();</span>
+        try {
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            softMap.setMaxSize((size &lt; 0) ? Integer.MAX_VALUE : size);</span>
+        } finally {
+<span class="nc" id="L258">            writeUnlock();</span>
+        }
+<span class="nc" id="L260">    }</span>
+
+    /**
+     * The maximum number of soft references to maintain, or -1 for no limit.
+     */
+    public int getSoftReferenceSize() {
+<span class="nc" id="L266">        int max = softMap.getMaxSize();</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">        return (max == Integer.MAX_VALUE) ? -1 : max;</span>
+    }
+
+    /**
+     * The keys pinned into the map.
+     */
+    public Set getPinnedKeys() {
+<span class="nc" id="L274">        readLock();</span>
+        try {
+<span class="nc" id="L276">            return Collections.unmodifiableSet(pinnedMap.keySet());</span>
+        } finally {
+<span class="nc" id="L278">            readUnlock();</span>
+        }
+    }
+
+    /**
+     * Locks the given key and its value into the map. Objects pinned into
+     * the map are not counted towards the maximum cache size, and are never
+     * evicted implicitly. You may pin keys for which no value is in the map.
+     *
+     * @return true if the givne key's value was pinned; false if no value
+     * for the given key is cached
+     */
+    public boolean pin(Object key) {
+<span class="fc" id="L291">        writeLock();</span>
+        try {
+            // if we don't have a pinned map we need to create one; else if the
+            // pinned map already contains the key, nothing to do
+<span class="fc bfc" id="L295" title="All 2 branches covered.">            if (pinnedMap.containsKey(key))</span>
+<span class="fc bfc" id="L296" title="All 2 branches covered.">                return pinnedMap.get(key) != null;</span>
+
+            // check other maps for key
+<span class="fc" id="L299">            Object val = remove(cacheMap, key);</span>
+<span class="fc bfc" id="L300" title="All 2 branches covered.">            if (val == null)</span>
+<span class="fc" id="L301">                val = remove(softMap, key);</span>
+
+            // pin key
+<span class="fc" id="L304">            put(pinnedMap, key, val);</span>
+<span class="fc bfc" id="L305" title="All 2 branches covered.">            if (val != null) {</span>
+<span class="fc" id="L306">                _pinnedSize++;</span>
+<span class="fc" id="L307">                return true;</span>
+            }
+<span class="fc" id="L309">            return false;</span>
+        } finally {
+<span class="fc" id="L311">            writeUnlock();</span>
+        }
+    }
+
+    /**
+     * Undo a pinning.
+     */
+    public boolean unpin(Object key) {
+<span class="nc" id="L319">        writeLock();</span>
+        try {
+<span class="nc" id="L321">            Object val = remove(pinnedMap, key);</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">            if (val != null) {</span>
+                // put back into unpinned cache
+<span class="nc" id="L324">                put(key, val);</span>
+<span class="nc" id="L325">                _pinnedSize--;</span>
+<span class="nc" id="L326">                return true;</span>
+            }
+<span class="nc" id="L328">            return false;</span>
+        } finally {
+<span class="nc" id="L330">            writeUnlock();</span>
+        }
+    }
+
+    /**
+     * Invoked when a key-value pair is evicted from this data
+     * structure. This is invoked with &lt;code&gt;expired&lt;/code&gt; set to
+     * &lt;code&gt;true&lt;/code&gt; when an object is dropped because of space
+     * requirements or through garbage collection of soft references.
+     * It is invoked with &lt;code&gt;expired&lt;/code&gt; set to &lt;code&gt;false&lt;/code&gt;
+     * when an object is explicitly removed via the {@link #remove} or
+     * {@link #clear} methods. This may be invoked more than once for a
+     * given entry.
+     *
+     * @param value may be null if the value was a soft reference that has
+     * been GCd
+     * @since 0.2.5.0
+     */
+    protected void entryRemoved(Object key, Object value, boolean expired) {
+<span class="fc" id="L349">    }</span>
+
+    /**
+     * Invoked when an entry is added to the cache. This may be invoked
+     * more than once for an entry.
+     */
+    protected void entryAdded(Object key, Object value) {
+<span class="fc" id="L356">    }</span>
+
+    @Override
+    public Object get(Object key) {
+<span class="fc" id="L360">        boolean putcache = false;</span>
+<span class="fc" id="L361">        Object val = null;</span>
+<span class="fc" id="L362">        readLock();</span>
+        try {
+<span class="fc" id="L364">            val = softMap.get(key);</span>
+<span class="pc bpc" id="L365" title="1 of 2 branches missed.">            if (val == null) {</span>
+<span class="fc" id="L366">                val = cacheMap.get(key);</span>
+<span class="fc bfc" id="L367" title="All 2 branches covered.">                if (val == null) {</span>
+<span class="fc" id="L368">                    val = pinnedMap.get(key);</span>
+                }
+            } else {
+<span class="nc" id="L371">                putcache = true;</span>
+            }
+<span class="fc" id="L373">            return val;</span>
+        } finally {
+<span class="fc" id="L375">            readUnlock();</span>
+            //cannot obtain a write lock while holding a read lock
+            //doing it this way prevents a deadlock
+<span class="pc bpc" id="L378" title="1 of 2 branches missed.">            if (putcache)</span>
+<span class="nc" id="L379">                put(key, val);</span>
+        }
+    }
+
+    @Override
+    public Object put(Object key, Object value) {
+<span class="fc" id="L385">        writeLock();</span>
+        try {
+            // if the key is pinned, just interact directly with the pinned map
+            Object val;
+<span class="fc bfc" id="L389" title="All 2 branches covered.">            if (pinnedMap.containsKey(key)) {</span>
+<span class="fc" id="L390">                val = put(pinnedMap, key, value);</span>
+<span class="fc bfc" id="L391" title="All 2 branches covered.">                if (val == null) {</span>
+<span class="fc" id="L392">                    _pinnedSize++;</span>
+<span class="fc" id="L393">                    entryAdded(key, value);</span>
+                } else {
+<span class="fc" id="L395">                    entryRemoved(key, val, false);</span>
+<span class="fc" id="L396">                    entryAdded(key, value);</span>
+                }
+<span class="fc" id="L398">                return val;</span>
+            }
+
+            // if no hard refs, don't put anything
+<span class="fc bfc" id="L402" title="All 2 branches covered.">            if (cacheMap.getMaxSize() == 0)</span>
+<span class="fc" id="L403">                return null;</span>
+
+            // otherwise, put the value into the map and clear it from the
+            // soft map
+<span class="fc" id="L407">            val = put(cacheMap, key, value);</span>
+<span class="fc bfc" id="L408" title="All 2 branches covered.">            if (val == null) {</span>
+<span class="fc" id="L409">                val = remove(softMap, key);</span>
+<span class="fc bfc" id="L410" title="All 2 branches covered.">                if (val == null)</span>
+<span class="fc" id="L411">                    entryAdded(key, value);</span>
+                else {
+<span class="fc" id="L413">                    entryRemoved(key, val, false);</span>
+<span class="fc" id="L414">                    entryAdded(key, value);</span>
+                }
+            } else {
+<span class="fc" id="L417">                entryRemoved(key, val, false);</span>
+<span class="fc" id="L418">                entryAdded(key, value);</span>
+            }
+<span class="fc" id="L420">            return val;</span>
+        } finally {
+<span class="fc" id="L422">            writeUnlock();</span>
+        }
+    }
+
+    @Override
+    public void putAll(Map map) {
+<span class="nc" id="L428">        putAll(map, true);</span>
+<span class="nc" id="L429">    }</span>
+
+    public void putAll(Map map, boolean replaceExisting) {
+        Map.Entry entry;
+<span class="nc bnc" id="L433" title="All 2 branches missed.">        for (Iterator itr = map.entrySet().iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L434">            entry = (Map.Entry) itr.next();</span>
+<span class="nc bnc" id="L435" title="All 4 branches missed.">            if(replaceExisting || !containsKey(entry.getKey())) {</span>
+<span class="nc" id="L436">                put(entry.getKey(), entry.getValue());</span>
+            }
+        }
+<span class="nc" id="L439">    }</span>
+
+    /**
+     * If &lt;code&gt;key&lt;/code&gt; is pinned into the cache, the pin is
+     * cleared and the object is removed.
+     */
+    @Override
+    public Object remove(Object key) {
+<span class="fc" id="L447">        writeLock();</span>
+        try {
+            // if the key is pinned, just interact directly with the
+            // pinned map
+            Object val;
+<span class="fc bfc" id="L452" title="All 2 branches covered.">            if (pinnedMap.containsKey(key)) {</span>
+                // re-put with null value; we still want key pinned
+<span class="fc" id="L454">                val = put(pinnedMap, key, null);</span>
+<span class="fc bfc" id="L455" title="All 2 branches covered.">                if (val != null) {</span>
+<span class="fc" id="L456">                    _pinnedSize--;</span>
+<span class="fc" id="L457">                    entryRemoved(key, val, false);</span>
+                }
+<span class="fc" id="L459">                return val;</span>
+            }
+
+<span class="fc" id="L462">            val = remove(cacheMap, key);</span>
+<span class="fc bfc" id="L463" title="All 2 branches covered.">            if (val == null)</span>
+<span class="fc" id="L464">                val = softMap.remove(key);</span>
+<span class="fc bfc" id="L465" title="All 2 branches covered.">            if (val != null)</span>
+<span class="fc" id="L466">                entryRemoved(key, val, false);</span>
+
+<span class="fc" id="L468">            return val;</span>
+        } finally {
+<span class="fc" id="L470">            writeUnlock();</span>
+        }
+    }
+
+    /**
+     * Removes pinned objects as well as unpinned ones.
+     */
+    @Override
+    public void clear() {
+<span class="nc" id="L479">        writeLock();</span>
+        try {
+<span class="nc" id="L481">            notifyEntryRemovals(pinnedMap.entrySet());</span>
+<span class="nc" id="L482">            pinnedMap.clear();</span>
+<span class="nc" id="L483">            _pinnedSize = 0;</span>
+
+<span class="nc" id="L485">            notifyEntryRemovals(cacheMap.entrySet());</span>
+<span class="nc" id="L486">            cacheMap.clear();</span>
+
+<span class="nc" id="L488">            notifyEntryRemovals(softMap.entrySet());</span>
+<span class="nc" id="L489">            softMap.clear();</span>
+        } finally {
+<span class="nc" id="L491">            writeUnlock();</span>
+        }
+<span class="nc" id="L493">    }</span>
+
+    private void notifyEntryRemovals(Set set) {
+        Map.Entry entry;
+<span class="nc bnc" id="L497" title="All 2 branches missed.">        for (Iterator itr = set.iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L498">            entry = (Map.Entry) itr.next();</span>
+<span class="nc bnc" id="L499" title="All 2 branches missed.">            if (entry.getValue() != null)</span>
+<span class="nc" id="L500">                entryRemoved(entry.getKey(), entry.getValue(), false);</span>
+        }
+<span class="nc" id="L502">    }</span>
+
+    @Override
+    public int size() {
+<span class="nc" id="L506">        readLock();</span>
+        try {
+<span class="nc" id="L508">            return _pinnedSize + cacheMap.size() + softMap.size();</span>
+        } finally {
+<span class="nc" id="L510">            readUnlock();</span>
+        }
+    }
+
+    @Override
+    public boolean isEmpty() {
+<span class="nc bnc" id="L516" title="All 2 branches missed.">        return size() == 0;</span>
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+<span class="nc" id="L521">        readLock();</span>
+        try {
+<span class="nc bnc" id="L523" title="All 6 branches missed.">            return cacheMap.containsKey(key) || pinnedMap.get(key) != null || softMap.containsKey(key);</span>
+        } finally {
+<span class="nc" id="L525">            readUnlock();</span>
+        }
+    }
+
+    @Override
+    public boolean containsValue(Object val) {
+<span class="nc" id="L531">        readLock();</span>
+        try {
+<span class="nc bnc" id="L533" title="All 6 branches missed.">            return cacheMap.containsValue(val) || pinnedMap.containsValue(val) || softMap.containsValue(val);</span>
+        } finally {
+<span class="nc" id="L535">            readUnlock();</span>
+        }
+    }
+
+    @Override
+    public Set keySet() {
+<span class="nc" id="L541">        return new KeySet();</span>
+    }
+
+    @Override
+    public Collection values() {
+<span class="nc" id="L546">        return new ValueCollection();</span>
+    }
+
+    @Override
+    public Set entrySet() {
+<span class="nc" id="L551">        return new EntrySet();</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L556">        readLock();</span>
+        try {
+<span class="nc" id="L558">            return &quot;CacheMap:&quot; + cacheMap.toString() + &quot;::&quot; + softMap.toString();</span>
+        } finally {
+<span class="nc" id="L560">            readUnlock();</span>
+        }
+    }
+
+    /**
+     * View of the entry set.
+     */
+<span class="nc" id="L567">    private class EntrySet</span>
+        extends AbstractSet {
+
+        @Override
+        public int size() {
+<span class="nc" id="L572">            return CacheMap.this.size();</span>
+        }
+
+        @Override
+        public boolean add(Object o) {
+<span class="nc" id="L577">            Map.Entry entry = (Map.Entry) o;</span>
+<span class="nc" id="L578">            put(entry.getKey(), entry.getValue());</span>
+<span class="nc" id="L579">            return true;</span>
+        }
+
+        @Override
+        public Iterator iterator() {
+<span class="nc" id="L584">            return new EntryIterator(EntryIterator.ENTRY);</span>
+        }
+    }
+
+    /**
+     * View of the key set.
+     */
+<span class="nc" id="L591">    private class KeySet</span>
+        extends AbstractSet {
+
+        @Override
+        public int size() {
+<span class="nc" id="L596">            return CacheMap.this.size();</span>
+        }
+
+        @Override
+        public Iterator iterator() {
+<span class="nc" id="L601">            return new EntryIterator(EntryIterator.KEY);</span>
+        }
+    }
+
+    /**
+     * View of the value collection.
+     */
+<span class="nc" id="L608">    private class ValueCollection</span>
+        extends AbstractCollection {
+
+        @Override
+        public int size() {
+<span class="nc" id="L613">            return CacheMap.this.size();</span>
+        }
+
+        @Override
+        public Iterator iterator() {
+<span class="nc" id="L618">            return new EntryIterator(EntryIterator.VALUE);</span>
+        }
+    }
+
+    /**
+     * Iterator over all entries.
+     */
+    private class EntryIterator
+        implements Iterator, Predicate {
+
+        public static final int ENTRY = 0;
+        public static final int KEY = 1;
+        public static final int VALUE = 2;
+
+<span class="nc" id="L632">        private final IteratorChain _itr = new IteratorChain();</span>
+        private final int _type;
+
+<span class="nc" id="L635">        public EntryIterator(int type) {</span>
+<span class="nc" id="L636">            _type = type;</span>
+<span class="nc" id="L637">            _itr.addIterator(new FilterIterator(getView(pinnedMap), this));</span>
+<span class="nc" id="L638">            _itr.addIterator(getView(cacheMap));</span>
+<span class="nc" id="L639">            _itr.addIterator(getView(softMap));</span>
+<span class="nc" id="L640">        }</span>
+
+        /**
+         * Return an iterator over the appropriate view of the given map.
+         */
+        private Iterator getView(Map m) {
+<span class="nc bnc" id="L646" title="All 2 branches missed.">            if (m == null)</span>
+<span class="nc" id="L647">                return null;</span>
+
+<span class="nc bnc" id="L649" title="All 3 branches missed.">            switch (_type) {</span>
+                case KEY:
+<span class="nc" id="L651">                    return m.keySet().iterator();</span>
+                case VALUE:
+<span class="nc" id="L653">                    return m.values().iterator();</span>
+                default:
+<span class="nc" id="L655">                    return m.entrySet().iterator();</span>
+            }
+        }
+
+        @Override
+        public boolean hasNext() {
+<span class="nc" id="L661">            return _itr.hasNext();</span>
+        }
+
+        @Override
+        public Object next() {
+<span class="nc" id="L666">            return _itr.next();</span>
+        }
+
+        @Override
+        public void remove() {
+<span class="nc" id="L671">            _itr.remove();</span>
+<span class="nc" id="L672">        }</span>
+
+        @Override
+        public boolean evaluate(Object obj) {
+<span class="nc bnc" id="L676" title="All 3 branches missed.">            switch (_type) {</span>
+                case ENTRY:
+<span class="nc bnc" id="L678" title="All 2 branches missed.">                    return ((Map.Entry) obj).getValue() != null;</span>
+			case VALUE:
+<span class="nc bnc" id="L680" title="All 2 branches missed.">				return obj != null;</span>
+			default:
+<span class="nc" id="L682">				return true;</span>
+			}
+		}
+	}
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

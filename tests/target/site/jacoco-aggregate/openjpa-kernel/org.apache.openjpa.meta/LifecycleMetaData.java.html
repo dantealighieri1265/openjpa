@@ -1,0 +1,273 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>LifecycleMetaData.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.meta</a> &gt; <span class="el_source">LifecycleMetaData.java</span></div><h1>LifecycleMetaData.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.meta;
+
+import java.io.Serializable;
+import java.util.Arrays;
+
+import org.apache.openjpa.event.LifecycleCallbacks;
+import org.apache.openjpa.event.LifecycleEvent;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.util.InternalException;
+
+/**
+ * Information about lifecycle events for a managed type.
+ *
+ * @author Steve Kim
+ * @author Abe White
+ */
+public class LifecycleMetaData
+    implements Serializable {
+
+    
+    private static final long serialVersionUID = 1L;
+    public static final int IGNORE_NONE = 0;
+    public static final int IGNORE_HIGH = 2 &lt;&lt; 0;
+    public static final int IGNORE_LOW = 2 &lt;&lt; 1;
+
+<span class="nc" id="L44">    private static final LifecycleCallbacks[] EMPTY_CALLBACKS =</span>
+        new LifecycleCallbacks[0];
+<span class="nc" id="L46">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L47">        (LifecycleMetaData.class);</span>
+
+    private final ClassMetaData _meta;
+<span class="nc" id="L50">    private LifecycleCallbacks[][] _declared = null;</span>
+<span class="nc" id="L51">    private LifecycleCallbacks[][] _super = null;</span>
+<span class="nc" id="L52">    private LifecycleCallbacks[][] _all = null;</span>
+<span class="nc" id="L53">    private int[] _high = null;</span>
+<span class="nc" id="L54">    private int[] _superHigh = null;</span>
+<span class="nc" id="L55">    private boolean _resolved = false;</span>
+<span class="nc" id="L56">    private boolean _ignoreSystem = false;</span>
+<span class="nc" id="L57">    private int _ignoreSups = 0;</span>
+<span class="nc" id="L58">    private boolean _activated = false;</span>
+
+    /**
+     * Construct with owning metadata.
+     */
+<span class="nc" id="L63">    LifecycleMetaData(ClassMetaData meta) {</span>
+<span class="nc" id="L64">        _meta = meta;</span>
+<span class="nc" id="L65">    }</span>
+
+    /**
+     * Whether the LifeCycleMetaData has had any callbacks or listeners registered.  Used
+     * for a quick test to determine whether to attempt to fire any events.
+     * @return boolean
+     */
+    public boolean is_activated() {
+<span class="nc" id="L73">        return _activated;</span>
+    }
+
+    /**
+     * Whether to exclude system listeners from events.
+     */
+    public boolean getIgnoreSystemListeners() {
+<span class="nc" id="L80">        return _ignoreSystem;</span>
+    }
+
+    /**
+     * Whether to exclude system listeners from events.
+     */
+    public void setIgnoreSystemListeners(boolean ignore) {
+<span class="nc" id="L87">        _ignoreSystem = ignore;</span>
+<span class="nc" id="L88">    }</span>
+
+    /**
+     * Whether to exclude superclass callbacks from events.
+     */
+    public int getIgnoreSuperclassCallbacks() {
+<span class="nc" id="L94">        return _ignoreSups;</span>
+    }
+
+    /**
+     * Whether to exclude superclass callbacks from events.
+     */
+    public void setIgnoreSuperclassCallbacks(int ignore) {
+<span class="nc" id="L101">        _ignoreSups = ignore;</span>
+<span class="nc" id="L102">    }</span>
+
+    /**
+     * Return the declared callbacks for the given event type.
+     */
+    public LifecycleCallbacks[] getDeclaredCallbacks(int eventType) {
+<span class="nc bnc" id="L108" title="All 4 branches missed.">        return (_declared == null || _declared[eventType] == null)</span>
+<span class="nc" id="L109">            ? EMPTY_CALLBACKS : _declared[eventType];</span>
+    }
+
+    /**
+     * Return all callbacks for the given event type, including superclass
+     * callbacks if appropriate.
+     */
+    public LifecycleCallbacks[] getCallbacks(int eventType) {
+<span class="nc" id="L117">        resolve();</span>
+<span class="nc bnc" id="L118" title="All 4 branches missed.">        return (_all == null || _all[eventType] == null)</span>
+<span class="nc" id="L119">            ? EMPTY_CALLBACKS : _all[eventType];</span>
+    }
+
+    /**
+     * Set the callbacks for the given event type.
+     *
+     * @param highPriority the first N given callbacks are high priority;
+     * high priority callbacks will be returned before
+     * non-high-priority superclass callbacks
+     */
+    public void setDeclaredCallbacks(int eventType,
+        LifecycleCallbacks[] callbacks, int highPriority) {
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        if (_resolved)</span>
+<span class="nc" id="L132">            throw new InternalException(_loc.get(&quot;lifecycle-resolved&quot;,</span>
+<span class="nc" id="L133">                _meta, Arrays.asList(callbacks)));</span>
+
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        if (_declared == null) {</span>
+<span class="nc" id="L136">            _declared = new LifecycleCallbacks</span>
+                [LifecycleEvent.ALL_EVENTS.length][];
+<span class="nc" id="L138">            _high = new int[LifecycleEvent.ALL_EVENTS.length];</span>
+        }
+<span class="nc" id="L140">        _declared[eventType] = callbacks;</span>
+<span class="nc" id="L141">        _high[eventType] = highPriority;</span>
+<span class="nc" id="L142">        _activated = true;</span>
+<span class="nc" id="L143">    }</span>
+
+    /**
+     * Return the callbacks for the non-PC superclass.
+     */
+    public LifecycleCallbacks[] getNonPCSuperclassCallbacks
+        (int eventType) {
+<span class="nc bnc" id="L150" title="All 4 branches missed.">        return (_super == null || _super[eventType] == null)</span>
+<span class="nc" id="L151">            ? EMPTY_CALLBACKS : _super[eventType];</span>
+    }
+
+    /**
+     * Set the callbacks for the given event type for non-persistent
+     * superclass. Note these callbacks will only be used where the
+     * non-persistent superclass is the direct ancestor of the described class.
+     *
+     * @param highPriority the first N given callbacks are high priority;
+     * high priority callbacks will be returned before
+     * non-high-priority superclass callbacks
+     */
+    public void setNonPCSuperclassCallbacks(int eventType,
+        LifecycleCallbacks[] callbacks, int highPriority) {
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (_resolved)</span>
+<span class="nc" id="L166">            throw new InternalException(_loc.get(&quot;lifecycle-resolved&quot;,</span>
+<span class="nc" id="L167">                _meta, Arrays.asList(callbacks)));</span>
+
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (_super == null) {</span>
+<span class="nc" id="L170">            _super = new LifecycleCallbacks</span>
+                [LifecycleEvent.ALL_EVENTS.length][];
+<span class="nc" id="L172">            _superHigh = new int[LifecycleEvent.ALL_EVENTS.length];</span>
+        }
+<span class="nc" id="L174">        _super[eventType] = callbacks;</span>
+<span class="nc" id="L175">        _superHigh[eventType] = highPriority;</span>
+<span class="nc" id="L176">        _activated = true;</span>
+<span class="nc" id="L177">    }</span>
+
+    /**
+     * Resolve all callbacks.
+     */
+    void resolve() {
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (!_resolved) {</span>
+<span class="nc" id="L184">            _all = combineCallbacks();</span>
+<span class="nc" id="L185">            _resolved = true;</span>
+        }
+<span class="nc" id="L187">    }</span>
+
+    /**
+     * Combine our callbacks with superclass callbacks as necessary.
+     * This method has the side effect of manipulating the _high array to
+     * reflect the combined callbacks rather than the declared ones.
+     */
+    private LifecycleCallbacks[][] combineCallbacks() {
+<span class="nc bnc" id="L195" title="All 2 branches missed.">        if (_ignoreSups == (IGNORE_HIGH | IGNORE_LOW))</span>
+<span class="nc" id="L196">            return _declared;</span>
+
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        LifecycleMetaData supMeta = (_meta.getPCSuperclass() == null) ? null</span>
+<span class="nc" id="L199">            : _meta.getPCSuperclassMetaData().getLifecycleMetaData();</span>
+<span class="nc bnc" id="L200" title="All 4 branches missed.">        if (supMeta == null &amp;&amp; _super == null)</span>
+<span class="nc" id="L201">            return _declared;</span>
+
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if (supMeta != null) {</span>
+<span class="nc" id="L204">            supMeta.resolve();</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">            if (supMeta._all == null)</span>
+<span class="nc" id="L206">                return _declared;</span>
+<span class="nc bnc" id="L207" title="All 4 branches missed.">            if (_declared == null &amp;&amp; _ignoreSups == 0) {</span>
+<span class="nc" id="L208">                _high = supMeta._high;</span>
+<span class="nc" id="L209">                _activated = true;</span>
+<span class="nc" id="L210">                return supMeta._all;</span>
+            }
+            // don't hold strong refs onto redundant info
+<span class="nc" id="L213">            _super = null;</span>
+<span class="nc" id="L214">            _superHigh = null;</span>
+        }
+
+<span class="nc" id="L217">        LifecycleCallbacks[][] all = new LifecycleCallbacks</span>
+            [LifecycleEvent.ALL_EVENTS.length][];
+        LifecycleCallbacks[] decs, sups;
+        int supStart, supEnd, supHigh;
+        int count;
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        for (int i = 0; i &lt; all.length; i++) {</span>
+<span class="nc" id="L223">            decs = getDeclaredCallbacks(i);</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">            if (supMeta == null) {</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">                sups = (_super[i] == null) ? EMPTY_CALLBACKS : _super[i];</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">                supHigh = (_superHigh == null) ? 0 : _superHigh[i];</span>
+            } else {
+<span class="nc" id="L228">                sups = supMeta.getCallbacks(i);</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">                supHigh = (supMeta._high == null) ? 0 : supMeta._high[i];</span>
+            }
+<span class="nc bnc" id="L231" title="All 2 branches missed.">            supStart = ((_ignoreSups &amp; IGNORE_HIGH) != 0) ? supHigh : 0;</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">            supEnd = ((_ignoreSups &amp; IGNORE_LOW) != 0) ? supHigh : sups.length;</span>
+
+<span class="nc bnc" id="L234" title="All 2 branches missed.">            if (supEnd - supStart == 0)</span>
+<span class="nc" id="L235">                all[i] = decs;</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">            else if (decs.length == 0) {</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">                if (supEnd - supStart == sups.length)</span>
+<span class="nc" id="L238">                    all[i] = sups;</span>
+                else {
+<span class="nc" id="L240">                    all[i] = new LifecycleCallbacks[supEnd - supStart];</span>
+<span class="nc" id="L241">                    System.arraycopy(sups, supStart, all[i], 0, all[i].length);</span>
+                }
+<span class="nc bnc" id="L243" title="All 2 branches missed.">                if (_high == null)</span>
+<span class="nc" id="L244">                    _high = new int[all.length];</span>
+<span class="nc" id="L245">                _high[i] = supHigh - supStart;</span>
+            } else {
+<span class="nc" id="L247">                all[i] =</span>
+                    new LifecycleCallbacks[decs.length + supEnd - supStart];
+<span class="nc" id="L249">                count = 0;</span>
+
+                // add superclass high priority callbacks first
+<span class="nc bnc" id="L252" title="All 2 branches missed.">                if ((_ignoreSups &amp; IGNORE_HIGH) == 0)</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">                    for (int j = 0; j &lt; supHigh; j++)</span>
+<span class="nc" id="L254">                        all[i][count++] = sups[j];</span>
+                // then our high priority
+<span class="nc bnc" id="L256" title="All 2 branches missed.">                for (int j = 0; j &lt; _high[i]; j++)</span>
+<span class="nc" id="L257">                    all[i][count++] = decs[j];</span>
+                // then superclass low priority
+<span class="nc bnc" id="L259" title="All 2 branches missed.">                if ((_ignoreSups &amp; IGNORE_LOW) == 0)</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">                    for (int j = supHigh; j &lt; sups.length; j++)</span>
+<span class="nc" id="L261">                        all[i][count++] = sups[j];</span>
+                // then our low priority
+<span class="nc bnc" id="L263" title="All 2 branches missed.">                for (int j = _high[i]; j &lt; decs.length; j++)</span>
+<span class="nc" id="L264">                    all[i][count++] = decs[j];</span>
+
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                if ((_ignoreSups &amp; IGNORE_HIGH) == 0)</span>
+<span class="nc" id="L267">                    _high[i] += supHigh;</span>
+			}
+		}
+<span class="nc" id="L270">		return all;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

@@ -1,0 +1,326 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AutomaticManagedRuntime.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.ee</a> &gt; <span class="el_source">AutomaticManagedRuntime.java</span></div><h1>AutomaticManagedRuntime.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.ee;
+
+import java.util.LinkedList;
+import java.util.List;
+
+import javax.transaction.NotSupportedException;
+import javax.transaction.SystemException;
+import javax.transaction.TransactionManager;
+
+import org.apache.openjpa.lib.conf.Configurable;
+import org.apache.openjpa.lib.conf.Configuration;
+import org.apache.openjpa.lib.util.J2DoPrivHelper;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.util.InvalidStateException;
+
+/**
+ * Implementation of the {@link ManagedRuntime} interface that searches
+ * through a set of known JNDI locations and method invocations to locate the
+ * appropriate mechanism for obtaining a TransactionManager.
+ *  Built in support is provided for the following Application Servers:
+ * &lt;ul&gt;
+ * &lt;li&gt;Bluestone&lt;/li&gt;
+ * &lt;li&gt;GlassFish&lt;/li&gt;
+ * &lt;li&gt;HP Application Server&lt;/li&gt;
+ * &lt;li&gt;JBoss&lt;/li&gt;
+ * &lt;li&gt;JRun&lt;/li&gt;
+ * &lt;li&gt;OpenEJB&lt;/li&gt;
+ * &lt;li&gt;Oracle Application Server&lt;/li&gt;
+ * &lt;li&gt;Orion&lt;/li&gt;
+ * &lt;li&gt;SunONE&lt;/li&gt;
+ * &lt;li&gt;Weblogic&lt;/li&gt;
+ * &lt;li&gt;Websphere&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * @author Marc Prud'hommeaux
+ */
+public class AutomaticManagedRuntime extends AbstractManagedRuntime
+    implements ManagedRuntime, Configurable {
+
+<span class="nc" id="L58">    private static final String [] JNDI_LOCS = new String []{</span>
+        &quot;javax.transaction.TransactionManager&quot;, // weblogic
+        &quot;java:/TransactionManager&quot;, // jboss, jrun, Geronimo
+        &quot;java:/DefaultDomain/TransactionManager&quot;, // jrun too
+        &quot;java:comp/pm/TransactionManager&quot;, // orion &amp; oracle
+        &quot;java:comp/TransactionManager&quot;, // generic
+        &quot;java:appserver/TransactionManager&quot;, // GlassFish
+        &quot;java:pm/TransactionManager&quot;, // borland
+        &quot;aries:services/javax.transaction.TransactionManager&quot;, // Apache Aries
+    };
+<span class="nc" id="L68">    private static final String [] METHODS = new String[]{</span>
+        &quot;com.arjuna.jta.JTA_TransactionManager.transactionManager&quot;, // hp
+        &quot;com.bluestone.jta.SaTransactionManagerFactory.SaGetTransactionManager&quot;,
+        &quot;org.openejb.OpenEJB.getTransactionManager&quot;,
+        &quot;com.sun.jts.jta.TransactionManagerImpl.getTransactionManagerImpl&quot;,
+        &quot;com.inprise.visitransact.jta.TransactionManagerImpl.&quot;
+            + &quot;getTransactionManagerImpl&quot;, // borland
+    };
+
+    private final ManagedRuntime REGISTRY;
+    private final WLSManagedRuntime WLS;
+    private final SunOneManagedRuntime SUNONE;
+    private final WASManagedRuntime WAS;
+    private final WASRegistryManagedRuntime WAS_REG;
+
+<span class="nc" id="L83">    private static Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L84">        (AutomaticManagedRuntime.class);</span>
+
+<span class="nc" id="L86">    public AutomaticManagedRuntime() {</span>
+<span class="nc" id="L87">        ManagedRuntime mr = null;</span>
+
+<span class="nc" id="L89">        mr = null;</span>
+        try {
+<span class="nc" id="L91">            mr = (ManagedRuntime) Class.</span>
+<span class="nc" id="L92">                forName(&quot;org.apache.openjpa.ee.RegistryManagedRuntime&quot;).</span>
+<span class="nc" id="L93">                    newInstance();</span>
+<span class="nc" id="L94">        } catch (Throwable t) {</span>
+            // might be JTA version lower than 1.1, which doesn't have
+            // TransactionSynchronizationRegistry
+<span class="nc" id="L97">        }</span>
+<span class="nc" id="L98">        REGISTRY = mr;</span>
+
+<span class="nc" id="L100">        mr = null;</span>
+        try {
+<span class="nc" id="L102">            mr = new WLSManagedRuntime();</span>
+<span class="nc" id="L103">        } catch (Throwable t) {</span>
+<span class="nc" id="L104">        }</span>
+<span class="nc" id="L105">        WLS = (WLSManagedRuntime) mr;</span>
+
+<span class="nc" id="L107">        mr = null;</span>
+        try {
+<span class="nc" id="L109">            mr = new SunOneManagedRuntime();</span>
+<span class="nc" id="L110">        } catch (Throwable t) {</span>
+<span class="nc" id="L111">        }</span>
+<span class="nc" id="L112">        SUNONE = (SunOneManagedRuntime) mr;</span>
+
+<span class="nc" id="L114">        mr = null;</span>
+        try {
+<span class="nc" id="L116">            mr = new WASManagedRuntime();</span>
+<span class="nc" id="L117">        } catch (Throwable t) {</span>
+<span class="nc" id="L118">        }</span>
+<span class="nc" id="L119">        WAS = (WASManagedRuntime) mr;</span>
+
+<span class="nc" id="L121">        mr = null;</span>
+        try {
+            // In a WebSphere environment the thread's current classloader might
+            // not have access to the WebSphere APIs. However the &quot;runtime&quot;
+            // classloader will have access to them.
+
+            // Should not need a doPriv getting this class' classloader
+<span class="nc" id="L128">            ClassLoader cl = AutomaticManagedRuntime.class.getClassLoader();</span>
+
+<span class="nc" id="L130">            Class&lt;WASRegistryManagedRuntime&gt; mrClass =</span>
+                (Class&lt;WASRegistryManagedRuntime&gt;) J2DoPrivHelper
+<span class="nc" id="L132">                        .getForNameAction(</span>
+<span class="nc" id="L133">                                WASRegistryManagedRuntime.class.getName(),</span>
+<span class="nc" id="L134">                                true, cl).run();</span>
+<span class="nc" id="L135">            mr = J2DoPrivHelper.newInstanceAction(mrClass).run();</span>
+<span class="nc" id="L136">        } catch (Throwable t) {</span>
+            // safe to ignore
+<span class="nc" id="L138">        }</span>
+<span class="nc" id="L139">        WAS_REG = (WASRegistryManagedRuntime) mr;</span>
+<span class="nc" id="L140">    }</span>
+
+<span class="nc" id="L142">    private Configuration _conf = null;</span>
+<span class="nc" id="L143">    private ManagedRuntime _runtime = null;</span>
+
+    @Override
+    public TransactionManager getTransactionManager()
+        throws Exception {
+<span class="nc bnc" id="L148" title="All 2 branches missed.">        if (_runtime != null)</span>
+<span class="nc" id="L149">            return _runtime.getTransactionManager();</span>
+
+<span class="nc" id="L151">        List&lt;Throwable&gt; errors = new LinkedList&lt;&gt;();</span>
+<span class="nc" id="L152">        TransactionManager tm = null;</span>
+
+        // Try the registry extensions first so that any applicable vendor
+        // specific extensions are used.
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (WAS_REG != null) {</span>
+            try {
+<span class="nc" id="L158">                tm = WAS_REG.getTransactionManager();</span>
+<span class="nc" id="L159">            } catch (Throwable t) {</span>
+<span class="nc" id="L160">                errors.add(t);</span>
+<span class="nc" id="L161">            }</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">            if (tm != null) {</span>
+<span class="nc" id="L163">                _runtime = WAS_REG;</span>
+<span class="nc" id="L164">                return tm;</span>
+            }
+        }
+
+        // Then try the registry, which is the official way to obtain
+        // transaction synchronication in JTA 1.1
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        if (REGISTRY != null) {</span>
+            try {
+<span class="nc" id="L172">                tm = REGISTRY.getTransactionManager();</span>
+<span class="nc" id="L173">            } catch (Throwable t) {</span>
+<span class="nc" id="L174">                errors.add(t);</span>
+<span class="nc" id="L175">            }</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">            if (tm != null) {</span>
+<span class="nc" id="L177">                _runtime = REGISTRY;</span>
+<span class="nc" id="L178">                return tm;</span>
+            }
+        }
+
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (WLS != null) {</span>
+            try {
+<span class="nc" id="L184">                tm = WLS.getTransactionManager();</span>
+<span class="nc" id="L185">            } catch (Throwable t) {</span>
+<span class="nc" id="L186">                errors.add(t);</span>
+<span class="nc" id="L187">            }</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">            if (tm != null) {</span>
+<span class="nc" id="L189">                _runtime = WLS;</span>
+<span class="nc" id="L190">                return tm;</span>
+            }
+        }
+
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (WAS != null) {</span>
+            try {
+<span class="nc" id="L196">                WAS.setConfiguration(_conf);</span>
+<span class="nc" id="L197">                WAS.startConfiguration();</span>
+<span class="nc" id="L198">                WAS.endConfiguration();</span>
+<span class="nc" id="L199">                tm = WAS.getTransactionManager();</span>
+<span class="nc" id="L200">            } catch (Throwable t) {</span>
+<span class="nc" id="L201">                errors.add(t);</span>
+<span class="nc" id="L202">            }</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">            if (tm != null) {</span>
+<span class="nc" id="L204">                _runtime = WAS;</span>
+<span class="nc" id="L205">                return tm;</span>
+            }
+        }
+
+        // try to find a jndi runtime
+<span class="nc" id="L210">        JNDIManagedRuntime jmr = new JNDIManagedRuntime();</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        for (int i = 0; i &lt; JNDI_LOCS.length; i++) {</span>
+<span class="nc" id="L212">            jmr.setTransactionManagerName(JNDI_LOCS[i]);</span>
+            try {
+<span class="nc" id="L214">                tm = jmr.getTransactionManager();</span>
+<span class="nc" id="L215">            } catch (Throwable t) {</span>
+<span class="nc" id="L216">                errors.add(t);</span>
+<span class="nc" id="L217">            }</span>
+<span class="nc bnc" id="L218" title="All 2 branches missed.">            if (tm != null) {</span>
+<span class="nc" id="L219">                _runtime = jmr;</span>
+<span class="nc" id="L220">                return tm;</span>
+            }
+        }
+
+        // look for a method runtime
+<span class="nc" id="L225">        InvocationManagedRuntime imr = new InvocationManagedRuntime();</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        for (int i = 0; i &lt; METHODS.length; i++) {</span>
+<span class="nc" id="L227">            imr.setConfiguration(_conf);</span>
+<span class="nc" id="L228">            imr.setTransactionManagerMethod(METHODS[i]);</span>
+            try {
+<span class="nc" id="L230">                tm = imr.getTransactionManager();</span>
+<span class="nc" id="L231">            } catch (Throwable t) {</span>
+<span class="nc" id="L232">                errors.add(t);</span>
+<span class="nc" id="L233">            }</span>
+<span class="nc bnc" id="L234" title="All 2 branches missed.">            if (tm != null) {</span>
+<span class="nc" id="L235">                _runtime = imr;</span>
+<span class="nc" id="L236">                return tm;</span>
+            }
+        }
+
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (SUNONE != null) {</span>
+            try {
+<span class="nc" id="L242">                tm = SUNONE.getTransactionManager();</span>
+<span class="nc" id="L243">            } catch (Throwable t) {</span>
+<span class="nc" id="L244">                errors.add(t);</span>
+<span class="nc" id="L245">            }</span>
+<span class="nc bnc" id="L246" title="All 2 branches missed.">            if (tm != null) {</span>
+<span class="nc" id="L247">                _runtime = SUNONE;</span>
+<span class="nc" id="L248">                return tm;</span>
+            }
+        }
+
+<span class="nc" id="L252">        Throwable[] t = (Throwable []) errors.toArray(</span>
+<span class="nc" id="L253">            new Throwable [errors.size()]);</span>
+<span class="nc" id="L254">        throw new InvalidStateException(_loc.get(&quot;tm-not-found&quot;)).</span>
+<span class="nc" id="L255">            setFatal(true).setNestedThrowables(t);</span>
+    }
+
+    @Override
+    public void setConfiguration(Configuration conf) {
+<span class="nc" id="L260">        _conf = conf;</span>
+<span class="nc" id="L261">    }</span>
+
+    @Override
+    public void startConfiguration() {
+<span class="nc" id="L265">    }</span>
+
+    @Override
+    public void endConfiguration() {
+<span class="nc" id="L269">    }</span>
+
+    @Override
+    public void setRollbackOnly(Throwable cause)
+        throws Exception {
+        // check to see if the runtime is cached
+<span class="nc bnc" id="L275" title="All 2 branches missed.">        if (_runtime == null)</span>
+<span class="nc" id="L276">            getTransactionManager();</span>
+
+<span class="nc bnc" id="L278" title="All 2 branches missed.">        if (_runtime != null)</span>
+<span class="nc" id="L279">            _runtime.setRollbackOnly(cause);</span>
+<span class="nc" id="L280">    }</span>
+
+    @Override
+    public Throwable getRollbackCause()
+        throws Exception {
+        // check to see if the runtime is cached
+<span class="nc bnc" id="L286" title="All 2 branches missed.">        if (_runtime == null)</span>
+<span class="nc" id="L287">            getTransactionManager();</span>
+
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if (_runtime != null)</span>
+<span class="nc" id="L290">            return _runtime.getRollbackCause();</span>
+
+<span class="nc" id="L292">        return null;</span>
+    }
+
+    @Override
+    public Object getTransactionKey() throws Exception, SystemException {
+<span class="nc bnc" id="L297" title="All 2 branches missed.">        if(_runtime == null)</span>
+<span class="nc" id="L298">            getTransactionManager();</span>
+
+<span class="nc bnc" id="L300" title="All 2 branches missed.">        if(_runtime != null )</span>
+<span class="nc" id="L301">            return _runtime.getTransactionKey();</span>
+
+<span class="nc" id="L303">        return null;</span>
+    }
+
+    /**
+     * Delegate nonTransactional work to the appropriate managed runtime. If no
+     * managed runtime is found then delegate {@link AbstractManagedRuntime}.
+     */
+    @Override
+    public void doNonTransactionalWork(Runnable runnable)
+            throws NotSupportedException {
+        // Obtain a transaction manager to initialize the runtime.
+        try {
+<span class="nc" id="L315">            getTransactionManager();</span>
+<span class="nc" id="L316">        } catch (Exception e) {</span>
+<span class="nc" id="L317">            NotSupportedException nse =</span>
+                new NotSupportedException(_loc
+<span class="nc" id="L319">                        .get(&quot;tm-unavailable&quot;, _runtime).getMessage());</span>
+<span class="nc" id="L320">            nse.initCause(e);</span>
+<span class="nc" id="L321">            throw nse;</span>
+<span class="nc" id="L322">        }</span>
+<span class="nc" id="L323">        _runtime.doNonTransactionalWork(runnable);</span>
+<span class="nc" id="L324">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

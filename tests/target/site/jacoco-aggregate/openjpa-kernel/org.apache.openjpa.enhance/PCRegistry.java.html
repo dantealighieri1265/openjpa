@@ -1,0 +1,286 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PCRegistry.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.enhance</a> &gt; <span class="el_source">PCRegistry.java</span></div><h1>PCRegistry.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.enhance;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Map;
+
+import org.apache.commons.collections4.map.AbstractReferenceMap.ReferenceStrength;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.concurrent.ConcurrentReferenceHashMap;
+import org.apache.openjpa.lib.util.concurrent.ConcurrentReferenceHashSet;
+import org.apache.openjpa.util.UserException;
+
+/**
+ * Tracks registered persistence-capable classes.
+ *
+ * @since 0.4.0
+ * @author Abe White
+ */
+<span class="nc" id="L37">public class PCRegistry {</span>
+    // DO NOT ADD ADDITIONAL DEPENDENCIES TO THIS CLASS
+
+<span class="fc" id="L40">    private static final Localizer _loc = Localizer.forPackage(PCRegistry.class);</span>
+
+    // map of persistent classes to meta structures; weak so the VM can GC classes
+<span class="fc" id="L43">    private static final Map&lt;Class&lt;?&gt;,Meta&gt; _metas = new ConcurrentReferenceHashMap(ReferenceStrength.WEAK,</span>
+        ReferenceStrength.HARD);
+
+    // register class listeners
+    // Weak reference prevents OutOfMemeoryError as described in OPENJPA-2042
+<span class="fc" id="L48">    private static final Collection&lt;RegisterClassListener&gt; _listeners =</span>
+        new ConcurrentReferenceHashSet&lt;&gt;(
+                ReferenceStrength.WEAK);
+
+    /**
+     * Register a {@link RegisterClassListener}.
+     */
+    public static void addRegisterClassListener(RegisterClassListener rcl) {
+<span class="nc bnc" id="L56" title="All 2 branches missed.">        if (rcl == null)</span>
+<span class="nc" id="L57">            return;</span>
+
+        // we have to be positive that every listener gets notified for
+        // every class, so lots of locking
+<span class="nc" id="L61">        synchronized (_listeners) {</span>
+<span class="nc" id="L62">            _listeners.add(rcl);</span>
+<span class="nc" id="L63">        }</span>
+<span class="nc" id="L64">        synchronized (_metas) {</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            for (Class&lt;?&gt; cls : _metas.keySet())</span>
+<span class="nc" id="L66">                rcl.register(cls);</span>
+<span class="nc" id="L67">        }</span>
+<span class="nc" id="L68">    }</span>
+
+    /**
+     * Removes a {@link RegisterClassListener}.
+     */
+    public static boolean removeRegisterClassListener(RegisterClassListener rcl) {
+<span class="nc" id="L74">        synchronized (_listeners) {</span>
+<span class="nc" id="L75">            return _listeners.remove(rcl);</span>
+        }
+    }
+
+    /**
+     * Get the field names for a &lt;code&gt;PersistenceCapable&lt;/code&gt; class.
+     */
+    public static String[] getFieldNames(Class&lt;?&gt; pcClass) {
+<span class="nc" id="L83">        Meta meta = getMeta(pcClass);</span>
+<span class="nc" id="L84">        return meta.fieldNames;</span>
+    }
+
+    /**
+     * Get the field types for a &lt;code&gt;PersistenceCapable&lt;/code&gt; class.
+     */
+    public static Class&lt;?&gt;[] getFieldTypes(Class&lt;?&gt; pcClass) {
+<span class="nc" id="L91">        Meta meta = getMeta(pcClass);</span>
+<span class="nc" id="L92">        return meta.fieldTypes;</span>
+    }
+
+    /**
+     * Return the persistent superclass for a &lt;code&gt;PersistenceCapable&lt;/code&gt;
+     * class, or null if none. The superclass may or may not implement
+     * {@link PersistenceCapable}, depending on the access type of the class.
+     */
+    public static Class&lt;?&gt; getPersistentSuperclass(Class&lt;?&gt; pcClass) {
+<span class="nc" id="L101">        Meta meta = getMeta(pcClass);</span>
+<span class="nc" id="L102">        return meta.pcSuper;</span>
+    }
+
+    /**
+     * Create a new instance of the class and assign its state manager.
+     * The new instance has its flags set to &lt;code&gt;LOAD_REQUIRED&lt;/code&gt;.
+     */
+    public static PersistenceCapable newInstance(Class&lt;?&gt; pcClass, StateManager sm, boolean clear) {
+<span class="nc" id="L110">        Meta meta = getMeta(pcClass);</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        return (meta.pc == null) ? null : meta.pc.pcNewInstance(sm, clear);</span>
+    }
+
+    /**
+     * Create a new instance of the class and assign its state manager and oid.
+     * The new instance has its flags set to &lt;code&gt;LOAD_REQUIRED&lt;/code&gt;.
+     */
+    public static PersistenceCapable newInstance(Class&lt;?&gt; pcClass, StateManager sm, Object oid, boolean clear) {
+<span class="nc" id="L119">        Meta meta = getMeta(pcClass);</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        return (meta.pc == null) ? null : meta.pc.pcNewInstance(sm, oid, clear);</span>
+    }
+
+    /**
+     * Return the persistence-capable type for &lt;code&gt;type&lt;/code&gt;. This might
+     * be a generated subclass of &lt;code&gt;type&lt;/code&gt;.
+     *
+     * @since 1.1.0
+     */
+    public static Class&lt;?&gt; getPCType(Class&lt;?&gt; type) {
+<span class="nc" id="L130">        Meta meta = getMeta(type);</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">        return (meta.pc == null) ? null : meta.pc.getClass();</span>
+    }
+
+    /**
+     * Create a new identity object for the given
+     * &lt;code&gt;PersistenceCapable&lt;/code&gt; class.
+     */
+    public static Object newObjectId(Class&lt;?&gt; pcClass) {
+<span class="nc" id="L139">        Meta meta = getMeta(pcClass);</span>
+<span class="nc bnc" id="L140" title="All 2 branches missed.">        return (meta.pc == null) ? null : meta.pc.pcNewObjectIdInstance();</span>
+    }
+
+    /**
+     * Create a new identity object for the given
+     * &lt;code&gt;PersistenceCapable&lt;/code&gt; class, using the &lt;code&gt;String&lt;/code&gt;
+     * form of the constructor.
+     */
+    public static Object newObjectId(Class&lt;?&gt; pcClass, String str) {
+<span class="nc" id="L149">        Meta meta = getMeta(pcClass);</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        return (meta.pc == null) ? null : meta.pc.pcNewObjectIdInstance(str);</span>
+    }
+
+    /**
+     * Return the alias for the given type.
+     */
+    public static String getTypeAlias(Class&lt;?&gt; pcClass) {
+<span class="nc" id="L157">        return getMeta(pcClass).alias;</span>
+    }
+
+    /**
+     * Copy fields from an outside source to the key fields in the identity
+     * object.
+     */
+    public static void copyKeyFieldsToObjectId(Class&lt;?&gt; pcClass, FieldSupplier fm, Object oid) {
+<span class="nc" id="L165">        Meta meta = getMeta(pcClass);</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if (meta.pc == null)</span>
+<span class="nc" id="L167">            throw new UserException(_loc.get(&quot;copy-no-id&quot;, pcClass));</span>
+
+<span class="nc" id="L169">        meta.pc.pcCopyKeyFieldsToObjectId(fm, oid);</span>
+<span class="nc" id="L170">    }</span>
+
+    /**
+     * Copy fields to an outside source from the key fields in the identity
+     * object.
+     */
+    public static void copyKeyFieldsFromObjectId(Class&lt;?&gt; pcClass, FieldConsumer fm, Object oid) {
+<span class="nc" id="L177">        Meta meta = getMeta(pcClass);</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        if (meta.pc == null)</span>
+<span class="nc" id="L179">            throw new UserException(_loc.get(&quot;copy-no-id&quot;, pcClass));</span>
+
+<span class="nc" id="L181">        meta.pc.pcCopyKeyFieldsFromObjectId(fm, oid);</span>
+<span class="nc" id="L182">    }</span>
+
+    /**
+     * Register metadata by class.
+     *
+     * @param fieldTypes managed field types
+     * @param fieldFlags managed field flags
+     * @param sup the most immediate persistent superclass
+     * @param pcClass the &lt;code&gt;PersistenceCapable&lt;/code&gt; class
+     * @param fieldNames managed field names
+     * @param alias the class alias
+     * @param pc an instance of the class, if not abstract
+     */
+    public static void register(Class&lt;?&gt; pcClass, String[] fieldNames, Class&lt;?&gt;[] fieldTypes, byte[] fieldFlags,
+        Class&lt;?&gt; sup, String alias, PersistenceCapable pc) {
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        if (pcClass == null)</span>
+<span class="nc" id="L198">            throw new NullPointerException();</span>
+
+        // we have to be positive that every listener gets notified for
+        // every class, so lots of locking
+<span class="nc" id="L202">        Meta meta = new Meta(pc, fieldNames, fieldTypes, sup, alias);</span>
+<span class="nc" id="L203">        synchronized (_metas) {</span>
+<span class="nc" id="L204">            _metas.put(pcClass, meta);</span>
+<span class="nc" id="L205">        }</span>
+<span class="nc" id="L206">        synchronized (_listeners) {</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">            for (RegisterClassListener r : _listeners){</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">                if (r != null) {</span>
+<span class="nc" id="L209">                    r.register(pcClass);</span>
+                }
+<span class="nc" id="L211">            }</span>
+<span class="nc" id="L212">        }</span>
+<span class="nc" id="L213">    }</span>
+
+    /**
+     * De-Register all metadata associated with the given ClassLoader.
+     * Allows ClassLoaders to be garbage collected.
+     *
+     * @param cl the ClassLoader
+     */
+    public static void deRegister(ClassLoader cl) {
+<span class="nc" id="L222">        synchronized (_metas) {</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">            for (Class&lt;?&gt; pcClass : _metas.keySet()) {</span>
+<span class="nc bnc" id="L224" title="All 2 branches missed.">                if (pcClass.getClassLoader() == cl) {</span>
+<span class="nc" id="L225">                    _metas.remove(pcClass);</span>
+                }
+<span class="nc" id="L227">            }</span>
+<span class="nc" id="L228">        }</span>
+<span class="nc" id="L229">    }</span>
+
+    /**
+     * Returns a collection of class objects of the registered
+     * persistence-capable classes.
+     */
+    public static Collection&lt;Class&lt;?&gt;&gt; getRegisteredTypes() {
+<span class="nc" id="L236">        return Collections.unmodifiableCollection(_metas.keySet());</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if the given class is already registered.
+     */
+    public static boolean isRegistered(Class&lt;?&gt; cls) {
+<span class="fc" id="L243">        return _metas.containsKey(cls);</span>
+    }
+
+    /**
+     * Look up the metadata for a &lt;code&gt;PersistenceCapable&lt;/code&gt; class.
+     */
+    private static Meta getMeta(Class&lt;?&gt; pcClass) {
+<span class="nc" id="L250">        Meta ret = (Meta) _metas.get(pcClass);</span>
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        if (ret == null)</span>
+<span class="nc" id="L252">            throw new IllegalStateException(_loc.get(&quot;no-meta&quot;, pcClass).</span>
+<span class="nc" id="L253">                getMessage());</span>
+<span class="nc" id="L254">        return ret;</span>
+    }
+
+    /**
+     * Listener for persistent class registration events.
+     */
+    public interface RegisterClassListener {
+
+        void register(Class&lt;?&gt; cls);
+    }
+
+    /**
+     * This is a helper class to manage metadata per persistence-capable class.
+     */
+    private static class Meta {
+
+        public final PersistenceCapable pc;
+        public final String[] fieldNames;
+        public final Class&lt;?&gt;[] fieldTypes;
+        public final Class&lt;?&gt; pcSuper;
+        public final String alias;
+
+        public Meta(PersistenceCapable pc, String[] fieldNames,
+<span class="nc" id="L277">            Class&lt;?&gt;[] fieldTypes, Class&lt;?&gt; pcSuper, String alias) {</span>
+<span class="nc" id="L278">            this.pc = pc;</span>
+<span class="nc" id="L279">            this.fieldNames = fieldNames;</span>
+<span class="nc" id="L280">            this.fieldTypes = fieldTypes;</span>
+<span class="nc" id="L281">            this.pcSuper = pcSuper;</span>
+<span class="nc" id="L282">			this.alias = alias;</span>
+<span class="nc" id="L283">		}</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

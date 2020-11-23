@@ -1,0 +1,1755 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProxyManagerImpl.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.util</a> &gt; <span class="el_source">ProxyManagerImpl.java</span></div><h1>ProxyManagerImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.util;
+
+import java.io.File;
+import java.io.IOException;
+import java.io.ObjectStreamException;
+import java.lang.reflect.Array;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.security.AccessController;
+import java.security.PrivilegedAction;
+import java.security.PrivilegedActionException;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Date;
+import java.util.GregorianCalendar;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Queue;
+import java.util.Set;
+import java.util.SortedMap;
+import java.util.SortedSet;
+import java.util.TimeZone;
+import java.util.TreeMap;
+import java.util.TreeSet;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.apache.openjpa.enhance.AsmAdaptor;
+import org.apache.openjpa.kernel.OpenJPAStateManager;
+import org.apache.openjpa.lib.util.ClassUtil;
+import org.apache.openjpa.lib.util.Files;
+import org.apache.openjpa.lib.util.J2DoPrivHelper;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.Options;
+import org.apache.openjpa.lib.util.StringUtil;
+
+import serp.bytecode.BCClass;
+import serp.bytecode.BCField;
+import serp.bytecode.BCMethod;
+import serp.bytecode.Code;
+import serp.bytecode.JumpInstruction;
+import serp.bytecode.Project;
+
+/**
+ * Default implementation of the {@link ProxyManager} interface.
+ *
+ * @author Abe White
+ */
+public class ProxyManagerImpl
+    implements ProxyManager {
+
+    private static final String PROXY_SUFFIX = &quot;$proxy&quot;;
+
+<span class="fc" id="L79">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="fc" id="L80">        (ProxyManagerImpl.class);</span>
+
+<span class="fc" id="L82">    private static long _proxyId = 0L;</span>
+<span class="fc" id="L83">    private static final Map _stdCollections = new HashMap();</span>
+<span class="fc" id="L84">    private static final Map _stdMaps = new HashMap();</span>
+    static {
+<span class="fc" id="L86">        _stdCollections.put(Collection.class, ArrayList.class);</span>
+<span class="fc" id="L87">        _stdCollections.put(Set.class, HashSet.class);</span>
+<span class="fc" id="L88">        _stdCollections.put(SortedSet.class, TreeSet.class);</span>
+<span class="fc" id="L89">        _stdCollections.put(List.class, ArrayList.class);</span>
+<span class="fc" id="L90">        _stdCollections.put(Queue.class, LinkedList.class);</span>
+<span class="fc" id="L91">        _stdMaps.put(Map.class, HashMap.class);</span>
+<span class="fc" id="L92">        _stdMaps.put(SortedMap.class, TreeMap.class);</span>
+<span class="fc" id="L93">    }</span>
+
+<span class="fc" id="L95">    private final Set&lt;String&gt; _unproxyable = new HashSet&lt;&gt;();</span>
+<span class="fc" id="L96">    private final Map&lt;Class&lt;?&gt;, Proxy&gt; _proxies = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="fc" id="L97">    private boolean _trackChanges = true;</span>
+<span class="fc" id="L98">    private boolean _assertType = false;</span>
+<span class="fc" id="L99">    private boolean _delayedCollectionLoading = false;</span>
+
+<span class="fc" id="L101">    public ProxyManagerImpl() {</span>
+<span class="fc" id="L102">        _unproxyable.add(TimeZone.class.getName());</span>
+<span class="fc" id="L103">    }</span>
+
+    /**
+     * Whether proxies produced by this factory will use {@link ChangeTracker}s
+     * to try to cut down on data store operations at the cost of some extra
+     * bookkeeping overhead. Defaults to true.
+     */
+    public boolean getTrackChanges() {
+<span class="nc" id="L111">        return _trackChanges;</span>
+    }
+
+    /**
+     * Whether proxies produced by this factory will use {@link ChangeTracker}s
+     * to try to cut down on data store operations at the cost of some extra
+     * bookkeeping overhead. Defaults to true.
+     */
+    public void setTrackChanges(boolean track) {
+<span class="nc" id="L120">        _trackChanges = track;</span>
+<span class="nc" id="L121">    }</span>
+
+    /**
+     * Whether to perform runtime checks to ensure that all elements
+     * added to collection and map proxies are the proper element/key/value
+     * type as defined by the metadata. Defaults to false.
+     */
+    public boolean getAssertAllowedType() {
+<span class="nc" id="L129">        return _assertType;</span>
+    }
+
+    /**
+     * Whether to perform runtime checks to ensure that all elements
+     * added to collection and map proxies are the proper element/key/value
+     * type as defined by the metadata. Defaults to false.
+     */
+    public void setAssertAllowedType(boolean assertType) {
+<span class="nc" id="L138">        _assertType = assertType;</span>
+<span class="nc" id="L139">    }</span>
+
+    /**
+     * Whether loading of collections should be delayed until an operation
+     * is performed that requires them to be loaded.  This property only
+     * applies to proxies that implement java.util.Collection (ie. not arrays
+     * or maps).  Defaults to false.
+     */
+    @Override
+    public boolean getDelayCollectionLoading() {
+<span class="nc" id="L149">        return _delayedCollectionLoading;</span>
+    }
+
+    /**
+     * Whether loading of collections should be delayed until an operation
+     * is performed that requires them to be loaded.  Defaults to false.
+     */
+    public void setDelayCollectionLoading(boolean delay) {
+<span class="nc" id="L157">        _delayedCollectionLoading = delay;</span>
+<span class="nc" id="L158">    }</span>
+
+    /**
+     * Return a mutable view of class names we know cannot be proxied
+     * correctly by this manager.
+     */
+    public Collection getUnproxyable() {
+<span class="nc" id="L165">        return _unproxyable;</span>
+    }
+
+    /**
+     * Provided for auto-configuration.  Add the given semicolon-separated
+     * class names to the set of class names we know cannot be proxied correctly
+     * by this manager.
+     */
+    public void setUnproxyable(String clsNames) {
+<span class="pc bpc" id="L174" title="1 of 2 branches missed.">        if (clsNames != null)</span>
+<span class="fc" id="L175">            _unproxyable.addAll(Arrays.asList(StringUtil.split(clsNames, &quot;;&quot;, 0)));</span>
+<span class="fc" id="L176">    }</span>
+
+    @Override
+    public Object copyArray(Object orig) {
+<span class="fc bfc" id="L180" title="All 2 branches covered.">        if (orig == null)</span>
+<span class="fc" id="L181">            return null;</span>
+
+        try {
+<span class="fc" id="L184">            int length = Array.getLength(orig);</span>
+<span class="fc" id="L185">            Object array = Array.newInstance(orig.getClass().</span>
+<span class="fc" id="L186">                getComponentType(), length);</span>
+
+<span class="fc" id="L188">            System.arraycopy(orig, 0, array, 0, length);</span>
+<span class="fc" id="L189">            return array;</span>
+<span class="fc" id="L190">        } catch (Exception e) {</span>
+<span class="fc" id="L191">            throw new UnsupportedException(_loc.get(&quot;bad-array&quot;,</span>
+<span class="fc" id="L192">                e.getMessage()), e);</span>
+        }
+    }
+
+    @Override
+    public Collection copyCollection(Collection orig) {
+<span class="pc bpc" id="L198" title="1 of 2 branches missed.">        if (orig == null)</span>
+<span class="nc" id="L199">            return null;</span>
+<span class="pc bpc" id="L200" title="1 of 2 branches missed.">        if (orig instanceof Proxy)</span>
+<span class="nc" id="L201">            return (Collection) ((Proxy) orig).copy(orig);</span>
+
+<span class="fc" id="L203">        ProxyCollection proxy = getFactoryProxyCollection(orig.getClass());</span>
+<span class="fc" id="L204">        return (Collection) proxy.copy(orig);</span>
+    }
+
+    @Override
+    public Proxy newCollectionProxy(Class type, Class elementType,
+        Comparator compare, boolean autoOff) {
+<span class="fc" id="L210">        type = toProxyableCollectionType(type);</span>
+<span class="fc" id="L211">        ProxyCollection proxy = getFactoryProxyCollection(type);</span>
+<span class="pc bpc" id="L212" title="1 of 2 branches missed.">        return proxy.newInstance((_assertType) ? elementType : null, compare,</span>
+            _trackChanges, autoOff);
+    }
+
+    @Override
+    public Map copyMap(Map orig) {
+<span class="pc bpc" id="L218" title="1 of 2 branches missed.">        if (orig == null)</span>
+<span class="nc" id="L219">            return null;</span>
+<span class="pc bpc" id="L220" title="1 of 2 branches missed.">        if (orig instanceof Proxy)</span>
+<span class="nc" id="L221">            return (Map) ((Proxy) orig).copy(orig);</span>
+
+<span class="fc" id="L223">        ProxyMap proxy = getFactoryProxyMap(orig.getClass());</span>
+<span class="fc" id="L224">        return (Map) proxy.copy(orig);</span>
+    }
+
+    @Override
+    public Proxy newMapProxy(Class type, Class keyType,
+        Class elementType, Comparator compare,boolean autoOff) {
+<span class="fc" id="L230">        type = toProxyableMapType(type);</span>
+<span class="fc" id="L231">        ProxyMap proxy = getFactoryProxyMap(type);</span>
+<span class="pc bpc" id="L232" title="1 of 2 branches missed.">        return proxy.newInstance((_assertType) ? keyType : null,</span>
+<span class="pc bpc" id="L233" title="1 of 2 branches missed.">            (_assertType) ? elementType : null, compare, _trackChanges, autoOff);</span>
+    }
+
+    @Override
+    public Date copyDate(Date orig) {
+<span class="pc bpc" id="L238" title="1 of 2 branches missed.">        if (orig == null)</span>
+<span class="nc" id="L239">            return null;</span>
+<span class="pc bpc" id="L240" title="1 of 2 branches missed.">        if (orig instanceof Proxy)</span>
+<span class="nc" id="L241">            return (Date) ((Proxy) orig).copy(orig);</span>
+
+<span class="fc" id="L243">        ProxyDate proxy = getFactoryProxyDate(orig.getClass());</span>
+<span class="fc" id="L244">        return (Date) proxy.copy(orig);</span>
+    }
+
+    @Override
+    public Proxy newDateProxy(Class type) {
+<span class="fc" id="L249">        ProxyDate proxy = getFactoryProxyDate(type);</span>
+<span class="fc" id="L250">        return proxy.newInstance();</span>
+    }
+
+    @Override
+    public Calendar copyCalendar(Calendar orig) {
+<span class="pc bpc" id="L255" title="1 of 2 branches missed.">        if (orig == null)</span>
+<span class="nc" id="L256">            return null;</span>
+<span class="pc bpc" id="L257" title="1 of 2 branches missed.">        if (orig instanceof Proxy)</span>
+<span class="nc" id="L258">            return (Calendar) ((Proxy) orig).copy(orig);</span>
+
+<span class="fc" id="L260">        ProxyCalendar proxy = getFactoryProxyCalendar(orig.getClass());</span>
+<span class="fc" id="L261">        return (Calendar) proxy.copy(orig);</span>
+    }
+
+    @Override
+    public Proxy newCalendarProxy(Class type, TimeZone zone) {
+<span class="pc bpc" id="L266" title="1 of 2 branches missed.">        if (type == Calendar.class)</span>
+<span class="nc" id="L267">            type = GregorianCalendar.class;</span>
+<span class="fc" id="L268">        ProxyCalendar proxy = getFactoryProxyCalendar(type);</span>
+<span class="fc" id="L269">        ProxyCalendar cal = proxy.newInstance();</span>
+<span class="pc bpc" id="L270" title="1 of 2 branches missed.">        if (zone != null)</span>
+<span class="fc" id="L271">            ((Calendar) cal).setTimeZone(zone);</span>
+<span class="fc" id="L272">        return cal;</span>
+    }
+
+    @Override
+    public Object copyCustom(Object orig) {
+<span class="fc bfc" id="L277" title="All 2 branches covered.">        if (orig == null)</span>
+<span class="fc" id="L278">            return null;</span>
+<span class="fc bfc" id="L279" title="All 2 branches covered.">        if (orig instanceof Proxy)</span>
+<span class="fc" id="L280">            return ((Proxy) orig).copy(orig);</span>
+<span class="pc bpc" id="L281" title="1 of 2 branches missed.">        if (ImplHelper.isManageable(orig))</span>
+<span class="nc" id="L282">            return null;</span>
+<span class="fc bfc" id="L283" title="All 2 branches covered.">        if (orig instanceof Collection)</span>
+<span class="fc" id="L284">            return copyCollection((Collection) orig);</span>
+<span class="fc bfc" id="L285" title="All 2 branches covered.">        if (orig instanceof Map)</span>
+<span class="fc" id="L286">            return copyMap((Map) orig);</span>
+<span class="fc bfc" id="L287" title="All 2 branches covered.">        if (orig instanceof Date)</span>
+<span class="fc" id="L288">            return copyDate((Date) orig);</span>
+<span class="fc bfc" id="L289" title="All 2 branches covered.">        if (orig instanceof Calendar)</span>
+<span class="fc" id="L290">            return copyCalendar((Calendar) orig);</span>
+<span class="fc" id="L291">        ProxyBean proxy = getFactoryProxyBean(orig);</span>
+<span class="fc bfc" id="L292" title="All 2 branches covered.">        return (proxy == null) ? null : proxy.copy(orig);</span>
+    }
+
+    @Override
+    public Proxy newCustomProxy(Object orig, boolean autoOff) {
+<span class="fc bfc" id="L297" title="All 2 branches covered.">        if (orig == null)</span>
+<span class="fc" id="L298">            return null;</span>
+<span class="fc bfc" id="L299" title="All 2 branches covered.">        if (orig instanceof Proxy)</span>
+<span class="fc" id="L300">            return (Proxy) orig;</span>
+<span class="pc bpc" id="L301" title="1 of 2 branches missed.">        if (ImplHelper.isManageable(orig))</span>
+<span class="nc" id="L302">            return null;</span>
+<span class="fc bfc" id="L303" title="All 2 branches covered.">        if (!isProxyable(orig.getClass()))</span>
+<span class="fc" id="L304">            return null;</span>
+
+<span class="fc bfc" id="L306" title="All 2 branches covered.">        if (orig instanceof Collection) {</span>
+<span class="fc bfc" id="L307" title="All 2 branches covered.">            Comparator comp = (orig instanceof SortedSet)</span>
+<span class="fc" id="L308">                ? ((SortedSet) orig).comparator() : null;</span>
+<span class="fc" id="L309">            Collection c = (Collection) newCollectionProxy(orig.getClass(),</span>
+                null, comp, autoOff);
+<span class="fc" id="L311">            c.addAll((Collection) orig);</span>
+<span class="fc" id="L312">            return (Proxy) c;</span>
+        }
+<span class="fc bfc" id="L314" title="All 2 branches covered.">        if (orig instanceof Map) {</span>
+<span class="fc bfc" id="L315" title="All 2 branches covered.">            Comparator comp = (orig instanceof SortedMap)</span>
+<span class="fc" id="L316">                ? ((SortedMap) orig).comparator() : null;</span>
+<span class="fc" id="L317">            Map m = (Map) newMapProxy(orig.getClass(), null, null, comp, autoOff);</span>
+<span class="fc" id="L318">            m.putAll((Map) orig);</span>
+<span class="fc" id="L319">            return (Proxy) m;</span>
+        }
+<span class="fc bfc" id="L321" title="All 2 branches covered.">        if (orig instanceof Date) {</span>
+<span class="fc" id="L322">            Date d = (Date) newDateProxy(orig.getClass());</span>
+<span class="fc" id="L323">            d.setTime(((Date) orig).getTime());</span>
+<span class="fc bfc" id="L324" title="All 2 branches covered.">            if (orig instanceof Timestamp)</span>
+<span class="fc" id="L325">                ((Timestamp) d).setNanos(((Timestamp) orig).getNanos());</span>
+<span class="fc" id="L326">            return (Proxy) d;</span>
+        }
+<span class="fc bfc" id="L328" title="All 2 branches covered.">        if (orig instanceof Calendar) {</span>
+<span class="fc" id="L329">            Calendar c = (Calendar) newCalendarProxy(orig.getClass(),</span>
+<span class="fc" id="L330">                ((Calendar) orig).getTimeZone());</span>
+<span class="fc" id="L331">            c.setTimeInMillis(((Calendar) orig).getTimeInMillis());</span>
+<span class="fc" id="L332">            return (Proxy) c;</span>
+        }
+
+<span class="fc" id="L335">        ProxyBean proxy = getFactoryProxyBean(orig);</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">        return (proxy == null) ? null : proxy.newInstance(orig);</span>
+    }
+
+    /**
+     * Return the concrete type for proxying.
+     */
+    protected Class toProxyableCollectionType(Class type) {
+<span class="pc bpc" id="L343" title="1 of 2 branches missed.">        if (type.getName().endsWith(PROXY_SUFFIX))</span>
+<span class="nc" id="L344">            type = type.getSuperclass();</span>
+<span class="pc bpc" id="L345" title="1 of 2 branches missed.">        else if (type.isInterface()) {</span>
+<span class="nc" id="L346">            type = toConcreteType(type, _stdCollections);</span>
+<span class="nc bnc" id="L347" title="All 2 branches missed.">            if (type == null)</span>
+<span class="nc" id="L348">                throw new UnsupportedException(_loc.get(&quot;no-proxy-intf&quot;, type));</span>
+<span class="pc bpc" id="L349" title="1 of 2 branches missed.">        } else if (Modifier.isAbstract(type.getModifiers()))</span>
+<span class="nc" id="L350">            throw new UnsupportedException(_loc.get(&quot;no-proxy-abstract&quot;, type));</span>
+<span class="fc" id="L351">        return type;</span>
+    }
+
+    /**
+     * Return the concrete type for proxying.
+     */
+    protected Class toProxyableMapType(Class type) {
+<span class="pc bpc" id="L358" title="1 of 2 branches missed.">        if (type.getName().endsWith(PROXY_SUFFIX))</span>
+<span class="nc" id="L359">            type = type.getSuperclass();</span>
+<span class="pc bpc" id="L360" title="1 of 2 branches missed.">        else if (type.isInterface()) {</span>
+<span class="nc" id="L361">            type = toConcreteType(type, _stdMaps);</span>
+<span class="nc bnc" id="L362" title="All 2 branches missed.">            if (type == null)</span>
+<span class="nc" id="L363">                throw new UnsupportedException(_loc.get(&quot;no-proxy-intf&quot;, type));</span>
+<span class="pc bpc" id="L364" title="1 of 2 branches missed.">        } else if (Modifier.isAbstract(type.getModifiers()))</span>
+<span class="nc" id="L365">            throw new UnsupportedException(_loc.get(&quot;no-proxy-abstract&quot;, type));</span>
+<span class="fc" id="L366">        return type;</span>
+    }
+
+    /**
+     * Locate a concrete type to proxy for the given collection interface.
+     */
+    private static Class toConcreteType(Class intf, Map concretes) {
+<span class="nc" id="L373">        Class concrete = (Class) concretes.get(intf);</span>
+<span class="nc bnc" id="L374" title="All 2 branches missed.">        if (concrete != null)</span>
+<span class="nc" id="L375">            return concrete;</span>
+<span class="nc" id="L376">        Class[] intfs = intf.getInterfaces();</span>
+<span class="nc bnc" id="L377" title="All 2 branches missed.">        for (int i = 0; i &lt; intfs.length; i++) {</span>
+<span class="nc" id="L378">            concrete = toConcreteType(intfs[i], concretes);</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">            if (concrete != null)</span>
+<span class="nc" id="L380">                return concrete;</span>
+        }
+<span class="nc" id="L382">        return null;</span>
+    }
+
+    /**
+     * Return the cached factory proxy for the given collection type.
+     */
+    private ProxyCollection getFactoryProxyCollection(Class type) {
+        // we don't lock here; ok if two proxies get generated for same type
+<span class="fc" id="L390">        ProxyCollection proxy = (ProxyCollection) _proxies.get(type);</span>
+<span class="pc bpc" id="L391" title="1 of 2 branches missed.">        if (proxy == null) {</span>
+<span class="fc" id="L392">            ClassLoader l = GeneratedClasses.getMostDerivedLoader(type,</span>
+                ProxyCollection.class);
+<span class="fc" id="L394">            Class pcls = loadBuildTimeProxy(type, l);</span>
+<span class="pc bpc" id="L395" title="1 of 2 branches missed.">            if (pcls == null)</span>
+<span class="fc" id="L396">                pcls = GeneratedClasses.loadBCClass(</span>
+<span class="fc" id="L397">                    generateProxyCollectionBytecode(type, true), l);</span>
+<span class="fc" id="L398">            proxy = (ProxyCollection) instantiateProxy(pcls, null, null);</span>
+<span class="fc" id="L399">            _proxies.put(type, proxy);</span>
+        }
+<span class="fc" id="L401">        return proxy;</span>
+    }
+
+    /**
+     * Return the cached factory proxy for the given map type.
+     */
+    private ProxyMap getFactoryProxyMap(Class type) {
+        // we don't lock here; ok if two proxies get generated for same type
+<span class="fc" id="L409">        ProxyMap proxy = (ProxyMap) _proxies.get(type);</span>
+<span class="pc bpc" id="L410" title="1 of 2 branches missed.">        if (proxy == null) {</span>
+<span class="fc" id="L411">            ClassLoader l = GeneratedClasses.getMostDerivedLoader(type,</span>
+                ProxyMap.class);
+<span class="fc" id="L413">            Class pcls = loadBuildTimeProxy(type, l);</span>
+<span class="pc bpc" id="L414" title="1 of 2 branches missed.">            if (pcls == null)</span>
+<span class="fc" id="L415">                pcls = GeneratedClasses.loadBCClass(</span>
+<span class="fc" id="L416">                    generateProxyMapBytecode(type, true), l);</span>
+<span class="fc" id="L417">            proxy = (ProxyMap) instantiateProxy(pcls, null, null);</span>
+<span class="fc" id="L418">            _proxies.put(type, proxy);</span>
+        }
+<span class="fc" id="L420">        return proxy;</span>
+    }
+
+    /**
+     * Return the cached factory proxy for the given date type.
+     */
+    private ProxyDate getFactoryProxyDate(Class type) {
+        // we don't lock here; ok if two proxies get generated for same type
+<span class="fc" id="L428">        ProxyDate proxy = (ProxyDate) _proxies.get(type);</span>
+<span class="pc bpc" id="L429" title="1 of 2 branches missed.">        if (proxy == null) {</span>
+<span class="fc" id="L430">            ClassLoader l = GeneratedClasses.getMostDerivedLoader(type,</span>
+                ProxyDate.class);
+<span class="fc" id="L432">            Class pcls = loadBuildTimeProxy(type, l);</span>
+<span class="pc bpc" id="L433" title="1 of 2 branches missed.">            if (pcls == null)</span>
+<span class="fc" id="L434">                pcls = GeneratedClasses.loadBCClass(</span>
+<span class="fc" id="L435">                    generateProxyDateBytecode(type, true), l);</span>
+<span class="fc" id="L436">            proxy = (ProxyDate) instantiateProxy(pcls, null, null);</span>
+<span class="fc" id="L437">            _proxies.put(type, proxy);</span>
+        }
+<span class="fc" id="L439">        return proxy;</span>
+    }
+
+    /**
+     * Return the cached factory proxy for the given calendar type.
+     */
+    private ProxyCalendar getFactoryProxyCalendar(Class type) {
+        // we don't lock here; ok if two proxies get generated for same type
+<span class="fc" id="L447">        ProxyCalendar proxy = (ProxyCalendar) _proxies.get(type);</span>
+<span class="pc bpc" id="L448" title="1 of 2 branches missed.">        if (proxy == null) {</span>
+<span class="fc" id="L449">            ClassLoader l = GeneratedClasses.getMostDerivedLoader(type,</span>
+                ProxyCalendar.class);
+<span class="fc" id="L451">            Class pcls = loadBuildTimeProxy(type, l);</span>
+<span class="pc bpc" id="L452" title="1 of 2 branches missed.">            if (pcls == null)</span>
+<span class="fc" id="L453">                pcls = GeneratedClasses.loadBCClass(</span>
+<span class="fc" id="L454">                    generateProxyCalendarBytecode(type, true), l);</span>
+<span class="fc" id="L455">            proxy = (ProxyCalendar) instantiateProxy(pcls, null, null);</span>
+<span class="fc" id="L456">            _proxies.put(type, proxy);</span>
+        }
+<span class="fc" id="L458">        return proxy;</span>
+    }
+
+    /**
+     * Return the cached factory proxy for the given bean type.
+     */
+    private ProxyBean getFactoryProxyBean(Object orig) {
+<span class="fc" id="L465">        final Class&lt;?&gt; type = orig.getClass();</span>
+<span class="fc bfc" id="L466" title="All 2 branches covered.">        if (isUnproxyable(type))</span>
+<span class="fc" id="L467">            return null;</span>
+
+        // we don't lock here; ok if two proxies get generated for same type
+<span class="fc" id="L470">        ProxyBean proxy = (ProxyBean) _proxies.get(type);</span>
+<span class="pc bpc" id="L471" title="1 of 2 branches missed.">        if (proxy == null) {</span>
+<span class="fc" id="L472">            ClassLoader l = GeneratedClasses.getMostDerivedLoader(type, ProxyBean.class);</span>
+<span class="fc" id="L473">            Class&lt;?&gt; pcls = loadBuildTimeProxy(type, l);</span>
+<span class="pc bpc" id="L474" title="1 of 2 branches missed.">            if (pcls == null) {</span>
+                // TODO Move this to J2DOPrivHelper?
+<span class="fc" id="L476">                BCClass bc = AccessController.doPrivileged(new PrivilegedAction&lt;BCClass&gt;() {</span>
+                    @Override
+                    public BCClass run() {
+<span class="fc" id="L479">                        return generateProxyBeanBytecode(type, true);</span>
+                    }
+                });
+<span class="fc bfc" id="L482" title="All 2 branches covered.">                if (bc != null)</span>
+<span class="fc" id="L483">                    pcls = GeneratedClasses.loadBCClass(bc, l);</span>
+            }
+<span class="fc bfc" id="L485" title="All 2 branches covered.">            if (pcls != null)</span>
+<span class="fc" id="L486">                proxy = (ProxyBean) instantiateProxy(pcls, findCopyConstructor(type), new Object[] { orig });</span>
+<span class="fc bfc" id="L487" title="All 2 branches covered.">            if (proxy == null) {</span>
+<span class="fc" id="L488">                _unproxyable.add(type.getName());</span>
+            } else {
+<span class="fc" id="L490">                _proxies.put(type, proxy);</span>
+            }
+        }
+<span class="fc" id="L493">        return proxy;</span>
+    }
+
+    /**
+     * Return whether the given type is known to be unproxyable.
+     */
+    protected boolean isUnproxyable(Class type) {
+<span class="pc bpc" id="L500" title="1 of 4 branches missed.">        for (; type != null &amp;&amp; type != Object.class;</span>
+<span class="fc" id="L501">            type = type.getSuperclass()) {</span>
+<span class="fc bfc" id="L502" title="All 2 branches covered.">            if (_unproxyable.contains(type.getName()))</span>
+<span class="fc" id="L503">                return true;</span>
+        }
+<span class="fc" id="L505">        return false;</span>
+    }
+
+    /**
+     * Load the proxy class generated at build time for the given type,
+     * returning null if none exists.
+     */
+    protected Class loadBuildTimeProxy(Class type, ClassLoader loader) {
+        try {
+<span class="fc" id="L514">            Class&lt;?&gt; proxyClass = null;</span>
+<span class="pc bpc" id="L515" title="1 of 2 branches missed.">            if (_delayedCollectionLoading) {</span>
+<span class="nc" id="L516">                proxyClass = loadDelayedProxy(type);</span>
+<span class="nc bnc" id="L517" title="All 2 branches missed.">                if (proxyClass != null) {</span>
+<span class="nc" id="L518">                    return proxyClass;</span>
+                }
+            }
+<span class="nc" id="L521">            return Class.forName(getProxyClassName(type, false), true, loader);</span>
+<span class="fc" id="L522">        } catch (Throwable t) {</span>
+<span class="fc" id="L523">            return null;</span>
+        }
+    }
+
+    protected Class&lt;?&gt; loadDelayedProxy(Class&lt;?&gt; type) {
+<span class="nc bnc" id="L528" title="All 2 branches missed.">        if (type.equals(java.util.ArrayList.class)) {</span>
+<span class="nc" id="L529">            return org.apache.openjpa.util.DelayedArrayListProxy.class;</span>
+        }
+<span class="nc bnc" id="L531" title="All 2 branches missed.">        if (type.equals(java.util.HashSet.class)) {</span>
+<span class="nc" id="L532">            return org.apache.openjpa.util.DelayedHashSetProxy.class;</span>
+        }
+<span class="nc bnc" id="L534" title="All 2 branches missed.">        if (type.equals(java.util.LinkedList.class)) {</span>
+<span class="nc" id="L535">            return org.apache.openjpa.util.DelayedLinkedListProxy.class;</span>
+        }
+<span class="nc bnc" id="L537" title="All 2 branches missed.">        if (type.equals(java.util.Vector.class)) {</span>
+<span class="nc" id="L538">            return org.apache.openjpa.util.DelayedVectorProxy.class;</span>
+        }
+<span class="nc bnc" id="L540" title="All 2 branches missed.">        if (type.equals(java.util.LinkedHashSet.class)) {</span>
+<span class="nc" id="L541">            return org.apache.openjpa.util.DelayedLinkedHashSetProxy.class;</span>
+        }
+<span class="nc bnc" id="L543" title="All 4 branches missed.">        if (type.equals(java.util.SortedSet.class) || type.equals(java.util.TreeSet.class)) {</span>
+<span class="nc" id="L544">            return org.apache.openjpa.util.DelayedTreeSetProxy.class;</span>
+        }
+<span class="nc bnc" id="L546" title="All 2 branches missed.">        if (type.equals(java.util.PriorityQueue.class)) {</span>
+<span class="nc" id="L547">            return org.apache.openjpa.util.DelayedPriorityQueueProxy.class;</span>
+        }
+<span class="nc" id="L549">        return null;</span>
+    }
+
+    /**
+     * Instantiate the given proxy class.
+     */
+    private Proxy instantiateProxy(Class cls, Constructor cons, Object[] args) {
+        try {
+<span class="pc bpc" id="L557" title="1 of 2 branches missed.">            if (cons != null)</span>
+<span class="nc" id="L558">                return (Proxy) cls.getConstructor(cons.getParameterTypes()).</span>
+<span class="nc" id="L559">                    newInstance(args);</span>
+<span class="fc" id="L560">            return (Proxy) AccessController.doPrivileged(</span>
+<span class="fc" id="L561">                J2DoPrivHelper.newInstanceAction(cls));</span>
+<span class="nc" id="L562">        } catch (InstantiationException ie) {</span>
+<span class="nc" id="L563">            throw new UnsupportedException(_loc.get(&quot;cant-newinstance&quot;,</span>
+<span class="nc" id="L564">                cls.getSuperclass().getName()));</span>
+<span class="nc" id="L565">        } catch (PrivilegedActionException pae) {</span>
+<span class="nc" id="L566">            Exception e = pae.getException();</span>
+<span class="nc bnc" id="L567" title="All 2 branches missed.">            if (e instanceof InstantiationException)</span>
+<span class="nc" id="L568">                throw new UnsupportedException(_loc.get(&quot;cant-newinstance&quot;,</span>
+<span class="nc" id="L569">                    cls.getSuperclass().getName()));</span>
+            else
+<span class="nc" id="L571">                throw new GeneralException(cls.getName()).setCause(e);</span>
+<span class="nc" id="L572">        } catch (Throwable t) {</span>
+<span class="nc" id="L573">            throw new GeneralException(cls.getName()).setCause(t);</span>
+        }
+    }
+
+    /**
+     * Generate the bytecode for a collection proxy for the given type.
+     */
+    protected BCClass generateProxyCollectionBytecode(Class type,
+        boolean runtime) {
+<span class="fc" id="L582">        assertNotFinal(type);</span>
+<span class="fc" id="L583">        Project project = new Project();</span>
+<span class="fc" id="L584">        BCClass bc = AccessController.doPrivileged(J2DoPrivHelper</span>
+<span class="fc" id="L585">            .loadProjectClassAction(project, getProxyClassName(type, runtime)));</span>
+<span class="fc" id="L586">        bc.setSuperclass(type);</span>
+<span class="fc" id="L587">        bc.declareInterface(ProxyCollection.class);</span>
+
+<span class="fc" id="L589">        delegateConstructors(bc, type);</span>
+<span class="fc" id="L590">        addProxyMethods(bc, false);</span>
+<span class="fc" id="L591">        addProxyCollectionMethods(bc, type);</span>
+<span class="fc" id="L592">        proxyRecognizedMethods(bc, type, ProxyCollections.class,</span>
+            ProxyCollection.class);
+<span class="fc" id="L594">        proxySetters(bc, type);</span>
+<span class="fc" id="L595">        addWriteReplaceMethod(bc, runtime);</span>
+<span class="fc" id="L596">        return bc;</span>
+    }
+
+    /**
+     * Return the name of the proxy class to generate for the given type.
+     */
+    private static String getProxyClassName(Class type, boolean runtime) {
+<span class="fc bfc" id="L603" title="All 2 branches covered.">        String id = (runtime) ? &quot;$&quot; + nextProxyId() : &quot;&quot;;</span>
+<span class="fc" id="L604">        return ClassUtil.getPackageName(ProxyManagerImpl.class) + &quot;.&quot;</span>
+<span class="fc" id="L605">            + type.getName().replace('.', '$') + id + PROXY_SUFFIX;</span>
+    }
+
+    /**
+     * Throw appropriate exception if the given type is final.
+     */
+    private static void assertNotFinal(Class type) {
+<span class="pc bpc" id="L612" title="1 of 2 branches missed.">        if (Modifier.isFinal(type.getModifiers()))</span>
+<span class="nc" id="L613">            throw new UnsupportedException(_loc.get(&quot;no-proxy-final&quot;, type));</span>
+<span class="fc" id="L614">    }</span>
+
+    private static boolean isProxyable(Class&lt;?&gt; cls){
+<span class="fc" id="L617">        int mod = cls.getModifiers();</span>
+<span class="fc bfc" id="L618" title="All 2 branches covered.">        if(Modifier.isFinal(mod))</span>
+<span class="fc" id="L619">            return false;</span>
+<span class="pc bpc" id="L620" title="2 of 4 branches missed.">        if(Modifier.isProtected(mod) || Modifier.isPublic(mod))</span>
+<span class="fc" id="L621">            return true;</span>
+        // Default scoped class, we can only extend if it is in the same package as the generated proxy. Ideally
+        // we'd fix the code gen portion and place proxies in the same pacakge as the types being proxied.
+<span class="nc bnc" id="L624" title="All 2 branches missed.">        if(cls.getPackage().getName().equals(&quot;org.apache.openjpa.util&quot;))</span>
+<span class="nc" id="L625">            return true;</span>
+
+<span class="nc" id="L627">        return false;</span>
+
+    }
+
+    /**
+     * Generate the bytecode for a map proxy for the given type.
+     */
+    protected BCClass generateProxyMapBytecode(Class type, boolean runtime) {
+<span class="fc" id="L635">        assertNotFinal(type);</span>
+<span class="fc" id="L636">        Project project = new Project();</span>
+<span class="fc" id="L637">        BCClass bc = AccessController.doPrivileged(J2DoPrivHelper</span>
+<span class="fc" id="L638">            .loadProjectClassAction(project, getProxyClassName(type, runtime)));</span>
+<span class="fc" id="L639">        bc.setSuperclass(type);</span>
+<span class="fc" id="L640">        bc.declareInterface(ProxyMap.class);</span>
+
+<span class="fc" id="L642">        delegateConstructors(bc, type);</span>
+<span class="fc" id="L643">        addProxyMethods(bc, false);</span>
+<span class="fc" id="L644">        addProxyMapMethods(bc, type);</span>
+<span class="fc" id="L645">        Class&lt;? extends ProxyMaps&gt; mapProxyClassType = ProxyConcurrentMaps.class;</span>
+<span class="fc" id="L646">        proxyRecognizedMethods(bc, type, mapProxyClassType, ProxyMap.class);</span>
+<span class="fc" id="L647">        proxySetters(bc, type);</span>
+<span class="fc" id="L648">        addWriteReplaceMethod(bc, runtime);</span>
+<span class="fc" id="L649">        return bc;</span>
+    }
+
+    /**
+     * Generate the bytecode for a date proxy for the given type.
+     */
+    protected BCClass generateProxyDateBytecode(Class type, boolean runtime) {
+<span class="fc" id="L656">        assertNotFinal(type);</span>
+<span class="fc" id="L657">        Project project = new Project();</span>
+<span class="fc" id="L658">        BCClass bc = AccessController.doPrivileged(J2DoPrivHelper</span>
+<span class="fc" id="L659">            .loadProjectClassAction(project, getProxyClassName(type, runtime)));</span>
+<span class="fc" id="L660">        bc.setSuperclass(type);</span>
+<span class="fc" id="L661">        bc.declareInterface(ProxyDate.class);</span>
+
+<span class="fc" id="L663">        delegateConstructors(bc, type);</span>
+<span class="fc" id="L664">        addProxyMethods(bc, true);</span>
+<span class="fc" id="L665">        addProxyDateMethods(bc, type);</span>
+<span class="fc" id="L666">        proxySetters(bc, type);</span>
+<span class="fc" id="L667">        addWriteReplaceMethod(bc, runtime);</span>
+<span class="fc" id="L668">        return bc;</span>
+    }
+
+    /**
+     * Generate the bytecode for a calendar proxy for the given type.
+     */
+    protected BCClass generateProxyCalendarBytecode(Class type,
+        boolean runtime) {
+<span class="fc" id="L676">        assertNotFinal(type);</span>
+<span class="fc" id="L677">        Project project = new Project();</span>
+<span class="fc" id="L678">        BCClass bc = AccessController.doPrivileged(J2DoPrivHelper</span>
+<span class="fc" id="L679">            .loadProjectClassAction(project, getProxyClassName(type, runtime)));</span>
+<span class="fc" id="L680">        bc.setSuperclass(type);</span>
+<span class="fc" id="L681">        bc.declareInterface(ProxyCalendar.class);</span>
+
+<span class="fc" id="L683">        delegateConstructors(bc, type);</span>
+<span class="fc" id="L684">        addProxyMethods(bc, true);</span>
+<span class="fc" id="L685">        addProxyCalendarMethods(bc, type);</span>
+<span class="fc" id="L686">        proxySetters(bc, type);</span>
+<span class="fc" id="L687">        addWriteReplaceMethod(bc, runtime);</span>
+<span class="fc" id="L688">        return bc;</span>
+    }
+
+    /**
+     * Generate the bytecode for a bean proxy for the given type.
+     */
+    protected BCClass generateProxyBeanBytecode(Class type, boolean runtime) {
+<span class="pc bpc" id="L695" title="1 of 2 branches missed.">        if (Modifier.isFinal(type.getModifiers()))</span>
+<span class="nc" id="L696">            return null;</span>
+<span class="pc bpc" id="L697" title="1 of 2 branches missed.">        if (ImplHelper.isManagedType(null, type))</span>
+<span class="nc" id="L698">            return null;</span>
+
+        // we can only generate a valid proxy if there is a copy constructor
+        // or a default constructor
+<span class="fc" id="L702">        Constructor cons = findCopyConstructor(type);</span>
+<span class="pc bpc" id="L703" title="1 of 2 branches missed.">        if (cons == null) {</span>
+<span class="fc" id="L704">            Constructor[] cs = type.getConstructors();</span>
+<span class="fc bfc" id="L705" title="All 4 branches covered.">            for (int i = 0; cons == null &amp;&amp; i &lt; cs.length; i++)</span>
+<span class="fc bfc" id="L706" title="All 2 branches covered.">               if (cs[i].getParameterTypes().length == 0)</span>
+<span class="fc" id="L707">                    cons = cs[i];</span>
+<span class="fc bfc" id="L708" title="All 2 branches covered.">            if (cons == null)</span>
+<span class="fc" id="L709">                return null;</span>
+        }
+
+<span class="fc" id="L712">        Project project = new Project();</span>
+<span class="fc" id="L713">        BCClass bc = AccessController.doPrivileged(J2DoPrivHelper</span>
+<span class="fc" id="L714">            .loadProjectClassAction(project, getProxyClassName(type, runtime)));</span>
+<span class="fc" id="L715">        bc.setSuperclass(type);</span>
+<span class="fc" id="L716">        bc.declareInterface(ProxyBean.class);</span>
+
+<span class="fc" id="L718">        delegateConstructors(bc, type);</span>
+<span class="fc" id="L719">        addProxyMethods(bc, true);</span>
+<span class="fc" id="L720">        addProxyBeanMethods(bc, type, cons);</span>
+<span class="pc bpc" id="L721" title="1 of 2 branches missed.">        if (!proxySetters(bc, type))</span>
+<span class="nc" id="L722">            return null;</span>
+<span class="fc" id="L723">        addWriteReplaceMethod(bc, runtime);</span>
+<span class="fc" id="L724">        return bc;</span>
+    }
+
+    /**
+     * Create pass-through constructors to base type.
+     */
+    private void delegateConstructors(BCClass bc, Class type) {
+<span class="fc" id="L731">        Constructor[] cons = type.getConstructors();</span>
+        Class[] params;
+        BCMethod m;
+        Code code;
+<span class="fc bfc" id="L735" title="All 2 branches covered.">        for (int i = 0; i &lt; cons.length; i++) {</span>
+<span class="fc" id="L736">            params = cons[i].getParameterTypes();</span>
+<span class="fc" id="L737">            m = bc.declareMethod(&quot;&lt;init&gt;&quot;, void.class, params);</span>
+<span class="fc" id="L738">            m.makePublic();</span>
+
+<span class="fc" id="L740">            code = m.getCode(true);</span>
+<span class="fc" id="L741">            code.aload().setThis();</span>
+<span class="fc bfc" id="L742" title="All 2 branches covered.">            for (int j = 0; j &lt; params.length; j++)</span>
+<span class="fc" id="L743">                code.xload().setParam(j).setType(params[j]);</span>
+<span class="fc" id="L744">            code.invokespecial().setMethod(cons[i]);</span>
+<span class="fc" id="L745">            code.vreturn();</span>
+<span class="fc" id="L746">            code.calculateMaxStack();</span>
+<span class="fc" id="L747">            code.calculateMaxLocals();</span>
+        }
+<span class="fc" id="L749">    }</span>
+
+    /**
+     * Implement the methods in the {@link Proxy} interface, with the exception
+     * of {@link Proxy#copy}.
+     *
+     * @param changeTracker whether to implement a null change tracker; if false
+     * the change tracker method is left unimplemented
+     */
+    private void addProxyMethods(BCClass bc, boolean changeTracker) {
+<span class="fc" id="L759">        BCField sm = bc.declareField(&quot;sm&quot;, OpenJPAStateManager.class);</span>
+<span class="fc" id="L760">        sm.setTransient(true);</span>
+<span class="fc" id="L761">        BCField field = bc.declareField(&quot;field&quot;, int.class);</span>
+<span class="fc" id="L762">        field.setTransient(true);</span>
+
+<span class="fc" id="L764">        BCMethod m = bc.declareMethod(&quot;setOwner&quot;, void.class, new Class[] {</span>
+            OpenJPAStateManager.class, int.class });
+<span class="fc" id="L766">        m.makePublic();</span>
+<span class="fc" id="L767">        Code code = m.getCode(true);</span>
+<span class="fc" id="L768">        code.aload().setThis();</span>
+<span class="fc" id="L769">        code.aload().setParam(0);</span>
+<span class="fc" id="L770">        code.putfield().setField(sm);</span>
+<span class="fc" id="L771">        code.aload().setThis();</span>
+<span class="fc" id="L772">        code.iload().setParam(1);</span>
+<span class="fc" id="L773">        code.putfield().setField(field);</span>
+<span class="fc" id="L774">        code.vreturn();</span>
+<span class="fc" id="L775">        code.calculateMaxStack();</span>
+<span class="fc" id="L776">        code.calculateMaxLocals();</span>
+
+<span class="fc" id="L778">        m = bc.declareMethod(&quot;getOwner&quot;, OpenJPAStateManager.class, null);</span>
+<span class="fc" id="L779">        m.makePublic();</span>
+<span class="fc" id="L780">        code = m.getCode(true);</span>
+<span class="fc" id="L781">        code.aload().setThis();</span>
+<span class="fc" id="L782">        code.getfield().setField(sm);</span>
+<span class="fc" id="L783">        code.areturn();</span>
+<span class="fc" id="L784">        code.calculateMaxStack();</span>
+<span class="fc" id="L785">        code.calculateMaxLocals();</span>
+
+<span class="fc" id="L787">        m = bc.declareMethod(&quot;getOwnerField&quot;, int.class, null);</span>
+<span class="fc" id="L788">        m.makePublic();</span>
+<span class="fc" id="L789">        code = m.getCode(true);</span>
+<span class="fc" id="L790">        code.aload().setThis();</span>
+<span class="fc" id="L791">        code.getfield().setField(field);</span>
+<span class="fc" id="L792">        code.ireturn();</span>
+<span class="fc" id="L793">        code.calculateMaxStack();</span>
+<span class="fc" id="L794">        code.calculateMaxLocals();</span>
+
+        /*
+         * clone (return detached proxy object)
+         * Note:  This method is only being provided to satisfy a quirk with
+         * the IBM JDK -- while comparing Calendar objects, the clone() method
+         * was invoked.  So, we are now overriding the clone() method so as to
+         * provide a detached proxy object (null out the StateManager).
+         */
+<span class="fc" id="L803">        m = bc.declareMethod(&quot;clone&quot;, Object.class, null);</span>
+<span class="fc" id="L804">        m.makePublic();</span>
+<span class="fc" id="L805">        code = m.getCode(true);</span>
+<span class="fc" id="L806">        code.aload().setThis();</span>
+<span class="fc" id="L807">        code.invokespecial().setMethod(bc.getSuperclassType(), &quot;clone&quot;,</span>
+                Object.class, null);
+<span class="fc" id="L809">        code.checkcast().setType(Proxy.class);</span>
+<span class="fc" id="L810">        int other = code.getNextLocalsIndex();</span>
+<span class="fc" id="L811">        code.astore().setLocal(other);</span>
+<span class="fc" id="L812">        code.aload().setLocal(other);</span>
+<span class="fc" id="L813">        code.constant().setNull();</span>
+<span class="fc" id="L814">        code.constant().setValue(0);</span>
+<span class="fc" id="L815">        code.invokeinterface().setMethod(Proxy.class, &quot;setOwner&quot;, void.class,</span>
+                new Class[] { OpenJPAStateManager.class, int.class });
+<span class="fc" id="L817">        code.aload().setLocal(other);</span>
+<span class="fc" id="L818">        code.areturn();</span>
+<span class="fc" id="L819">        code.calculateMaxStack();</span>
+<span class="fc" id="L820">        code.calculateMaxLocals();</span>
+
+<span class="fc bfc" id="L822" title="All 2 branches covered.">        if (changeTracker) {</span>
+<span class="fc" id="L823">            m = bc.declareMethod(&quot;getChangeTracker&quot;, ChangeTracker.class, null);</span>
+<span class="fc" id="L824">            m.makePublic();</span>
+<span class="fc" id="L825">            code = m.getCode(true);</span>
+<span class="fc" id="L826">            code.constant().setNull();</span>
+<span class="fc" id="L827">            code.areturn();</span>
+<span class="fc" id="L828">            code.calculateMaxStack();</span>
+<span class="fc" id="L829">            code.calculateMaxLocals();</span>
+        }
+<span class="fc" id="L831">    }</span>
+
+    /**
+     * Implement the methods in the {@link ProxyCollection} interface.
+     */
+    private void addProxyCollectionMethods(BCClass bc, Class type) {
+        // change tracker
+<span class="fc" id="L838">        BCField changeTracker = bc.declareField(&quot;changeTracker&quot;,</span>
+            CollectionChangeTracker.class);
+<span class="fc" id="L840">        changeTracker.setTransient(true);</span>
+<span class="fc" id="L841">        BCMethod m = bc.declareMethod(&quot;getChangeTracker&quot;, ChangeTracker.class,</span>
+            null);
+<span class="fc" id="L843">        m.makePublic();</span>
+<span class="fc" id="L844">        Code code = m.getCode(true);</span>
+<span class="fc" id="L845">        code.aload().setThis();</span>
+<span class="fc" id="L846">        code.getfield().setField(changeTracker);</span>
+<span class="fc" id="L847">        code.areturn();</span>
+<span class="fc" id="L848">        code.calculateMaxStack();</span>
+<span class="fc" id="L849">        code.calculateMaxLocals();</span>
+
+        // collection copy
+<span class="fc" id="L852">        Constructor cons = findCopyConstructor(type);</span>
+<span class="pc bpc" id="L853" title="3 of 4 branches missed.">        if (cons == null &amp;&amp; SortedSet.class.isAssignableFrom(type))</span>
+<span class="nc" id="L854">            cons = findComparatorConstructor(type);</span>
+<span class="pc bpc" id="L855" title="1 of 2 branches missed.">        Class[] params = (cons == null) ? new Class[0]</span>
+<span class="fc" id="L856">            : cons.getParameterTypes();</span>
+
+<span class="fc" id="L858">        m = bc.declareMethod(&quot;copy&quot;, Object.class, new Class[] {Object.class});</span>
+<span class="fc" id="L859">        m.makePublic();</span>
+<span class="fc" id="L860">        code = m.getCode(true);</span>
+
+<span class="fc" id="L862">        code.anew().setType(type);</span>
+<span class="fc" id="L863">        code.dup();</span>
+<span class="pc bpc" id="L864" title="1 of 2 branches missed.">        if (params.length == 1) {</span>
+<span class="fc" id="L865">            code.aload().setParam(0);</span>
+<span class="pc bpc" id="L866" title="1 of 2 branches missed.">            if (params[0] == Comparator.class) {</span>
+<span class="nc" id="L867">                code.checkcast().setType(SortedSet.class);</span>
+<span class="nc" id="L868">                code.invokeinterface().setMethod(SortedSet.class, &quot;comparator&quot;,</span>
+                    Comparator.class, null);
+            } else
+<span class="fc" id="L871">                code.checkcast().setType(params[0]);</span>
+        }
+<span class="fc" id="L873">        code.invokespecial().setMethod(type, &quot;&lt;init&gt;&quot;, void.class, params);</span>
+<span class="pc bpc" id="L874" title="2 of 4 branches missed.">        if (params.length == 0 || params[0] == Comparator.class) {</span>
+<span class="nc" id="L875">            code.dup();</span>
+<span class="nc" id="L876">            code.aload().setParam(0);</span>
+<span class="nc" id="L877">            code.checkcast().setType(Collection.class);</span>
+<span class="nc" id="L878">            code.invokevirtual().setMethod(type, &quot;addAll&quot;, boolean.class,</span>
+                new Class[] { Collection.class });
+<span class="nc" id="L880">            code.pop();</span>
+        }
+<span class="fc" id="L882">        code.areturn();</span>
+<span class="fc" id="L883">        code.calculateMaxStack();</span>
+<span class="fc" id="L884">        code.calculateMaxLocals();</span>
+
+        // element type
+<span class="fc" id="L887">        BCField elementType = bc.declareField(&quot;elementType&quot;, Class.class);</span>
+<span class="fc" id="L888">        elementType.setTransient(true);</span>
+<span class="fc" id="L889">        m = bc.declareMethod(&quot;getElementType&quot;, Class.class, null);</span>
+<span class="fc" id="L890">        m.makePublic();</span>
+<span class="fc" id="L891">        code = m.getCode(true);</span>
+<span class="fc" id="L892">        code.aload().setThis();</span>
+<span class="fc" id="L893">        code.getfield().setField(elementType);</span>
+<span class="fc" id="L894">        code.areturn();</span>
+<span class="fc" id="L895">        code.calculateMaxStack();</span>
+<span class="fc" id="L896">        code.calculateMaxLocals();</span>
+
+        // new instance factory
+<span class="fc" id="L899">        m = bc.declareMethod(&quot;newInstance&quot;, ProxyCollection.class,</span>
+            new Class[] { Class.class, Comparator.class, boolean.class, boolean.class });
+<span class="fc" id="L901">        m.makePublic();</span>
+<span class="fc" id="L902">        code = m.getCode(true);</span>
+
+<span class="fc" id="L904">        code.anew().setType(bc);</span>
+<span class="fc" id="L905">        code.dup();</span>
+<span class="fc" id="L906">        cons = findComparatorConstructor(type);</span>
+<span class="fc bfc" id="L907" title="All 2 branches covered.">        params = (cons == null) ? new Class[0] : cons.getParameterTypes();</span>
+<span class="fc bfc" id="L908" title="All 2 branches covered.">        if (params.length == 1)</span>
+<span class="fc" id="L909">            code.aload().setParam(1);</span>
+<span class="fc" id="L910">        code.invokespecial().setMethod(&quot;&lt;init&gt;&quot;, void.class, params);</span>
+<span class="fc" id="L911">        int ret = code.getNextLocalsIndex();</span>
+<span class="fc" id="L912">        code.astore().setLocal(ret);</span>
+
+        // set element type
+<span class="fc" id="L915">        code.aload().setLocal(ret);</span>
+<span class="fc" id="L916">        code.aload().setParam(0);</span>
+<span class="fc" id="L917">        code.putfield().setField(elementType);</span>
+
+        // create change tracker and set it
+<span class="fc" id="L920">        code.iload().setParam(2);</span>
+<span class="fc" id="L921">        JumpInstruction ifins = code.ifeq();</span>
+<span class="fc" id="L922">        code.aload().setLocal(ret);</span>
+<span class="fc" id="L923">        code.anew().setType(CollectionChangeTrackerImpl.class);</span>
+<span class="fc" id="L924">        code.dup();</span>
+<span class="fc" id="L925">        code.aload().setLocal(ret);</span>
+<span class="fc" id="L926">        code.constant().setValue(allowsDuplicates(type));</span>
+<span class="fc" id="L927">        code.constant().setValue(isOrdered(type));</span>
+<span class="fc" id="L928">        code.aload().setParam(3);</span>
+<span class="fc" id="L929">        code.invokespecial().setMethod(CollectionChangeTrackerImpl.class,</span>
+            &quot;&lt;init&gt;&quot;, void.class, new Class[] { Collection.class,
+            boolean.class, boolean.class, boolean.class });
+<span class="fc" id="L932">        code.putfield().setField(changeTracker);</span>
+
+<span class="fc" id="L934">        ifins.setTarget(code.aload().setLocal(ret));</span>
+<span class="fc" id="L935">        code.areturn();</span>
+<span class="fc" id="L936">        code.calculateMaxStack();</span>
+<span class="fc" id="L937">        code.calculateMaxLocals();</span>
+<span class="fc" id="L938">    }</span>
+
+    /**
+     * Return whether the given collection type allows duplicates.
+     */
+    protected boolean allowsDuplicates(Class type) {
+<span class="fc bfc" id="L944" title="All 2 branches covered.">        return !Set.class.isAssignableFrom(type);</span>
+    }
+
+    /**
+     * Return whether the given collection type maintains an artificial
+     * ordering.
+     */
+    protected boolean isOrdered(Class type) {
+<span class="fc bfc" id="L952" title="All 2 branches covered.">        return List.class.isAssignableFrom(type)</span>
+<span class="pc bpc" id="L953" title="1 of 2 branches missed.">            || &quot;java.util.LinkedHashSet&quot;.equals(type.getName());</span>
+    }
+
+    /**
+     * Implement the methods in the {@link ProxyMap} interface.
+     */
+    private void addProxyMapMethods(BCClass bc, Class type) {
+        // change tracker
+<span class="fc" id="L961">        BCField changeTracker = bc.declareField(&quot;changeTracker&quot;,</span>
+            MapChangeTracker.class);
+<span class="fc" id="L963">        changeTracker.setTransient(true);</span>
+<span class="fc" id="L964">        BCMethod m = bc.declareMethod(&quot;getChangeTracker&quot;, ChangeTracker.class,</span>
+            null);
+<span class="fc" id="L966">        m.makePublic();</span>
+<span class="fc" id="L967">        Code code = m.getCode(true);</span>
+<span class="fc" id="L968">        code.aload().setThis();</span>
+<span class="fc" id="L969">        code.getfield().setField(changeTracker);</span>
+<span class="fc" id="L970">        code.areturn();</span>
+<span class="fc" id="L971">        code.calculateMaxStack();</span>
+<span class="fc" id="L972">        code.calculateMaxLocals();</span>
+
+        // map copy
+<span class="fc" id="L975">        Constructor cons = findCopyConstructor(type);</span>
+<span class="pc bpc" id="L976" title="3 of 4 branches missed.">        if (cons == null &amp;&amp; SortedMap.class.isAssignableFrom(type))</span>
+<span class="nc" id="L977">            cons = findComparatorConstructor(type);</span>
+<span class="pc bpc" id="L978" title="1 of 2 branches missed.">        Class[] params = (cons == null) ? new Class[0]</span>
+<span class="fc" id="L979">            : cons.getParameterTypes();</span>
+
+<span class="fc" id="L981">        m = bc.declareMethod(&quot;copy&quot;, Object.class, new Class[] {Object.class});</span>
+<span class="fc" id="L982">        m.makePublic();</span>
+<span class="fc" id="L983">        code = m.getCode(true);</span>
+
+<span class="fc" id="L985">        code.anew().setType(type);</span>
+<span class="fc" id="L986">        code.dup();</span>
+<span class="pc bpc" id="L987" title="1 of 2 branches missed.">        if (params.length == 1) {</span>
+<span class="fc" id="L988">            code.aload().setParam(0);</span>
+<span class="pc bpc" id="L989" title="1 of 2 branches missed.">            if (params[0] == Comparator.class) {</span>
+<span class="nc" id="L990">                code.checkcast().setType(SortedMap.class);</span>
+<span class="nc" id="L991">                code.invokeinterface().setMethod(SortedMap.class, &quot;comparator&quot;,</span>
+                    Comparator.class, null);
+            } else
+<span class="fc" id="L994">                code.checkcast().setType(params[0]);</span>
+        }
+<span class="fc" id="L996">        code.invokespecial().setMethod(type, &quot;&lt;init&gt;&quot;, void.class, params);</span>
+<span class="pc bpc" id="L997" title="2 of 4 branches missed.">        if (params.length == 0 || params[0] == Comparator.class) {</span>
+<span class="nc" id="L998">            code.dup();</span>
+<span class="nc" id="L999">            code.aload().setParam(0);</span>
+<span class="nc" id="L1000">            code.checkcast().setType(Map.class);</span>
+<span class="nc" id="L1001">            code.invokevirtual().setMethod(type, &quot;putAll&quot;, void.class,</span>
+                new Class[] { Map.class });
+        }
+<span class="fc" id="L1004">        code.areturn();</span>
+<span class="fc" id="L1005">        code.calculateMaxStack();</span>
+<span class="fc" id="L1006">        code.calculateMaxLocals();</span>
+
+        // key type
+<span class="fc" id="L1009">        BCField keyType = bc.declareField(&quot;keyType&quot;, Class.class);</span>
+<span class="fc" id="L1010">        keyType.setTransient(true);</span>
+<span class="fc" id="L1011">        m = bc.declareMethod(&quot;getKeyType&quot;, Class.class, null);</span>
+<span class="fc" id="L1012">        m.makePublic();</span>
+<span class="fc" id="L1013">        code = m.getCode(true);</span>
+<span class="fc" id="L1014">        code.aload().setThis();</span>
+<span class="fc" id="L1015">        code.getfield().setField(keyType);</span>
+<span class="fc" id="L1016">        code.areturn();</span>
+<span class="fc" id="L1017">        code.calculateMaxStack();</span>
+<span class="fc" id="L1018">        code.calculateMaxLocals();</span>
+
+        // value type
+<span class="fc" id="L1021">        BCField valueType = bc.declareField(&quot;valueType&quot;, Class.class);</span>
+<span class="fc" id="L1022">        valueType.setTransient(true);</span>
+<span class="fc" id="L1023">        m = bc.declareMethod(&quot;getValueType&quot;, Class.class, null);</span>
+<span class="fc" id="L1024">        m.makePublic();</span>
+<span class="fc" id="L1025">        code = m.getCode(true);</span>
+<span class="fc" id="L1026">        code.aload().setThis();</span>
+<span class="fc" id="L1027">        code.getfield().setField(valueType);</span>
+<span class="fc" id="L1028">        code.areturn();</span>
+<span class="fc" id="L1029">        code.calculateMaxStack();</span>
+<span class="fc" id="L1030">        code.calculateMaxLocals();</span>
+
+        // new instance factory
+<span class="fc" id="L1033">        m = bc.declareMethod(&quot;newInstance&quot;, ProxyMap.class,</span>
+            new Class[] { Class.class, Class.class, Comparator.class,
+            boolean.class,boolean.class });
+<span class="fc" id="L1036">        m.makePublic();</span>
+<span class="fc" id="L1037">        code = m.getCode(true);</span>
+
+<span class="fc" id="L1039">        code.anew().setType(bc);</span>
+<span class="fc" id="L1040">        code.dup();</span>
+<span class="fc" id="L1041">        cons = findComparatorConstructor(type);</span>
+<span class="fc bfc" id="L1042" title="All 2 branches covered.">        params = (cons == null) ? new Class[0] : cons.getParameterTypes();</span>
+<span class="fc bfc" id="L1043" title="All 2 branches covered.">        if (params.length == 1)</span>
+<span class="fc" id="L1044">            code.aload().setParam(2);</span>
+<span class="fc" id="L1045">        code.invokespecial().setMethod(&quot;&lt;init&gt;&quot;, void.class, params);</span>
+<span class="fc" id="L1046">        int ret = code.getNextLocalsIndex();</span>
+<span class="fc" id="L1047">        code.astore().setLocal(ret);</span>
+
+        // set key and value types
+<span class="fc" id="L1050">        code.aload().setLocal(ret);</span>
+<span class="fc" id="L1051">        code.aload().setParam(0);</span>
+<span class="fc" id="L1052">        code.putfield().setField(keyType);</span>
+<span class="fc" id="L1053">        code.aload().setLocal(ret);</span>
+<span class="fc" id="L1054">        code.aload().setParam(1);</span>
+<span class="fc" id="L1055">        code.putfield().setField(valueType);</span>
+
+        // create change tracker and set it
+<span class="fc" id="L1058">        code.iload().setParam(3);</span>
+<span class="fc" id="L1059">        JumpInstruction ifins = code.ifeq();</span>
+<span class="fc" id="L1060">        code.aload().setLocal(ret);</span>
+<span class="fc" id="L1061">        code.anew().setType(MapChangeTrackerImpl.class);</span>
+<span class="fc" id="L1062">        code.dup();</span>
+<span class="fc" id="L1063">        code.aload().setLocal(ret);</span>
+<span class="fc" id="L1064">        code.aload().setParam(4);</span>
+<span class="fc" id="L1065">        code.invokespecial().setMethod(MapChangeTrackerImpl.class,</span>
+            &quot;&lt;init&gt;&quot;, void.class, new Class[] { Map.class, boolean.class });
+<span class="fc" id="L1067">        code.putfield().setField(changeTracker);</span>
+
+<span class="fc" id="L1069">        ifins.setTarget(code.aload().setLocal(ret));</span>
+<span class="fc" id="L1070">        code.areturn();</span>
+<span class="fc" id="L1071">        code.calculateMaxStack();</span>
+<span class="fc" id="L1072">        code.calculateMaxLocals();</span>
+<span class="fc" id="L1073">    }</span>
+
+    /**
+     * Implement the methods in the {@link ProxyDate} interface.
+     */
+    private void addProxyDateMethods(BCClass bc, Class type) {
+<span class="fc bfc" id="L1079" title="All 2 branches covered.">        boolean hasDefaultCons = bc.getDeclaredMethod(&quot;&lt;init&gt;&quot;,</span>
+            (Class[]) null) != null;
+<span class="pc bpc" id="L1081" title="1 of 2 branches missed.">        boolean hasMillisCons = bc.getDeclaredMethod(&quot;&lt;init&gt;&quot;,</span>
+            new Class[] { long.class }) != null;
+<span class="pc bpc" id="L1083" title="1 of 4 branches missed.">        if (!hasDefaultCons &amp;&amp; !hasMillisCons)</span>
+<span class="nc" id="L1084">            throw new UnsupportedException(_loc.get(&quot;no-date-cons&quot;, type));</span>
+
+        // add a default constructor that delegates to the millis constructor
+        BCMethod m;
+        Code code;
+<span class="fc bfc" id="L1089" title="All 2 branches covered.">        if (!hasDefaultCons) {</span>
+<span class="fc" id="L1090">            m = bc.declareMethod(&quot;&lt;init&gt;&quot;, void.class, null);</span>
+<span class="fc" id="L1091">            m.makePublic();</span>
+<span class="fc" id="L1092">            code = m.getCode(true);</span>
+<span class="fc" id="L1093">            code.aload().setThis();</span>
+<span class="fc" id="L1094">            code.invokestatic().setMethod(System.class, &quot;currentTimeMillis&quot;,</span>
+                long.class, null);
+<span class="fc" id="L1096">            code.invokespecial().setMethod(type, &quot;&lt;init&gt;&quot;, void.class,</span>
+                new Class[] { long.class });
+<span class="fc" id="L1098">            code.vreturn();</span>
+<span class="fc" id="L1099">            code.calculateMaxStack();</span>
+<span class="fc" id="L1100">            code.calculateMaxLocals();</span>
+        }
+
+        // date copy
+<span class="fc" id="L1104">        Constructor cons = findCopyConstructor(type);</span>
+        Class[] params;
+<span class="pc bpc" id="L1106" title="1 of 2 branches missed.">        if (cons != null)</span>
+<span class="nc" id="L1107">            params = cons.getParameterTypes();</span>
+<span class="pc bpc" id="L1108" title="1 of 2 branches missed.">        else if (hasMillisCons)</span>
+<span class="fc" id="L1109">            params = new Class[] { long.class };</span>
+        else
+<span class="nc" id="L1111">            params = new Class[0];</span>
+
+<span class="fc" id="L1113">        m = bc.declareMethod(&quot;copy&quot;, Object.class, new Class[] {Object.class});</span>
+<span class="fc" id="L1114">        m.makePublic();</span>
+<span class="fc" id="L1115">        code = m.getCode(true);</span>
+
+<span class="fc" id="L1117">        code.anew().setType(type);</span>
+<span class="fc" id="L1118">        code.dup();</span>
+<span class="pc bpc" id="L1119" title="1 of 2 branches missed.">        if (params.length == 1) {</span>
+<span class="pc bpc" id="L1120" title="1 of 2 branches missed.">            if (params[0] == long.class) {</span>
+<span class="fc" id="L1121">                code.aload().setParam(0);</span>
+<span class="fc" id="L1122">                code.checkcast().setType(Date.class);</span>
+<span class="fc" id="L1123">                code.invokevirtual().setMethod(Date.class, &quot;getTime&quot;,</span>
+                    long.class, null);
+            } else {
+<span class="nc" id="L1126">                code.aload().setParam(0);</span>
+<span class="nc" id="L1127">                code.checkcast().setType(params[0]);</span>
+            }
+        }
+<span class="fc" id="L1130">        code.invokespecial().setMethod(type, &quot;&lt;init&gt;&quot;, void.class, params);</span>
+<span class="pc bpc" id="L1131" title="1 of 2 branches missed.">        if (params.length == 0) {</span>
+<span class="nc" id="L1132">            code.dup();</span>
+<span class="nc" id="L1133">            code.aload().setParam(0);</span>
+<span class="nc" id="L1134">            code.checkcast().setType(Date.class);</span>
+<span class="nc" id="L1135">            code.invokevirtual().setMethod(Date.class, &quot;getTime&quot;, long.class,</span>
+                null);
+<span class="nc" id="L1137">            code.invokevirtual().setMethod(type, &quot;setTime&quot;, void.class,</span>
+                new Class[] { long.class });
+        }
+<span class="pc bpc" id="L1140" title="2 of 4 branches missed.">        if ((params.length == 0 || params[0] == long.class)</span>
+<span class="fc bfc" id="L1141" title="All 2 branches covered.">            &amp;&amp; Timestamp.class.isAssignableFrom(type)) {</span>
+<span class="fc" id="L1142">            code.dup();</span>
+<span class="fc" id="L1143">            code.aload().setParam(0);</span>
+<span class="fc" id="L1144">            code.checkcast().setType(Timestamp.class);</span>
+<span class="fc" id="L1145">            code.invokevirtual().setMethod(Timestamp.class, &quot;getNanos&quot;,</span>
+                int.class, null);
+<span class="fc" id="L1147">            code.invokevirtual().setMethod(type, &quot;setNanos&quot;, void.class,</span>
+                new Class[] { int.class });
+        }
+<span class="fc" id="L1150">        code.areturn();</span>
+<span class="fc" id="L1151">        code.calculateMaxStack();</span>
+<span class="fc" id="L1152">        code.calculateMaxLocals();</span>
+
+        // new instance factory
+<span class="fc" id="L1155">        m = bc.declareMethod(&quot;newInstance&quot;, ProxyDate.class, null);</span>
+<span class="fc" id="L1156">        m.makePublic();</span>
+<span class="fc" id="L1157">        code = m.getCode(true);</span>
+<span class="fc" id="L1158">        code.anew().setType(bc);</span>
+<span class="fc" id="L1159">        code.dup();</span>
+<span class="fc" id="L1160">        code.invokespecial().setMethod(&quot;&lt;init&gt;&quot;, void.class, null);</span>
+<span class="fc" id="L1161">        code.areturn();</span>
+<span class="fc" id="L1162">        code.calculateMaxStack();</span>
+<span class="fc" id="L1163">        code.calculateMaxLocals();</span>
+<span class="fc" id="L1164">    }</span>
+
+    /**
+     * Implement the methods in the {@link ProxyCalendar} interface.
+     */
+    private void addProxyCalendarMethods(BCClass bc, Class type) {
+        // calendar copy
+<span class="fc" id="L1171">        Constructor cons = findCopyConstructor(type);</span>
+<span class="pc bpc" id="L1172" title="1 of 2 branches missed.">        Class[] params = (cons == null) ? new Class[0]</span>
+<span class="pc" id="L1173">            : cons.getParameterTypes();</span>
+
+<span class="fc" id="L1175">        BCMethod m = bc.declareMethod(&quot;copy&quot;, Object.class,</span>
+            new Class[] {Object.class});
+<span class="fc" id="L1177">        m.makePublic();</span>
+<span class="fc" id="L1178">        Code code = m.getCode(true);</span>
+
+<span class="fc" id="L1180">        code.anew().setType(type);</span>
+<span class="fc" id="L1181">        code.dup();</span>
+<span class="pc bpc" id="L1182" title="1 of 2 branches missed.">        if (params.length == 1) {</span>
+<span class="nc" id="L1183">            code.aload().setParam(0);</span>
+<span class="nc" id="L1184">            code.checkcast().setType(params[0]);</span>
+        }
+<span class="fc" id="L1186">        code.invokespecial().setMethod(type, &quot;&lt;init&gt;&quot;, void.class, params);</span>
+<span class="pc bpc" id="L1187" title="1 of 2 branches missed.">        if (params.length == 0) {</span>
+<span class="fc" id="L1188">            code.dup();</span>
+<span class="fc" id="L1189">            code.aload().setParam(0);</span>
+<span class="fc" id="L1190">            code.checkcast().setType(Calendar.class);</span>
+<span class="fc" id="L1191">            code.invokevirtual().setMethod(Calendar.class, &quot;getTimeInMillis&quot;,</span>
+                long.class, null);
+<span class="fc" id="L1193">            code.invokevirtual().setMethod(type, &quot;setTimeInMillis&quot;, void.class,</span>
+                new Class[] { long.class });
+
+<span class="fc" id="L1196">            code.dup();</span>
+<span class="fc" id="L1197">            code.aload().setParam(0);</span>
+<span class="fc" id="L1198">            code.checkcast().setType(Calendar.class);</span>
+<span class="fc" id="L1199">            code.invokevirtual().setMethod(Calendar.class, &quot;isLenient&quot;,</span>
+                boolean.class, null);
+<span class="fc" id="L1201">            code.invokevirtual().setMethod(type, &quot;setLenient&quot;, void.class,</span>
+                new Class[] { boolean.class });
+
+<span class="fc" id="L1204">            code.dup();</span>
+<span class="fc" id="L1205">            code.aload().setParam(0);</span>
+<span class="fc" id="L1206">            code.checkcast().setType(Calendar.class);</span>
+<span class="fc" id="L1207">            code.invokevirtual().setMethod(Calendar.class, &quot;getFirstDayOfWeek&quot;,</span>
+                int.class, null);
+<span class="fc" id="L1209">            code.invokevirtual().setMethod(type, &quot;setFirstDayOfWeek&quot;,</span>
+                void.class, new Class[] { int.class });
+
+<span class="fc" id="L1212">            code.dup();</span>
+<span class="fc" id="L1213">            code.aload().setParam(0);</span>
+<span class="fc" id="L1214">            code.checkcast().setType(Calendar.class);</span>
+<span class="fc" id="L1215">            code.invokevirtual().setMethod(Calendar.class,</span>
+                &quot;getMinimalDaysInFirstWeek&quot;, int.class, null);
+<span class="fc" id="L1217">            code.invokevirtual().setMethod(type, &quot;setMinimalDaysInFirstWeek&quot;,</span>
+                void.class, new Class[] { int.class });
+
+<span class="fc" id="L1220">            code.dup();</span>
+<span class="fc" id="L1221">            code.aload().setParam(0);</span>
+<span class="fc" id="L1222">            code.checkcast().setType(Calendar.class);</span>
+<span class="fc" id="L1223">            code.invokevirtual().setMethod(Calendar.class, &quot;getTimeZone&quot;,</span>
+                TimeZone.class, null);
+<span class="fc" id="L1225">            code.invokevirtual().setMethod(type, &quot;setTimeZone&quot;, void.class,</span>
+                new Class[] { TimeZone.class });
+        }
+<span class="fc" id="L1228">        code.areturn();</span>
+<span class="fc" id="L1229">        code.calculateMaxStack();</span>
+<span class="fc" id="L1230">        code.calculateMaxLocals();</span>
+
+        // new instance factory
+<span class="fc" id="L1233">        m = bc.declareMethod(&quot;newInstance&quot;, ProxyCalendar.class, null);</span>
+<span class="fc" id="L1234">        m.makePublic();</span>
+<span class="fc" id="L1235">        code = m.getCode(true);</span>
+<span class="fc" id="L1236">        code.anew().setType(bc);</span>
+<span class="fc" id="L1237">        code.dup();</span>
+<span class="fc" id="L1238">        code.invokespecial().setMethod(&quot;&lt;init&gt;&quot;, void.class, null);</span>
+<span class="fc" id="L1239">        code.areturn();</span>
+<span class="fc" id="L1240">        code.calculateMaxStack();</span>
+<span class="fc" id="L1241">        code.calculateMaxLocals();</span>
+
+        // proxy the protected computeFields method b/c it is called on
+        // mutate, and some setters are final and therefore not proxyable
+<span class="fc" id="L1245">        m = bc.declareMethod(&quot;computeFields&quot;, void.class, null);</span>
+<span class="fc" id="L1246">        m.makeProtected();</span>
+<span class="fc" id="L1247">        code = m.getCode(true);</span>
+<span class="fc" id="L1248">        code.aload().setThis();</span>
+<span class="fc" id="L1249">        code.constant().setValue(true);</span>
+<span class="fc" id="L1250">        code.invokestatic().setMethod(Proxies.class, &quot;dirty&quot;, void.class,</span>
+            new Class[] { Proxy.class, boolean.class });
+<span class="fc" id="L1252">        code.aload().setThis();</span>
+<span class="fc" id="L1253">        code.invokespecial().setMethod(type, &quot;computeFields&quot;, void.class, null);</span>
+<span class="fc" id="L1254">        code.vreturn();</span>
+<span class="fc" id="L1255">        code.calculateMaxStack();</span>
+<span class="fc" id="L1256">        code.calculateMaxLocals();</span>
+<span class="fc" id="L1257">    }</span>
+
+    /**
+     * Implement the methods in the {@link ProxyBean} interface.
+     */
+    private void addProxyBeanMethods(BCClass bc, Class type, Constructor cons) {
+        // bean copy
+<span class="fc" id="L1264">        BCMethod m = bc.declareMethod(&quot;copy&quot;, Object.class,</span>
+            new Class[] { Object.class });
+<span class="fc" id="L1266">        m.makePublic();</span>
+<span class="fc" id="L1267">        Code code = m.getCode(true);</span>
+
+<span class="fc" id="L1269">        code.anew().setType(type);</span>
+<span class="fc" id="L1270">        code.dup();</span>
+<span class="fc" id="L1271">        Class[] params = cons.getParameterTypes();</span>
+<span class="pc bpc" id="L1272" title="1 of 2 branches missed.">        if (params.length == 1) {</span>
+<span class="nc" id="L1273">            code.aload().setParam(0);</span>
+<span class="nc" id="L1274">            code.checkcast().setType(params[0]);</span>
+        }
+<span class="fc" id="L1276">        code.invokespecial().setMethod(cons);</span>
+<span class="pc bpc" id="L1277" title="1 of 2 branches missed.">        if (params.length == 0)</span>
+<span class="fc" id="L1278">            copyProperties(type, code);</span>
+<span class="fc" id="L1279">        code.areturn();</span>
+<span class="fc" id="L1280">        code.calculateMaxStack();</span>
+<span class="fc" id="L1281">        code.calculateMaxLocals();</span>
+
+        // new instance factory
+<span class="fc" id="L1284">        m = bc.declareMethod(&quot;newInstance&quot;, ProxyBean.class,</span>
+            new Class[] { Object.class });
+<span class="fc" id="L1286">        m.makePublic();</span>
+<span class="fc" id="L1287">        code = m.getCode(true);</span>
+<span class="fc" id="L1288">        code.anew().setType(bc);</span>
+<span class="fc" id="L1289">        code.dup();</span>
+<span class="pc bpc" id="L1290" title="1 of 2 branches missed.">        if (params.length == 1) {</span>
+<span class="nc" id="L1291">            code.aload().setParam(0);</span>
+<span class="nc" id="L1292">            code.checkcast().setType(params[0]);</span>
+        }
+<span class="fc" id="L1294">        code.invokespecial().setMethod(&quot;&lt;init&gt;&quot;, void.class, params);</span>
+<span class="pc bpc" id="L1295" title="1 of 2 branches missed.">        if (params.length == 0)</span>
+<span class="fc" id="L1296">            copyProperties(type, code);</span>
+<span class="fc" id="L1297">        code.areturn();</span>
+<span class="fc" id="L1298">        code.calculateMaxStack();</span>
+<span class="fc" id="L1299">        code.calculateMaxLocals();</span>
+<span class="fc" id="L1300">    }</span>
+
+    /**
+     * Copy bean properties.  Called with the copy object on the stack.  Must
+     * return with the copy object on the stack.
+     */
+    private void copyProperties(Class type, Code code) {
+<span class="fc" id="L1307">        int copy = code.getNextLocalsIndex();</span>
+<span class="fc" id="L1308">        code.astore().setLocal(copy);</span>
+
+<span class="fc" id="L1310">        Method[] meths = type.getMethods();</span>
+        Method getter;
+        int mods;
+<span class="fc bfc" id="L1313" title="All 2 branches covered.">        for (int i = 0; i &lt; meths.length; i++) {</span>
+<span class="fc" id="L1314">            mods = meths[i].getModifiers();</span>
+<span class="pc bpc" id="L1315" title="2 of 4 branches missed.">            if (!Modifier.isPublic(mods) || Modifier.isStatic(mods))</span>
+<span class="nc" id="L1316">                continue;</span>
+<span class="fc bfc" id="L1317" title="All 2 branches covered.">            if (!startsWith(meths[i].getName(), &quot;set&quot;)</span>
+<span class="pc bpc" id="L1318" title="1 of 2 branches missed.">                || meths[i].getParameterTypes().length != 1)</span>
+<span class="nc" id="L1319">                continue;</span>
+<span class="fc" id="L1320">            getter = findGetter(type, meths[i]);</span>
+<span class="pc bpc" id="L1321" title="1 of 2 branches missed.">            if (getter == null)</span>
+<span class="nc" id="L1322">                continue;</span>
+
+            // copy.setXXX(orig.getXXX());
+<span class="fc" id="L1325">            code.aload().setLocal(copy);</span>
+<span class="fc" id="L1326">            code.aload().setParam(0);</span>
+<span class="fc" id="L1327">            code.checkcast().setType(type);</span>
+<span class="fc" id="L1328">            code.invokevirtual().setMethod(getter);</span>
+<span class="fc" id="L1329">            code.invokevirtual().setMethod(meths[i]);</span>
+        }
+<span class="fc" id="L1331">        code.aload().setLocal(copy);</span>
+<span class="fc" id="L1332">    }</span>
+
+    /**
+     * Proxy recognized methods to invoke helpers in given helper class.
+     */
+    private void proxyRecognizedMethods(BCClass bc, Class type, Class helper,
+        Class proxyType) {
+<span class="fc" id="L1339">        Method[] meths = type.getMethods();</span>
+        Class[] params;
+        Class[] afterParams;
+        Method match;
+        Method after;
+<span class="fc bfc" id="L1344" title="All 2 branches covered.">        for (int i = 0; i &lt; meths.length; i++) {</span>
+            // Java 8 methods with a return type of KeySetView do not need to be proxied
+<span class="pc bpc" id="L1346" title="1 of 2 branches missed.">            if (meths[i].getReturnType().getName().contains(&quot;KeySetView&quot;)) continue;</span>
+
+<span class="fc" id="L1348">            params = toHelperParameters(meths[i].getParameterTypes(),</span>
+                proxyType);
+
+            // first check for overriding method
+            try {
+<span class="fc" id="L1353">                match = helper.getMethod(meths[i].getName(), params);</span>
+<span class="fc" id="L1354">                proxyOverrideMethod(bc, meths[i], match, params);</span>
+<span class="fc" id="L1355">                continue;</span>
+<span class="fc" id="L1356">            } catch (NoSuchMethodException nsme) {</span>
+<span class="nc" id="L1357">            } catch (Exception e) {</span>
+<span class="nc" id="L1358">                throw new GeneralException(e);</span>
+<span class="fc" id="L1359">            }</span>
+
+            // check for before and after methods, either of which may not
+            // exist
+<span class="fc" id="L1363">            match = null;</span>
+            try {
+<span class="fc" id="L1365">                match = helper.getMethod(&quot;before&quot;</span>
+<span class="fc" id="L1366">                    + StringUtil.capitalize(meths[i].getName()), params);</span>
+<span class="fc" id="L1367">            } catch (NoSuchMethodException nsme) {</span>
+<span class="nc" id="L1368">            } catch (Exception e) {</span>
+<span class="nc" id="L1369">                throw new GeneralException(e);</span>
+<span class="fc" id="L1370">            }</span>
+<span class="fc" id="L1371">            after = null;</span>
+<span class="fc" id="L1372">            afterParams = null;</span>
+            try {
+<span class="fc" id="L1374">                afterParams = toHelperAfterParameters(params,</span>
+<span class="fc bfc" id="L1375" title="All 2 branches covered.">                    meths[i].getReturnType(), (match == null)</span>
+<span class="fc" id="L1376">                    ? void.class : match.getReturnType());</span>
+<span class="fc" id="L1377">                after = helper.getMethod(&quot;after&quot;</span>
+<span class="fc" id="L1378">                    + StringUtil.capitalize(meths[i].getName()), afterParams);</span>
+<span class="fc" id="L1379">            } catch (NoSuchMethodException nsme) {</span>
+<span class="nc" id="L1380">            } catch (Exception e) {</span>
+<span class="nc" id="L1381">                throw new GeneralException(e);</span>
+<span class="fc" id="L1382">            }</span>
+<span class="fc bfc" id="L1383" title="All 4 branches covered.">            if (match != null || after != null)</span>
+<span class="fc" id="L1384">                proxyBeforeAfterMethod(bc, type, meths[i], match, params, after,</span>
+                    afterParams);
+        }
+<span class="fc" id="L1387">    }</span>
+
+    /**
+     * Return the parameter types to the corresponding helper class method.
+     */
+    private static Class[] toHelperParameters(Class[] cls, Class helper) {
+<span class="fc" id="L1393">        Class[] params = new Class[cls.length + 1];</span>
+<span class="fc" id="L1394">        params[0] = helper;</span>
+<span class="fc" id="L1395">        System.arraycopy(cls, 0, params, 1, cls.length);</span>
+<span class="fc" id="L1396">        return params;</span>
+    }
+
+    /**
+     * Return the parameter types to the corresponding helper class &quot;after&quot;
+     * method.
+     */
+    private static Class[] toHelperAfterParameters(Class[] cls, Class ret,
+        Class beforeRet) {
+<span class="pc bpc" id="L1405" title="1 of 4 branches missed.">        if (ret == void.class &amp;&amp; beforeRet == void.class)</span>
+<span class="fc" id="L1406">            return cls;</span>
+<span class="fc" id="L1407">        int len = cls.length;</span>
+<span class="pc bpc" id="L1408" title="1 of 2 branches missed.">        if (ret != void.class)</span>
+<span class="fc" id="L1409">            len++;</span>
+<span class="fc bfc" id="L1410" title="All 2 branches covered.">        if (beforeRet != void.class)</span>
+<span class="fc" id="L1411">            len++;</span>
+<span class="fc" id="L1412">        Class[] params = new Class[len];</span>
+<span class="fc" id="L1413">        System.arraycopy(cls, 0, params, 0, cls.length);</span>
+<span class="fc" id="L1414">        int pos = cls.length;</span>
+<span class="pc bpc" id="L1415" title="1 of 2 branches missed.">        if (ret != void.class)</span>
+<span class="fc" id="L1416">            params[pos++] = ret;</span>
+<span class="fc bfc" id="L1417" title="All 2 branches covered.">        if (beforeRet != void.class)</span>
+<span class="fc" id="L1418">            params[pos++] = beforeRet;</span>
+<span class="fc" id="L1419">        return params;</span>
+    }
+
+    /**
+     * Proxy setter methods of the given type.
+     *
+     * @return true if we find any setters, false otherwise
+     */
+    private boolean proxySetters(BCClass bc, Class type) {
+<span class="fc" id="L1428">        Method[] meths = type.getMethods();</span>
+<span class="fc" id="L1429">        int setters = 0;</span>
+<span class="fc bfc" id="L1430" title="All 2 branches covered.">        for (int i = 0; i &lt; meths.length; i++) {</span>
+<span class="fc bfc" id="L1431" title="All 4 branches covered.">            if (isSetter(meths[i]) &amp;&amp; !Modifier.isFinal(meths[i].getModifiers())</span>
+<span class="fc bfc" id="L1432" title="All 2 branches covered.">                &amp;&amp; bc.getDeclaredMethod(meths[i].getName(),</span>
+<span class="fc" id="L1433">                meths[i].getParameterTypes()) == null) {</span>
+<span class="fc" id="L1434">                setters++;</span>
+<span class="fc" id="L1435">                proxySetter(bc, type, meths[i]);</span>
+            }
+        }
+<span class="fc bfc" id="L1438" title="All 2 branches covered.">        return setters &gt; 0;</span>
+    }
+
+    /**
+     * Proxy the given method with one that overrides it by calling into the
+     * given helper.
+     */
+    private void proxyOverrideMethod(BCClass bc, Method meth,
+        Method helper, Class[] params) {
+<span class="fc" id="L1447">        BCMethod m = bc.declareMethod(meth.getName(), meth.getReturnType(),</span>
+<span class="fc" id="L1448">            meth.getParameterTypes());</span>
+<span class="fc" id="L1449">        m.makePublic();</span>
+<span class="fc" id="L1450">        Code code = m.getCode(true);</span>
+
+<span class="fc" id="L1452">        code.aload().setThis();</span>
+<span class="fc bfc" id="L1453" title="All 2 branches covered.">        for (int i = 1; i &lt; params.length; i++)</span>
+<span class="fc" id="L1454">            code.xload().setParam(i - 1).setType(params[i]);</span>
+<span class="fc" id="L1455">        code.invokestatic().setMethod(helper);</span>
+<span class="fc" id="L1456">        code.xreturn().setType(meth.getReturnType());</span>
+
+<span class="fc" id="L1458">        code.calculateMaxStack();</span>
+<span class="fc" id="L1459">        code.calculateMaxLocals();</span>
+<span class="fc" id="L1460">    }</span>
+
+    /**
+     * Proxy the given method with one that overrides it by calling into the
+     * given helper.
+     */
+    private void proxyBeforeAfterMethod(BCClass bc, Class type, Method meth,
+        Method before, Class[] params, Method after, Class[] afterParams) {
+<span class="fc" id="L1468">        BCMethod m = bc.declareMethod(meth.getName(), meth.getReturnType(),</span>
+<span class="fc" id="L1469">            meth.getParameterTypes());</span>
+<span class="fc" id="L1470">        m.makePublic();</span>
+<span class="fc" id="L1471">        Code code = m.getCode(true);</span>
+
+        // invoke before
+<span class="fc" id="L1474">        int beforeRet = -1;</span>
+<span class="fc bfc" id="L1475" title="All 2 branches covered.">        if (before != null) {</span>
+<span class="fc" id="L1476">            code.aload().setThis();</span>
+<span class="fc bfc" id="L1477" title="All 2 branches covered.">            for (int i = 1; i &lt; params.length; i++)</span>
+<span class="fc" id="L1478">                code.xload().setParam(i - 1).setType(params[i]);</span>
+<span class="fc" id="L1479">            code.invokestatic().setMethod(before);</span>
+<span class="fc bfc" id="L1480" title="All 4 branches covered.">            if (after != null &amp;&amp; before.getReturnType() != void.class) {</span>
+<span class="fc" id="L1481">                beforeRet = code.getNextLocalsIndex();</span>
+<span class="fc" id="L1482">                code.xstore().setLocal(beforeRet).</span>
+<span class="fc" id="L1483">                    setType(before.getReturnType());</span>
+            }
+        }
+
+        // invoke super
+<span class="fc" id="L1488">        code.aload().setThis();</span>
+<span class="fc bfc" id="L1489" title="All 2 branches covered.">        for (int i = 1; i &lt; params.length; i++)</span>
+<span class="fc" id="L1490">            code.xload().setParam(i - 1).setType(params[i]);</span>
+<span class="fc" id="L1491">        code.invokespecial().setMethod(type, meth.getName(),</span>
+<span class="fc" id="L1492">            meth.getReturnType(), meth.getParameterTypes());</span>
+
+        // invoke after
+<span class="fc bfc" id="L1495" title="All 2 branches covered.">        if (after != null) {</span>
+<span class="fc" id="L1496">            int ret = -1;</span>
+<span class="pc bpc" id="L1497" title="1 of 2 branches missed.">            if (meth.getReturnType() != void.class) {</span>
+<span class="fc" id="L1498">                ret = code.getNextLocalsIndex();</span>
+<span class="fc" id="L1499">                code.xstore().setLocal(ret).setType(meth.getReturnType());</span>
+            }
+<span class="fc" id="L1501">            code.aload().setThis();</span>
+<span class="fc bfc" id="L1502" title="All 2 branches covered.">            for (int i = 1; i &lt; params.length; i++)</span>
+<span class="fc" id="L1503">                code.xload().setParam(i - 1).setType(params[i]);</span>
+<span class="pc bpc" id="L1504" title="1 of 2 branches missed.">            if (ret != -1)</span>
+<span class="fc" id="L1505">                code.xload().setLocal(ret).setType(meth.getReturnType());</span>
+<span class="fc bfc" id="L1506" title="All 2 branches covered.">            if (beforeRet != -1)</span>
+<span class="fc" id="L1507">                code.xload().setLocal(beforeRet).</span>
+<span class="fc" id="L1508">                    setType(before.getReturnType());</span>
+<span class="fc" id="L1509">            code.invokestatic().setMethod(after);</span>
+        }
+<span class="fc" id="L1511">        code.xreturn().setType(meth.getReturnType());</span>
+
+<span class="fc" id="L1513">        code.calculateMaxStack();</span>
+<span class="fc" id="L1514">        code.calculateMaxLocals();</span>
+<span class="fc" id="L1515">    }</span>
+
+    /**
+     * Return whether the given method is a setter.
+     */
+    protected boolean isSetter(Method meth) {
+<span class="fc bfc" id="L1521" title="All 2 branches covered.">        return startsWith(meth.getName(), &quot;set&quot;)</span>
+<span class="fc bfc" id="L1522" title="All 2 branches covered.">            || startsWith(meth.getName(), &quot;add&quot;)</span>
+<span class="fc bfc" id="L1523" title="All 2 branches covered.">            || startsWith(meth.getName(), &quot;remove&quot;)</span>
+<span class="pc bpc" id="L1524" title="1 of 2 branches missed.">            || startsWith(meth.getName(), &quot;insert&quot;)</span>
+<span class="fc bfc" id="L1525" title="All 2 branches covered.">            || startsWith(meth.getName(), &quot;clear&quot;)</span>
+<span class="fc bfc" id="L1526" title="All 2 branches covered.">            || startsWith(meth.getName(), &quot;roll&quot;); // used by Calendar</span>
+    }
+
+    /**
+     * Return the getter corresponding to the given setter, or null.
+     */
+    protected Method findGetter(Class type, Method setter) {
+<span class="fc" id="L1533">        String name = setter.getName().substring(3);</span>
+<span class="fc" id="L1534">        Class param = setter.getParameterTypes()[0];</span>
+        Method getter;
+        try {
+<span class="fc" id="L1537">            getter = type.getMethod(&quot;get&quot; + name, (Class[]) null);</span>
+<span class="pc bpc" id="L1538" title="1 of 2 branches missed.">            if (getter.getReturnType().isAssignableFrom(param)</span>
+<span class="nc bnc" id="L1539" title="All 2 branches missed.">                || param.isAssignableFrom(getter.getReturnType()))</span>
+<span class="fc" id="L1540">                return getter;</span>
+<span class="nc" id="L1541">        } catch (NoSuchMethodException nsme) {</span>
+<span class="nc" id="L1542">        } catch (Exception e) {</span>
+<span class="nc" id="L1543">            throw new GeneralException(e);</span>
+<span class="nc" id="L1544">        }</span>
+
+<span class="nc bnc" id="L1546" title="All 4 branches missed.">        if (param == boolean.class || param == Boolean.class) {</span>
+            try {
+<span class="nc" id="L1548">                getter = type.getMethod(&quot;is&quot; + name, (Class[]) null);</span>
+<span class="nc bnc" id="L1549" title="All 2 branches missed.">                if (getter.getReturnType().isAssignableFrom(param)</span>
+<span class="nc bnc" id="L1550" title="All 2 branches missed.">                    || param.isAssignableFrom(getter.getReturnType()))</span>
+<span class="nc" id="L1551">                    return getter;</span>
+<span class="nc" id="L1552">            } catch (NoSuchMethodException nsme) {</span>
+<span class="nc" id="L1553">            } catch (Exception e) {</span>
+<span class="nc" id="L1554">                throw new GeneralException(e);</span>
+<span class="nc" id="L1555">            }</span>
+        }
+<span class="nc" id="L1557">        return null;</span>
+    }
+
+    /**
+     * Return whether the target string stars with the given token.
+     */
+    private static boolean startsWith(String str, String token) {
+<span class="fc bfc" id="L1564" title="All 2 branches covered.">        return str.startsWith(token)</span>
+<span class="fc bfc" id="L1565" title="All 2 branches covered.">            &amp;&amp; (str.length() == token.length()</span>
+<span class="pc bpc" id="L1566" title="1 of 2 branches missed.">            || Character.isUpperCase(str.charAt(token.length())));</span>
+    }
+
+    /**
+     * Proxy the given setter method to dirty the proxy owner.
+     */
+    private void proxySetter(BCClass bc, Class type, Method meth) {
+<span class="fc" id="L1573">        Class[] params = meth.getParameterTypes();</span>
+<span class="fc" id="L1574">        Class ret = meth.getReturnType();</span>
+<span class="fc" id="L1575">        BCMethod m = bc.declareMethod(meth.getName(), ret, params);</span>
+<span class="fc" id="L1576">        m.makePublic();</span>
+<span class="fc" id="L1577">        Code code = m.getCode(true);</span>
+<span class="fc" id="L1578">        code.aload().setThis();</span>
+<span class="fc" id="L1579">        code.constant().setValue(true);</span>
+<span class="fc" id="L1580">        code.invokestatic().setMethod(Proxies.class, &quot;dirty&quot;, void.class,</span>
+            new Class[] { Proxy.class, boolean.class });
+<span class="fc" id="L1582">        code.aload().setThis();</span>
+<span class="fc bfc" id="L1583" title="All 2 branches covered.">        for (int i = 0; i &lt; params.length; i++)</span>
+<span class="fc" id="L1584">            code.xload().setParam(i).setType(params[i]);</span>
+<span class="fc" id="L1585">        code.invokespecial().setMethod(type, meth.getName(), ret, params);</span>
+<span class="fc" id="L1586">        code.xreturn().setType(ret);</span>
+<span class="fc" id="L1587">        code.calculateMaxStack();</span>
+<span class="fc" id="L1588">        code.calculateMaxLocals();</span>
+<span class="fc" id="L1589">    }</span>
+
+    /**
+     * Add a writeReplace implementation that serializes to a non-proxy type
+     * unless detached and this is a build-time generated class.
+     */
+    private void addWriteReplaceMethod(BCClass bc, boolean runtime) {
+<span class="fc" id="L1596">        BCMethod m = bc.declareMethod(&quot;writeReplace&quot;, Object.class, null);</span>
+<span class="fc" id="L1597">        m.makeProtected();</span>
+<span class="fc" id="L1598">        m.getExceptions(true).addException(ObjectStreamException.class);</span>
+<span class="fc" id="L1599">        Code code = m.getCode(true);</span>
+<span class="fc" id="L1600">        code.aload().setThis();</span>
+<span class="pc bpc" id="L1601" title="1 of 2 branches missed.">        code.constant().setValue(!runtime);</span>
+<span class="fc" id="L1602">        code.invokestatic().setMethod(Proxies.class, &quot;writeReplace&quot;,</span>
+            Object.class, new Class[] { Proxy.class, boolean.class });
+<span class="fc" id="L1604">        code.areturn();</span>
+<span class="fc" id="L1605">        code.calculateMaxLocals();</span>
+<span class="fc" id="L1606">        code.calculateMaxStack();</span>
+<span class="fc" id="L1607">    }</span>
+
+    /**
+     * Create a unique id to avoid proxy class name conflicts.
+     */
+    private static synchronized long nextProxyId() {
+<span class="fc" id="L1613">        return _proxyId++;</span>
+    }
+
+    /**
+     * Find an appropriate copy constructor for the given type, or return null
+     * if none.
+     */
+    protected Constructor findCopyConstructor(Class cls) {
+<span class="fc" id="L1621">        Constructor[] cons = cls.getConstructors();</span>
+<span class="fc" id="L1622">        Constructor match = null;</span>
+<span class="fc" id="L1623">        Class matchParam = null;</span>
+        Class[] params;
+<span class="fc bfc" id="L1625" title="All 2 branches covered.">        for (int i = 0; i &lt; cons.length; i++) {</span>
+<span class="fc" id="L1626">            params = cons[i].getParameterTypes();</span>
+<span class="fc bfc" id="L1627" title="All 2 branches covered.">            if (params.length != 1)</span>
+<span class="fc" id="L1628">                continue;</span>
+
+            // quit immediately on exact match
+<span class="pc bpc" id="L1631" title="1 of 2 branches missed.">            if (params[0] == cls)</span>
+<span class="nc" id="L1632">                return cons[i];</span>
+
+<span class="fc bfc" id="L1634" title="All 4 branches covered.">            if (params[0].isAssignableFrom(cls) &amp;&amp; (matchParam == null</span>
+<span class="pc bpc" id="L1635" title="1 of 2 branches missed.">                || matchParam.isAssignableFrom(params[0]))) {</span>
+                 // track most derived collection constructor
+<span class="fc" id="L1637">                match = cons[i];</span>
+<span class="fc" id="L1638">                matchParam = params[0];</span>
+            }
+        }
+<span class="fc" id="L1641">        return match;</span>
+    }
+
+    /**
+     * Return the constructor that takes a comparator for the given type, or
+     * null if none.
+     */
+    private static Constructor findComparatorConstructor(Class cls) {
+        try {
+<span class="fc" id="L1650">            return cls.getConstructor(new Class[] { Comparator.class });</span>
+<span class="fc" id="L1651">        } catch (NoSuchMethodException nsme) {</span>
+<span class="fc" id="L1652">            return null;</span>
+<span class="nc" id="L1653">        } catch (Exception e) {</span>
+<span class="nc" id="L1654">            throw new GeneralException(e);</span>
+        }
+    }
+
+    /**
+     * Usage: java org.apache.openjpa.util.proxy.ProxyManagerImpl [option]*
+     * &amp;lt;class name&amp;gt;+&lt;br /&gt;
+     * Where the following options are recognized:
+     * &lt;ul&gt;
+     * &lt;li&gt;&lt;i&gt;-utils/-u &amp;lt;number&amp;gt;&lt;/i&gt;: Generate proxies for the standard
+     * java.util collection, map, date, and calendar classes of the given Java
+     * version.  Use 4 for Java 1.4, 5 for Java 5, etc.&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * The main method generates .class files for the proxies to the classes
+     * given on the command line.  It writes the generated classes to beside the
+     * ProxyManagerImpl.class file if possible; otherwise it writes to the
+     * current directory.  The proxy manager looks for these classes
+     * before generating its own proxies at runtime.
+     */
+    public static void main(String[] args)
+        throws ClassNotFoundException, IOException {
+<span class="nc" id="L1676">        File dir = Files.getClassFile(ProxyManagerImpl.class);</span>
+<span class="nc bnc" id="L1677" title="All 2 branches missed.">        dir = (dir == null) ? new File(AccessController.doPrivileged(</span>
+<span class="nc" id="L1678">            J2DoPrivHelper.getPropertyAction(&quot;user.dir&quot;)))</span>
+<span class="nc" id="L1679">            : dir.getParentFile();</span>
+
+<span class="nc" id="L1681">        Options opts = new Options();</span>
+<span class="nc" id="L1682">        args = opts.setFromCmdLine(args);</span>
+
+<span class="nc" id="L1684">        List types = new ArrayList();</span>
+<span class="nc" id="L1685">        types.addAll(Arrays.asList(args));</span>
+<span class="nc" id="L1686">        int utils = opts.removeIntProperty(&quot;utils&quot;, &quot;u&quot;, 0);</span>
+<span class="nc bnc" id="L1687" title="All 2 branches missed.">        if (utils &gt;= 4) {</span>
+<span class="nc" id="L1688">            types.addAll(Arrays.asList(new String[] {</span>
+<span class="nc" id="L1689">                java.sql.Date.class.getName(),</span>
+<span class="nc" id="L1690">                java.sql.Time.class.getName(),</span>
+<span class="nc" id="L1691">                java.sql.Timestamp.class.getName(),</span>
+<span class="nc" id="L1692">                java.util.ArrayList.class.getName(),</span>
+<span class="nc" id="L1693">                java.util.Date.class.getName(),</span>
+<span class="nc" id="L1694">                java.util.GregorianCalendar.class.getName(),</span>
+<span class="nc" id="L1695">                java.util.HashMap.class.getName(),</span>
+<span class="nc" id="L1696">                java.util.HashSet.class.getName(),</span>
+<span class="nc" id="L1697">                java.util.Hashtable.class.getName(),</span>
+<span class="nc" id="L1698">                java.util.LinkedList.class.getName(),</span>
+<span class="nc" id="L1699">                java.util.Properties.class.getName(),</span>
+<span class="nc" id="L1700">                java.util.TreeMap.class.getName(),</span>
+<span class="nc" id="L1701">                java.util.TreeSet.class.getName(),</span>
+<span class="nc" id="L1702">                java.util.Vector.class.getName(),</span>
+            }));
+        }
+<span class="nc bnc" id="L1705" title="All 2 branches missed.">        if (utils &gt;= 5) {</span>
+<span class="nc" id="L1706">            types.addAll(Arrays.asList(new String[] {</span>
+                &quot;java.util.EnumMap&quot;,
+                &quot;java.util.IdentityHashMap&quot;,
+                &quot;java.util.LinkedHashMap&quot;,
+                &quot;java.util.LinkedHashSet&quot;,
+                &quot;java.util.PriorityQueue&quot;,
+            }));
+        }
+
+<span class="nc" id="L1715">        final ProxyManagerImpl mgr = new ProxyManagerImpl();</span>
+        Class cls;
+        BCClass bc;
+<span class="nc bnc" id="L1718" title="All 2 branches missed.">        for (int i = 0; i &lt; types.size(); i++) {</span>
+<span class="nc" id="L1719">            cls = Class.forName((String) types.get(i));</span>
+            try {
+<span class="nc bnc" id="L1721" title="All 2 branches missed.">                if (Class.forName(getProxyClassName(cls, false), true,</span>
+<span class="nc" id="L1722">                    GeneratedClasses.getMostDerivedLoader(cls, Proxy.class))</span>
+                    != null)
+<span class="nc" id="L1724">                    continue;</span>
+<span class="nc" id="L1725">            } catch (Throwable t) {</span>
+                // expected if the class hasn't been generated
+<span class="nc" id="L1727">            }</span>
+
+<span class="nc bnc" id="L1729" title="All 2 branches missed.">            if (Collection.class.isAssignableFrom(cls))</span>
+<span class="nc" id="L1730">                bc = mgr.generateProxyCollectionBytecode(cls, false);</span>
+<span class="nc bnc" id="L1731" title="All 2 branches missed.">            else if (Map.class.isAssignableFrom(cls))</span>
+<span class="nc" id="L1732">                bc = mgr.generateProxyMapBytecode(cls, false);</span>
+<span class="nc bnc" id="L1733" title="All 2 branches missed.">            else if (Date.class.isAssignableFrom(cls))</span>
+<span class="nc" id="L1734">                bc = mgr.generateProxyDateBytecode(cls, false);</span>
+<span class="nc bnc" id="L1735" title="All 2 branches missed.">            else if (Calendar.class.isAssignableFrom(cls))</span>
+<span class="nc" id="L1736">                bc = mgr.generateProxyCalendarBytecode(cls, false);</span>
+            else {
+<span class="nc" id="L1738">                final Class fCls = cls;</span>
+                // TODO Move this to J2DOPrivHelper
+<span class="nc" id="L1740">                bc = AccessController</span>
+<span class="nc" id="L1741">                    .doPrivileged(new PrivilegedAction&lt;BCClass&gt;() {</span>
+                        @Override
+                        public BCClass run() {
+<span class="nc" id="L1744">                            return mgr.generateProxyBeanBytecode(fCls, false);</span>
+                        }
+                    });
+            }
+            // START - ALLOW PRINT STATEMENTS
+<span class="nc" id="L1749">            System.out.println(bc.getName());</span>
+            // STOP - ALLOW PRINT STATEMENTS
+<span class="nc" id="L1751">            AsmAdaptor.write(bc, new File(dir, bc.getClassName() + &quot;.class&quot;));</span>
+        }
+<span class="nc" id="L1753">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

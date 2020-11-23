@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PCEnhancerAgent.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.enhance</a> &gt; <span class="el_source">PCEnhancerAgent.java</span></div><h1>PCEnhancerAgent.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.enhance;
+
+import java.lang.instrument.Instrumentation;
+import java.security.AccessController;
+import java.util.List;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.conf.OpenJPAConfigurationImpl;
+import org.apache.openjpa.lib.conf.Configuration;
+import org.apache.openjpa.lib.conf.Configurations;
+import org.apache.openjpa.lib.log.Log;
+import org.apache.openjpa.lib.util.J2DoPrivHelper;
+import org.apache.openjpa.lib.util.Options;
+import org.apache.openjpa.util.ClassResolver;
+
+/**
+ * &lt;p&gt;
+ * Java agent that makes persistent classes work with OpenJPA at runtime. This
+ * is achieved by either running the enhancer on the classes as they are loaded,
+ * or by redefining the classes on the fly. The agent is launched at JVM startup
+ * from the command line:
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * &lt;code&gt;java -javaagent:openjpa.jar[=&amp;lt;options&amp;gt;]&lt;/code&gt; The options string
+ * should be formatted as a OpenJPA plugin, and may contain any properties
+ * understood by the OpenJPA enhancer or any configuration properties. For
+ * example:
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * &lt;code&gt;java -javaagent:openjpa.jar&lt;/code&gt;
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * By default, if specified, the agent runs the OpenJPA enhancer on all classes
+ * listed in the first persistence unit as they are loaded, and redefines all
+ * other persistent classes when they are encountered. To disable enhancement at
+ * class-load time and rely solely on the redefinition logic, set the
+ * ClassLoadEnhancement flag to false. To disable redefinition and rely solely
+ * on pre-deployment or class-load enhancement, set the RuntimeRedefinition flag
+ * to false.
+ * &lt;/p&gt;
+ *
+ * &lt;p&gt;
+ * &lt;code&gt;java -javaagent:openjpa.jar=ClassLoadEnhancement=false&lt;/code&gt;
+ * &lt;/p&gt;
+ *
+ * @author Abe White
+ * @author Patrick Linskey
+ */
+<span class="nc" id="L70">public class PCEnhancerAgent {</span>
+
+<span class="nc" id="L72">    private static boolean loadAttempted = false;</span>
+<span class="nc" id="L73">    private static boolean loadSuccessful = false;</span>
+<span class="nc" id="L74">    private static boolean disableDynamicAgent = false;</span>
+
+    /**
+     * @return True if the Agent has ran successfully. False otherwise.
+     */
+    public static synchronized boolean getLoadSuccessful() {
+<span class="nc" id="L80">        return loadSuccessful;</span>
+    }
+
+    public static void disableDynamicAgent(){
+<span class="nc" id="L84">        disableDynamicAgent=true;</span>
+<span class="nc" id="L85">    }</span>
+
+    /**
+     * @return True if the agent is loaded successfully
+     */
+    public static synchronized boolean loadDynamicAgent(Log log) {
+<span class="nc bnc" id="L91" title="All 4 branches missed.">        if (loadAttempted == false &amp;&amp; disableDynamicAgent == false) {</span>
+<span class="nc" id="L92">            Instrumentation inst =</span>
+<span class="nc" id="L93">                InstrumentationFactory.getInstrumentation(log);</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">            if (inst != null) {</span>
+<span class="nc" id="L95">                premain(&quot;&quot;, inst);</span>
+<span class="nc" id="L96">                return true;</span>
+            }
+            // If we successfully get the Instrumentation, we will call premain
+            // where loadAttempted will be set to true. This case is the path
+            // where we were unable to get Instrumentation so we need to set the
+            // loadAttempted flag to true. We do this so we will only run
+            // through this code one time.
+<span class="nc" id="L103">            loadAttempted = true;</span>
+        }
+
+<span class="nc" id="L106">        return false;</span>
+    }
+
+    public static void premain(String args, Instrumentation inst) {
+        // If the enhancer has already completed, noop. This can happen
+        // if runtime enhancement is specified via javaagent, and
+        // openJPA tries to dynamically enhance.
+        // The agent will be disabled when running in an application
+        // server.
+<span class="nc" id="L115">        synchronized (PCEnhancerAgent.class) {</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">            if (loadAttempted == true) {</span>
+<span class="nc" id="L117">                return;</span>
+            }
+            // See the comment in loadDynamicAgent as to why we set this to true
+            // in multiple places.
+<span class="nc" id="L121">            loadAttempted = true;</span>
+<span class="nc" id="L122">        }</span>
+
+<span class="nc" id="L124">        Options opts = Configurations.parseProperties(args);</span>
+
+<span class="nc bnc" id="L126" title="All 2 branches missed.">        if (opts.containsKey(&quot;ClassLoadEnhancement&quot;) ||</span>
+<span class="nc bnc" id="L127" title="All 2 branches missed.">            opts.containsKey(&quot;classLoadEnhancement&quot;)) {</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">            if (opts.getBooleanProperty(</span>
+                &quot;ClassLoadEnhancement&quot;, &quot;classLoadEnhancement&quot;, true))
+<span class="nc" id="L130">                registerClassLoadEnhancer(inst, opts);</span>
+        }
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        else if (opts.containsKey(&quot;RuntimeEnhancement&quot;) ||</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            opts.containsKey(&quot;runtimeEnhancement&quot;)) {</span>
+            // Deprecated property setting
+<span class="nc bnc" id="L135" title="All 2 branches missed.">            if (opts.getBooleanProperty(</span>
+                &quot;RuntimeEnhancement&quot;, &quot;runtimeEnhancement&quot;, true))
+<span class="nc" id="L137">                registerClassLoadEnhancer(inst, opts);</span>
+        } else {
+            // if neither is set, then we should be turning it on. We need this
+            // logic instead of just a getBooleanProperty() because of the
+            // backwards-compat logic flow.
+<span class="nc" id="L142">            registerClassLoadEnhancer(inst, opts);</span>
+        }
+
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        if (opts.getBooleanProperty(</span>
+            &quot;RuntimeRedefinition&quot;, &quot;runtimeRedefinition&quot;, true)) {
+<span class="nc" id="L147">            InstrumentationFactory.setInstrumentation(inst);</span>
+        } else {
+<span class="nc" id="L149">            InstrumentationFactory.setDynamicallyInstallAgent(false);</span>
+        }
+<span class="nc" id="L151">        loadSuccessful = true;</span>
+<span class="nc" id="L152">    }</span>
+
+    private static void registerClassLoadEnhancer(Instrumentation inst,
+        Options opts) {
+<span class="nc" id="L156">    	List&lt;String&gt; anchors = Configurations.</span>
+<span class="nc" id="L157">            getFullyQualifiedAnchorsInPropertiesLocation(opts);</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">    	for (String a : anchors) {</span>
+<span class="nc" id="L159">    		Options clonedOptions = (Options) opts.clone();</span>
+<span class="nc" id="L160">    		clonedOptions.setProperty(&quot;properties&quot;, a);</span>
+<span class="nc" id="L161">    		OpenJPAConfiguration conf = new OpenJPAConfigurationImpl();</span>
+<span class="nc" id="L162">    		Configurations.populateConfiguration(conf, clonedOptions);</span>
+    		// don't allow connections
+<span class="nc" id="L164">    		conf.setConnectionUserName(null);</span>
+<span class="nc" id="L165">    		conf.setConnectionPassword(null);</span>
+<span class="nc" id="L166">    		conf.setConnectionURL(null);</span>
+<span class="nc" id="L167">    		conf.setConnectionDriverName(null);</span>
+<span class="nc" id="L168">    		conf.setConnectionFactoryName(null);</span>
+    		// set single class resolver
+    		final ClassLoader tmpLoader = AccessController
+<span class="nc" id="L171">    		    .doPrivileged(J2DoPrivHelper</span>
+<span class="nc" id="L172">    		    .newTemporaryClassLoaderAction(AccessController</span>
+<span class="nc" id="L173">    		    .doPrivileged(J2DoPrivHelper.getContextClassLoaderAction())</span>
+    		    ));
+<span class="nc" id="L175">    		conf.setClassResolver(new ClassResolver() {</span>
+    		    @Override
+                public ClassLoader getClassLoader(Class context,
+                    ClassLoader env) {
+<span class="nc" id="L179">    		        return tmpLoader;</span>
+    		    }
+    		});
+<span class="nc" id="L182">    		conf.setReadOnly(Configuration.INIT_STATE_FREEZING);</span>
+<span class="nc" id="L183">    		conf.instantiateAll(); // avoid threading issues</span>
+
+<span class="nc" id="L185">    		PCClassFileTransformer transformer = new PCClassFileTransformer</span>
+<span class="nc" id="L186">    		    (conf.newMetaDataRepositoryInstance(), clonedOptions,</span>
+    		    tmpLoader);
+<span class="nc" id="L188">    		inst.addTransformer(transformer);</span>
+<span class="nc" id="L189">    		conf.close();</span>
+<span class="nc" id="L190">    	}</span>
+<span class="nc" id="L191">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

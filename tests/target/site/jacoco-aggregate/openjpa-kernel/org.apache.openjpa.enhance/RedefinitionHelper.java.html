@@ -1,0 +1,239 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RedefinitionHelper.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.enhance</a> &gt; <span class="el_source">RedefinitionHelper.java</span></div><h1>RedefinitionHelper.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.enhance;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationHandler;
+import java.lang.reflect.Method;
+import java.lang.reflect.Proxy;
+
+import org.apache.openjpa.kernel.OpenJPAStateManager;
+import org.apache.openjpa.kernel.StateManagerImpl;
+import org.apache.openjpa.meta.FieldMetaData;
+import org.apache.openjpa.meta.JavaTypes;
+import org.apache.openjpa.util.ImplHelper;
+
+/**
+ * Helper methods for managed types that use method redefinition for field
+ * tracking.
+ *
+ * @since 1.0.0
+ */
+<span class="nc" id="L38">public class RedefinitionHelper {</span>
+
+    /**
+     * Call {@link StateManagerImpl#dirtyCheck} if the argument is a
+     * {@link StateManagerImpl}.
+     */
+    public static void dirtyCheck(StateManager sm) {
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        if (sm instanceof StateManagerImpl)</span>
+<span class="nc" id="L46">            ((StateManagerImpl) sm).dirtyCheck();</span>
+<span class="nc" id="L47">    }</span>
+
+    /**
+     * Notify the state manager for &lt;code&gt;o&lt;/code&gt; (if any) that a field
+     * is about to be accessed.
+     */
+    public static void accessingField(Object o, int absoluteIndex) {
+<span class="nc" id="L54">        PersistenceCapable pc = ImplHelper.toPersistenceCapable(o, null);</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">        if (pc == null)</span>
+<span class="nc" id="L56">            return;</span>
+<span class="nc" id="L57">        StateManager sm = pc.pcGetStateManager();</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        if (sm != null)</span>
+<span class="nc" id="L59">            sm.accessingField(absoluteIndex);</span>
+<span class="nc" id="L60">    }</span>
+
+    /**
+     * Setting state callback.
+     */
+    public static void settingField(Object o, int idx, boolean cur,
+        boolean next) {
+<span class="nc" id="L67">        PersistenceCapable pc = ImplHelper.toPersistenceCapable(o, null);</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (pc == null)</span>
+<span class="nc" id="L69">            return;</span>
+<span class="nc" id="L70">        StateManager sm = pc.pcGetStateManager();</span>
+<span class="nc bnc" id="L71" title="All 2 branches missed.">        if (sm != null)</span>
+<span class="nc" id="L72">            sm.settingBooleanField(pc, idx, cur, next,</span>
+                OpenJPAStateManager.SET_USER);
+<span class="nc" id="L74">    }</span>
+
+    /**
+     * Setting state callback.
+     */
+    public static void settingField(Object o, int idx, char cur, char next) {
+<span class="nc" id="L80">        PersistenceCapable pc = ImplHelper.toPersistenceCapable(o, null);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (pc == null)</span>
+<span class="nc" id="L82">            return;</span>
+<span class="nc" id="L83">        StateManager sm = pc.pcGetStateManager();</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (sm != null)</span>
+<span class="nc" id="L85">            sm.settingCharField(pc, idx, cur, next,</span>
+                OpenJPAStateManager.SET_USER);
+<span class="nc" id="L87">    }</span>
+
+    /**
+     * Setting state callback.
+     */
+    public static void settingField(Object o, int idx, byte cur, byte next) {
+<span class="nc" id="L93">        PersistenceCapable pc = ImplHelper.toPersistenceCapable(o, null);</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        if (pc == null)</span>
+<span class="nc" id="L95">            return;</span>
+<span class="nc" id="L96">        StateManager sm = pc.pcGetStateManager();</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (sm != null)</span>
+<span class="nc" id="L98">            sm.settingByteField(pc, idx, cur, next,</span>
+                OpenJPAStateManager.SET_USER);
+<span class="nc" id="L100">    }</span>
+
+    /**
+     * Setting state callback.
+     */
+    public static void settingField(Object o, int idx, short cur, short next) {
+<span class="nc" id="L106">        PersistenceCapable pc = ImplHelper.toPersistenceCapable(o, null);</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        if (pc == null)</span>
+<span class="nc" id="L108">            return;</span>
+<span class="nc" id="L109">        StateManager sm = pc.pcGetStateManager();</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (sm != null)</span>
+<span class="nc" id="L111">            sm.settingShortField(pc, idx, cur, next,</span>
+                OpenJPAStateManager.SET_USER);
+<span class="nc" id="L113">    }</span>
+
+    /**
+     * Setting state callback.
+     */
+    public static void settingField(Object o, int idx, int cur, int next) {
+<span class="nc" id="L119">        PersistenceCapable pc = ImplHelper.toPersistenceCapable(o, null);</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (pc == null)</span>
+<span class="nc" id="L121">            return;</span>
+<span class="nc" id="L122">        StateManager sm = pc.pcGetStateManager();</span>
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        if (sm != null)</span>
+<span class="nc" id="L124">            sm.settingIntField(pc, idx, cur, next,</span>
+                OpenJPAStateManager.SET_USER);
+<span class="nc" id="L126">    }</span>
+
+    /**
+     * Setting state callback.
+     */
+    public static void settingField(Object o, int idx, long cur, long next) {
+<span class="nc" id="L132">        PersistenceCapable pc = ImplHelper.toPersistenceCapable(o, null);</span>
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (pc == null)</span>
+<span class="nc" id="L134">            return;</span>
+<span class="nc" id="L135">        StateManager sm = pc.pcGetStateManager();</span>
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (sm != null)</span>
+<span class="nc" id="L137">            sm.settingLongField(pc, idx, cur, next,</span>
+                OpenJPAStateManager.SET_USER);
+<span class="nc" id="L139">    }</span>
+
+    /**
+     * Setting state callback.
+     */
+    public static void settingField(Object o, int idx, float cur, float next) {
+<span class="nc" id="L145">        PersistenceCapable pc = ImplHelper.toPersistenceCapable(o, null);</span>
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (pc == null)</span>
+<span class="nc" id="L147">            return;</span>
+<span class="nc" id="L148">        StateManager sm = pc.pcGetStateManager();</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (sm != null)</span>
+<span class="nc" id="L150">            sm.settingFloatField(pc, idx, cur, next,</span>
+                OpenJPAStateManager.SET_USER);
+<span class="nc" id="L152">    }</span>
+
+    /**
+     * Setting state callback.
+     */
+    public static void settingField(Object o, int idx, double cur,
+        double next) {
+<span class="nc" id="L159">        PersistenceCapable pc = ImplHelper.toPersistenceCapable(o, null);</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (pc == null)</span>
+<span class="nc" id="L161">            return;</span>
+<span class="nc" id="L162">        StateManager sm = pc.pcGetStateManager();</span>
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (sm != null)</span>
+<span class="nc" id="L164">            sm.settingDoubleField(pc, idx, cur, next,</span>
+                OpenJPAStateManager.SET_USER);
+<span class="nc" id="L166">    }</span>
+
+    /**
+     * Setting state callback.
+     */
+    public static void settingField(Object o, int idx, String cur,
+        String next) {
+<span class="nc" id="L173">        PersistenceCapable pc = ImplHelper.toPersistenceCapable(o, null);</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (pc == null)</span>
+<span class="nc" id="L175">            return;</span>
+<span class="nc" id="L176">        StateManager sm = pc.pcGetStateManager();</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (sm != null)</span>
+<span class="nc" id="L178">            sm.settingStringField(pc, idx, cur, next,</span>
+                OpenJPAStateManager.SET_USER);
+<span class="nc" id="L180">    }</span>
+
+    /**
+     * Setting state callback.
+     */
+    public static void settingField(Object o, int idx, Object cur,
+        Object next) {
+<span class="nc" id="L187">        PersistenceCapable pc = ImplHelper.toPersistenceCapable(o, null);</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (pc == null)</span>
+<span class="nc" id="L189">            return;</span>
+<span class="nc" id="L190">        StateManager sm = pc.pcGetStateManager();</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (sm != null)</span>
+<span class="nc" id="L192">            sm.settingObjectField(pc, idx, cur, next,</span>
+                OpenJPAStateManager.SET_USER);
+<span class="nc" id="L194">    }</span>
+
+    /**
+     * Create a container instance that will delegate back to the state
+     * manager to emulate lazy loading. This is used by PC subclasses for
+     * unenhanced types that could not be redefined, and thus do not have
+     * field-interception capabilities. Do this for all collection and
+     * map field types, even if they are in the dfg, in case the fetch
+     * groups are reset at runtime.
+     *
+     * @since 1.1.0
+     */
+    public static void assignLazyLoadProxies(StateManagerImpl sm) {
+<span class="nc" id="L207">        FieldMetaData[] fmds = sm.getMetaData().getFields();</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">        for (int i = 0; i &lt; fmds.length; i++) {</span>
+<span class="nc bnc" id="L209" title="All 2 branches missed.">            switch (fmds[i].getTypeCode()) {</span>
+                case JavaTypes.COLLECTION:
+                case JavaTypes.MAP:
+<span class="nc" id="L212">                    PersistenceCapable pc = sm.getPersistenceCapable();</span>
+<span class="nc" id="L213">                    Field field = (Field) fmds[i].getBackingMember();</span>
+<span class="nc" id="L214">                    Reflection.set(pc, field,</span>
+<span class="nc" id="L215">                        newLazyLoadingProxy(fmds[i].getDeclaredType(), i, sm));</span>
+                    break;
+            }
+        }
+<span class="nc" id="L219">    }</span>
+
+    private static Object newLazyLoadingProxy(Class type, final int idx,
+        final StateManagerImpl sm) {
+<span class="nc" id="L223">        InvocationHandler handler = new InvocationHandler() {</span>
+
+            @Override
+            public Object invoke(Object proxy, Method method, Object[] args)
+                throws Throwable {
+                // this will replace the field in the instance, so the dynamic
+                // proxy should only be called the first time a
+                // lazy-load-proxied field is used in normal usage.
+<span class="nc" id="L231">                Object delegate = sm.fetch(idx);</span>
+<span class="nc" id="L232">                return method.invoke(delegate, args);</span>
+            }
+        };
+<span class="nc" id="L235">        return Proxy.newProxyInstance(type.getClassLoader(),</span>
+            new Class[] { type }, handler);
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

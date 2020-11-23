@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ParseException.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel.jpql</a> &gt; <span class="el_source">ParseException.java</span></div><h1>ParseException.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel.jpql;
+
+import java.util.TreeSet;
+
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.Localizer.Message;
+import org.apache.openjpa.util.UserException;
+
+/**
+ * Signifies that a lexical error occurred when parsing the JPQL statement.
+ *
+ * @author Marc Prud'hommeaux
+ */
+public class ParseException
+    extends UserException {
+
+<span class="nc" id="L35">    private static final Localizer _loc =</span>
+<span class="nc" id="L36">        Localizer.forPackage(ParseException.class);</span>
+
+    /**
+     * This constructor is used by the method &quot;generateParseException&quot;
+     * in the generated parser. Calling this constructor generates
+     * a new object of this type with the fields &quot;currentToken&quot;,
+     * &quot;expectedTokenSequences&quot;, and &quot;tokenImage&quot; set.
+     * This constructor calls its super class with the empty string
+     * to force the &quot;toString&quot; method of parent class &quot;Throwable&quot; to
+     * print the error message in the form:
+     * ParseException: &lt;result of getMessage&gt;
+     */
+    public ParseException(Token currentTokenVal,
+        int[][]expectedTokenSequencesVal, String[]tokenImageVal) {
+<span class="nc" id="L50">        super(initMessage(currentTokenVal,</span>
+            expectedTokenSequencesVal, tokenImageVal));
+<span class="nc" id="L52">    }</span>
+
+    /**
+     * The following constructors are for use by you for whatever
+     * purpose you can think of. Constructing the exception in this
+     * manner makes the exception behave in the normal way - i.e., as
+     * documented in the class &quot;Throwable&quot;. The fields &quot;errorToken&quot;,
+     * &quot;expectedTokenSequences&quot;, and &quot;tokenImage&quot; do not contain
+     * relevant information. The JavaCC generated code does not use
+     * these constructors.
+     */
+    public ParseException() {
+<span class="nc" id="L64">        super();</span>
+<span class="nc" id="L65">    }</span>
+
+    /**
+     * String constructor. Constructing the exception in this
+     * manner makes the exception behave in the normal way - i.e., as
+     * documented in the class &quot;Throwable&quot;. The fields &quot;errorToken&quot;,
+     * &quot;expectedTokenSequences&quot;, and &quot;tokenImage&quot; do not contain
+     * relevant information. The JavaCC generated code does not use
+     * these constructors.
+     */
+    public ParseException(String message) {
+<span class="nc" id="L76">        super(message);</span>
+<span class="nc" id="L77">    }</span>
+
+    public ParseException(String message, Throwable t) {
+<span class="nc" id="L80">    	super(message, t);</span>
+<span class="nc" id="L81">    }</span>
+
+    /**
+     * This method has the standard behavior when this object has been
+     * created using the standard constructors. Otherwise, it uses
+     * &quot;currentToken&quot; and &quot;expectedTokenSequences&quot; to generate a parse
+     * error message and returns it. If this object has been created
+     * due to a parse error, and you do not catch it (it gets thrown
+     * from the parser), then this method is called during the printing
+     * of the final stack trace, and hence the correct error message
+     * gets displayed.
+     */
+    private static Message initMessage(Token currentToken,
+        int[][]expectedTokenSequences, String[]tokenImage) {
+<span class="nc" id="L95">        TreeSet expected = new TreeSet();</span>
+
+<span class="nc" id="L97">        int maxSize = 0;</span>
+
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        for (int i = 0; i &lt; expectedTokenSequences.length; i++) {</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">            if (maxSize &lt; expectedTokenSequences[i].length)</span>
+<span class="nc" id="L101">                maxSize = expectedTokenSequences[i].length;</span>
+
+<span class="nc bnc" id="L103" title="All 2 branches missed.">            for (int j = 0; j &lt; expectedTokenSequences[i].length; j++)</span>
+<span class="nc" id="L104">                expected.add(tokenImage[expectedTokenSequences[i][j]]);</span>
+        }
+
+<span class="nc" id="L107">        Token tok = currentToken.next;</span>
+
+<span class="nc" id="L109">        StringBuffer curtokBuf = new StringBuffer();</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        for (int i = 0; i &lt; maxSize; i++) {</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (i != 0)</span>
+<span class="nc" id="L112">                curtokBuf.append(&quot; &quot;);</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">            if (tok.kind == 0) {</span>
+<span class="nc" id="L114">                curtokBuf.append(tokenImage[0]);</span>
+<span class="nc" id="L115">                break;</span>
+            }
+
+<span class="nc" id="L118">            curtokBuf.append(escape(tok.image));</span>
+<span class="nc" id="L119">            tok = tok.next;</span>
+        }
+<span class="nc" id="L121">        String curtok = curtokBuf.toString();</span>
+
+<span class="nc" id="L123">        return _loc.get(&quot;bad-parse&quot;, new Object[]{ curtok,</span>
+<span class="nc" id="L124">            Integer.valueOf(currentToken.next.beginColumn), expected });</span>
+    }
+
+    /**
+     * Used to convert raw characters to their escaped version
+     * when these raw version cannot be used as part of an ASCII string literal.
+     */
+    private static String escape(String str) {
+<span class="nc" id="L132">        StringBuffer retval = new StringBuffer();</span>
+        char ch;
+
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        for (int i = 0; i &lt; str.length(); i++) {</span>
+<span class="nc bnc" id="L136" title="All 10 branches missed.">            switch (str.charAt(i)) {</span>
+                case 0:
+<span class="nc" id="L138">                    continue;</span>
+                case '\b':
+<span class="nc" id="L140">                    retval.append(&quot;\\b&quot;);</span>
+<span class="nc" id="L141">                    continue;</span>
+                case '\t':
+<span class="nc" id="L143">                    retval.append(&quot;\\t&quot;);</span>
+<span class="nc" id="L144">                    continue;</span>
+                case '\n':
+<span class="nc" id="L146">                    retval.append(&quot;\\n&quot;);</span>
+<span class="nc" id="L147">                    continue;</span>
+                case '\f':
+<span class="nc" id="L149">                    retval.append(&quot;\\f&quot;);</span>
+<span class="nc" id="L150">                    continue;</span>
+                case '\r':
+<span class="nc" id="L152">                    retval.append(&quot;\\r&quot;);</span>
+<span class="nc" id="L153">                    continue;</span>
+                case '\&quot;':
+<span class="nc" id="L155">                    retval.append(&quot;\\\&quot;&quot;);</span>
+<span class="nc" id="L156">                    continue;</span>
+                case '\'':
+<span class="nc" id="L158">                    retval.append(&quot;\\\'&quot;);</span>
+<span class="nc" id="L159">                    continue;</span>
+                case '\\':
+<span class="nc" id="L161">                    retval.append(&quot;\\\\&quot;);</span>
+<span class="nc" id="L162">                    continue;</span>
+                default:
+<span class="nc bnc" id="L164" title="All 4 branches missed.">                    if ((ch = str.charAt(i)) &lt; 0x20 || ch &gt; 0x7e) {</span>
+<span class="nc" id="L165">                        String s = &quot;0000&quot; + Integer.toString(ch, 16);</span>
+
+<span class="nc" id="L167">                        retval.append(&quot;\\u&quot; + s.substring(s.length() - 4,</span>
+<span class="nc" id="L168">                            s.length()));</span>
+<span class="nc" id="L169">                    } else {</span>
+<span class="nc" id="L170">                        retval.append(ch);</span>
+                    }
+                    continue;
+            }
+        }
+<span class="nc" id="L175">        return retval.toString();</span>
+	}
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

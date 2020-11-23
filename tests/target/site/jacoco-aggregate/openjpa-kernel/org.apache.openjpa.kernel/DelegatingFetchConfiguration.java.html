@@ -1,0 +1,670 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DelegatingFetchConfiguration.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">DelegatingFetchConfiguration.java</span></div><h1>DelegatingFetchConfiguration.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.openjpa.lib.rop.ResultList;
+import org.apache.openjpa.lib.rop.ResultObjectProvider;
+import org.apache.openjpa.meta.FieldMetaData;
+import org.apache.openjpa.util.RuntimeExceptionTranslator;
+
+///////////////////////////////////////////////////////////////
+// NOTE: when adding a public API method, be sure to add it to
+// JDO and JPA facades!
+///////////////////////////////////////////////////////////////
+
+/**
+ * Delegating fetch configuration that can also perform exception
+ * translation for use in facades.
+ *
+ * @author Abe White
+ */
+public class DelegatingFetchConfiguration
+    implements FetchConfiguration {
+
+    
+    private static final long serialVersionUID = 1L;
+    private final FetchConfiguration _fetch;
+    private final DelegatingFetchConfiguration _del;
+    private final RuntimeExceptionTranslator _trans;
+
+    /**
+     * Constructor; supply delegate.
+     */
+    public DelegatingFetchConfiguration(FetchConfiguration fetch) {
+<span class="nc" id="L54">        this(fetch, null);</span>
+<span class="nc" id="L55">    }</span>
+
+    /**
+     * Constructor; supply delegate and exception translator.
+     */
+    public DelegatingFetchConfiguration(FetchConfiguration fetch,
+<span class="nc" id="L61">        RuntimeExceptionTranslator trans) {</span>
+<span class="nc" id="L62">        _fetch = fetch;</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        if (fetch instanceof DelegatingFetchConfiguration)</span>
+<span class="nc" id="L64">            _del = (DelegatingFetchConfiguration) fetch;</span>
+        else
+<span class="nc" id="L66">            _del = null;</span>
+<span class="nc" id="L67">        _trans = trans;</span>
+<span class="nc" id="L68">    }</span>
+
+    /**
+     * Return the direct delegate.
+     */
+    public FetchConfiguration getDelegate() {
+<span class="nc" id="L74">        return _fetch;</span>
+    }
+
+    /**
+     * Return the native delegate.
+     */
+    public FetchConfiguration getInnermostDelegate() {
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        return (_del == null) ? _fetch : _del.getInnermostDelegate();</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L86">        return getInnermostDelegate().hashCode();</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (other == this)</span>
+<span class="nc" id="L92">            return true;</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (other instanceof DelegatingFetchConfiguration)</span>
+<span class="nc" id="L94">            other = ((DelegatingFetchConfiguration) other).</span>
+<span class="nc" id="L95">                getInnermostDelegate();</span>
+<span class="nc" id="L96">        return getInnermostDelegate().equals(other);</span>
+    }
+
+    /**
+     * Translate the OpenJPA exception.
+     */
+    protected RuntimeException translate(RuntimeException re) {
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        return (_trans == null) ? re : _trans.translate(re);</span>
+    }
+
+    @Override
+    public StoreContext getContext() {
+        try {
+<span class="nc" id="L109">            return _fetch.getContext();</span>
+<span class="nc" id="L110">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L111">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setContext(StoreContext ctx) {
+        try {
+<span class="nc" id="L118">            _fetch.setContext(ctx);</span>
+<span class="nc" id="L119">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L120">            throw translate(re);</span>
+<span class="nc" id="L121">        }</span>
+<span class="nc" id="L122">    }</span>
+
+    @Override
+    public int getFetchBatchSize() {
+        try {
+<span class="nc" id="L127">            return _fetch.getFetchBatchSize();</span>
+<span class="nc" id="L128">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L129">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration setFetchBatchSize(int fetchBatchSize) {
+        try {
+<span class="nc" id="L136">            _fetch.setFetchBatchSize(fetchBatchSize);</span>
+<span class="nc" id="L137">            return this;</span>
+<span class="nc" id="L138">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L139">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public int getMaxFetchDepth() {
+        try {
+<span class="nc" id="L146">            return _fetch.getMaxFetchDepth();</span>
+<span class="nc" id="L147">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L148">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration setMaxFetchDepth(int depth) {
+        try {
+<span class="nc" id="L155">            _fetch.setMaxFetchDepth(depth);</span>
+<span class="nc" id="L156">            return this;</span>
+<span class="nc" id="L157">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L158">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Set getRootInstances() {
+        try {
+<span class="nc" id="L165">            return _fetch.getRootInstances();</span>
+<span class="nc" id="L166">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L167">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration setRootInstances(Collection roots) {
+        try {
+<span class="nc" id="L174">            _fetch.setRootInstances(roots);</span>
+<span class="nc" id="L175">            return this;</span>
+<span class="nc" id="L176">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L177">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Set getRootClasses() {
+        try {
+<span class="nc" id="L184">            return _fetch.getRootClasses();</span>
+<span class="nc" id="L185">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L186">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration setRootClasses(Collection roots) {
+        try {
+<span class="nc" id="L193">            _fetch.setRootClasses(roots);</span>
+<span class="nc" id="L194">            return this;</span>
+<span class="nc" id="L195">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L196">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean getQueryCacheEnabled() {
+        try {
+<span class="nc" id="L203">            return _fetch.getQueryCacheEnabled();</span>
+<span class="nc" id="L204">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L205">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration setQueryCacheEnabled(boolean cache) {
+        try {
+<span class="nc" id="L212">            _fetch.setQueryCacheEnabled(cache);</span>
+<span class="nc" id="L213">            return this;</span>
+<span class="nc" id="L214">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L215">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public int getFlushBeforeQueries() {
+        try {
+<span class="nc" id="L222">            return _fetch.getFlushBeforeQueries();</span>
+<span class="nc" id="L223">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L224">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration setFlushBeforeQueries(int flush) {
+        try {
+<span class="nc" id="L231">            _fetch.setFlushBeforeQueries(flush);</span>
+<span class="nc" id="L232">            return this;</span>
+<span class="nc" id="L233">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L234">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean getExtendedPathLookup() {
+        try {
+<span class="nc" id="L241">            return _fetch.getExtendedPathLookup();</span>
+<span class="nc" id="L242">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L243">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration setExtendedPathLookup(boolean flag) {
+        try {
+<span class="nc" id="L250">            _fetch.setExtendedPathLookup(flag);</span>
+<span class="nc" id="L251">            return this;</span>
+<span class="nc" id="L252">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L253">            throw translate(re);</span>
+        }
+    }
+
+
+    @Override
+    public Set getFetchGroups() {
+        try {
+<span class="nc" id="L261">            return _fetch.getFetchGroups();</span>
+<span class="nc" id="L262">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L263">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean hasFetchGroup(String group) {
+        try {
+<span class="nc" id="L270">            return _fetch.hasFetchGroup(group);</span>
+<span class="nc" id="L271">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L272">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration addFetchGroup(String group) {
+        try {
+<span class="nc" id="L279">            _fetch.addFetchGroup(group);</span>
+<span class="nc" id="L280">            return this;</span>
+<span class="nc" id="L281">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L282">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration addFetchGroups(Collection groups) {
+        try {
+<span class="nc" id="L289">            _fetch.addFetchGroups(groups);</span>
+<span class="nc" id="L290">            return this;</span>
+<span class="nc" id="L291">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L292">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration removeFetchGroup(String group) {
+        try {
+<span class="nc" id="L299">            _fetch.removeFetchGroup(group);</span>
+<span class="nc" id="L300">            return this;</span>
+<span class="nc" id="L301">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L302">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration removeFetchGroups(Collection groups) {
+        try {
+<span class="nc" id="L309">            _fetch.removeFetchGroups(groups);</span>
+<span class="nc" id="L310">            return this;</span>
+<span class="nc" id="L311">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L312">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration clearFetchGroups() {
+        try {
+<span class="nc" id="L319">            _fetch.clearFetchGroups();</span>
+<span class="nc" id="L320">            return this;</span>
+<span class="nc" id="L321">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L322">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration resetFetchGroups() {
+        try {
+<span class="nc" id="L329">            _fetch.resetFetchGroups();</span>
+<span class="nc" id="L330">            return this;</span>
+<span class="nc" id="L331">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L332">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Set getFields() {
+        try {
+<span class="nc" id="L339">            return _fetch.getFields();</span>
+<span class="nc" id="L340">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L341">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean hasField(String field) {
+        try {
+<span class="nc" id="L348">            return _fetch.hasField(field);</span>
+<span class="nc" id="L349">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L350">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration addField(String field) {
+        try {
+<span class="nc" id="L357">            _fetch.addField(field);</span>
+<span class="nc" id="L358">            return this;</span>
+<span class="nc" id="L359">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L360">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration addFields(Collection fields) {
+        try {
+<span class="nc" id="L367">            _fetch.addFields(fields);</span>
+<span class="nc" id="L368">            return this;</span>
+<span class="nc" id="L369">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L370">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration removeField(String field) {
+        try {
+<span class="nc" id="L377">            _fetch.removeField(field);</span>
+<span class="nc" id="L378">            return this;</span>
+<span class="nc" id="L379">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L380">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration removeFields(Collection fields) {
+        try {
+<span class="nc" id="L387">            _fetch.removeFields(fields);</span>
+<span class="nc" id="L388">            return this;</span>
+<span class="nc" id="L389">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L390">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration clearFields() {
+        try {
+<span class="nc" id="L397">            _fetch.clearFields();</span>
+<span class="nc" id="L398">            return this;</span>
+<span class="nc" id="L399">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L400">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public int getLockTimeout() {
+        try {
+<span class="nc" id="L407">            return _fetch.getLockTimeout();</span>
+<span class="nc" id="L408">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L409">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration setLockTimeout(int timeout) {
+        try {
+<span class="nc" id="L416">            _fetch.setLockTimeout(timeout);</span>
+<span class="nc" id="L417">            return this;</span>
+<span class="nc" id="L418">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L419">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public int getQueryTimeout() {
+        try {
+<span class="nc" id="L426">            return _fetch.getQueryTimeout();</span>
+<span class="nc" id="L427">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L428">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration setQueryTimeout(int timeout) {
+        try {
+<span class="nc" id="L435">            _fetch.setQueryTimeout(timeout);</span>
+<span class="nc" id="L436">            return this;</span>
+<span class="nc" id="L437">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L438">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public int getLockScope() {
+        try {
+<span class="nc" id="L445">            return _fetch.getLockScope();</span>
+<span class="nc" id="L446">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L447">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration setLockScope(int scope) {
+        try {
+<span class="nc" id="L454">            _fetch.setLockScope(scope);</span>
+<span class="nc" id="L455">            return this;</span>
+<span class="nc" id="L456">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L457">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public int getReadLockLevel() {
+        try {
+<span class="nc" id="L464">            return _fetch.getReadLockLevel();</span>
+<span class="nc" id="L465">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L466">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration setReadLockLevel(int level) {
+        try {
+<span class="nc" id="L473">            _fetch.setReadLockLevel(level);</span>
+<span class="nc" id="L474">            return this;</span>
+<span class="nc" id="L475">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L476">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public int getWriteLockLevel() {
+        try {
+<span class="nc" id="L483">            return _fetch.getWriteLockLevel();</span>
+<span class="nc" id="L484">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L485">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration setWriteLockLevel(int level) {
+        try {
+<span class="nc" id="L492">            _fetch.setWriteLockLevel(level);</span>
+<span class="nc" id="L493">            return this;</span>
+<span class="nc" id="L494">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L495">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public ResultList newResultList(ResultObjectProvider rop) {
+        try {
+<span class="nc" id="L502">            return _fetch.newResultList(rop);</span>
+<span class="nc" id="L503">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L504">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void copy(FetchConfiguration fetch) {
+        try {
+<span class="nc" id="L511">            _fetch.copy(fetch);</span>
+<span class="nc" id="L512">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L513">            throw translate(re);</span>
+<span class="nc" id="L514">        }</span>
+<span class="nc" id="L515">    }</span>
+
+    @Override
+    public Object clone() {
+        try {
+<span class="nc" id="L520">            return _fetch.clone();</span>
+<span class="nc" id="L521">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L522">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setHint(String name, Object value) {
+        try {
+<span class="nc" id="L529">            _fetch.setHint(name, value);</span>
+<span class="nc" id="L530">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L531">            throw translate(re);</span>
+<span class="nc" id="L532">        }</span>
+<span class="nc" id="L533">    }</span>
+
+    @Override
+    public void setHint(String name, Object value, Object original) {
+        try {
+<span class="nc" id="L538">            _fetch.setHint(name, value, original);</span>
+<span class="nc" id="L539">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L540">            throw translate(re);</span>
+<span class="nc" id="L541">        }</span>
+<span class="nc" id="L542">    }</span>
+
+    @Override
+    public boolean isHintSet(String key) {
+        try {
+<span class="nc" id="L547">            return _fetch.isHintSet(key);</span>
+<span class="nc" id="L548">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L549">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean isDefaultPUFetchGroupConfigurationOnly() {
+        try {
+<span class="nc" id="L556">            return _fetch.isDefaultPUFetchGroupConfigurationOnly();</span>
+<span class="nc" id="L557">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L558">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Object getHint(String name) {
+        try {
+<span class="nc" id="L565">            return _fetch.getHint(name);</span>
+<span class="nc" id="L566">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L567">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Map&lt;String, Object&gt; getHints() {
+        try {
+<span class="nc" id="L574">            return _fetch.getHints();</span>
+<span class="nc" id="L575">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L576">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public int requiresFetch(FieldMetaData fmd) {
+        try {
+<span class="nc" id="L583">            return _fetch.requiresFetch(fmd);</span>
+<span class="nc" id="L584">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L585">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean requiresLoad() {
+        try {
+<span class="nc" id="L592">            return _fetch.requiresLoad();</span>
+<span class="nc" id="L593">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L594">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration traverse(FieldMetaData fmd) {
+        try {
+<span class="nc" id="L601">            return _fetch.traverse(fmd);</span>
+<span class="nc" id="L602">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L603">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void lock() {
+        try {
+<span class="nc" id="L610">            _fetch.lock();</span>
+<span class="nc" id="L611">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L612">            throw translate(re);</span>
+<span class="nc" id="L613">		}</span>
+<span class="nc" id="L614">	}</span>
+
+    @Override
+    public void unlock() {
+        try {
+<span class="nc" id="L619">            _fetch.unlock();</span>
+<span class="nc" id="L620">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L621">            throw translate(re);</span>
+<span class="nc" id="L622">		}</span>
+<span class="nc" id="L623">	}</span>
+
+    @Override
+    public DataCacheRetrieveMode getCacheRetrieveMode() {
+        try {
+<span class="nc" id="L628">            return _fetch.getCacheRetrieveMode();</span>
+<span class="nc" id="L629">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L630">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public DataCacheStoreMode getCacheStoreMode() {
+        try {
+<span class="nc" id="L637">            return _fetch.getCacheStoreMode();</span>
+<span class="nc" id="L638">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L639">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setCacheRetrieveMode(DataCacheRetrieveMode mode) {
+        try {
+<span class="nc" id="L646">            _fetch.setCacheRetrieveMode(mode);</span>
+<span class="nc" id="L647">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L648">            throw translate(re);</span>
+<span class="nc" id="L649">        }</span>
+<span class="nc" id="L650">    }</span>
+
+    @Override
+    public void setCacheStoreMode(DataCacheStoreMode mode) {
+        try {
+<span class="nc" id="L655">            _fetch.setCacheStoreMode(mode);</span>
+<span class="nc" id="L656">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L657">            throw translate(re);</span>
+<span class="nc" id="L658">        }</span>
+<span class="nc" id="L659">    }</span>
+
+    @Override
+    public boolean isFetchConfigurationSQLCacheAdmissible() {
+        try {
+<span class="nc" id="L664">            return _fetch.isFetchConfigurationSQLCacheAdmissible();</span>
+<span class="nc" id="L665">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L666">            throw translate(re);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

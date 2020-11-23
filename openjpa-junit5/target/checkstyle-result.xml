@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.29">
+<file name="/home/marco/Scrivania/openjpa/openjpa-junit5/src/main/java/org/apache/openjpa/junit5/OpenJPASupport.java">
+</file>
+<file name="/home/marco/Scrivania/openjpa/openjpa-junit5/src/main/java/org/apache/openjpa/junit5/internal/OpenJPADirectoriesEnhancer.java">
+</file>
+<file name="/home/marco/Scrivania/openjpa/openjpa-junit5/src/main/java/org/apache/openjpa/junit5/internal/OpenJPAExtension.java">
+</file>
+</checkstyle>

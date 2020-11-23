@@ -1,0 +1,547 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractStoreManager.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.abstractstore</a> &gt; <span class="el_source">AbstractStoreManager.java</span></div><h1>AbstractStoreManager.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.abstractstore;
+
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.LinkedList;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.conf.OpenJPAConfigurationImpl;
+import org.apache.openjpa.kernel.FetchConfiguration;
+import org.apache.openjpa.kernel.FetchConfigurationImpl;
+import org.apache.openjpa.kernel.OpenJPAStateManager;
+import org.apache.openjpa.kernel.PCState;
+import org.apache.openjpa.kernel.Seq;
+import org.apache.openjpa.kernel.StoreContext;
+import org.apache.openjpa.kernel.StoreManager;
+import org.apache.openjpa.kernel.StoreQuery;
+import org.apache.openjpa.lib.rop.ResultObjectProvider;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.FieldMetaData;
+import org.apache.openjpa.meta.JavaTypes;
+import org.apache.openjpa.meta.ValueStrategies;
+import org.apache.openjpa.util.ApplicationIds;
+import org.apache.openjpa.util.Id;
+import org.apache.openjpa.util.ImplHelper;
+
+/**
+ * Abstract store manager implementation to ease development of custom
+ * OpenJPA back-ends. A concrete subclass must define implementations for the
+ * following methods:
+ * &lt;ul&gt;
+ * &lt;li&gt;{@link StoreManager#exists}&lt;/li&gt;
+ * &lt;li&gt;{@link #initialize}&lt;/li&gt;
+ * &lt;li&gt;{@link #load}&lt;/li&gt;
+ * &lt;li&gt;{@link
+ * #flush(Collection,Collection,Collection,Collection,Collection)}&lt;/li&gt;
+ * &lt;li&gt;{@link #executeExtent}&lt;/li&gt;
+ * &lt;/ul&gt; Additionally, subclasses should not attempt to acquire resources
+ * until {@link #open} has been called. Store manager instances might be
+ * created to call metadata methods such as {@link #newConfiguration} or
+ * {@link #getUnsupportedOptions} and never opened. These instances should
+ * not consume any data store resources.
+ *  Notes:
+ * &lt;ul&gt;
+ * &lt;li&gt;The {@link StoreManager#initialize} method is responsible
+ * for creating new instances of objects freshly loaded from the
+ * database. The method will be invoked with a {@link OpenJPAStateManager}
+ * that the newly-loaded object should be associated with. To create the
+ * new object and set up this association correctly, the implementation
+ * should use the {@link OpenJPAStateManager#initialize} method.&lt;/li&gt;
+ * &lt;li&gt;If your data store supports some sort of transaction or
+ * unit of work, you should override the {@link #begin}, {@link #commit},
+ * and {@link #rollback} methods.&lt;/li&gt;
+ * &lt;li&gt;This class provides no infrastructure support for optimistic
+ * transactions. To provide optimistic transaction support:
+ * &lt;ul&gt;
+ * &lt;li&gt;Override {@link #beginOptimistic}, {@link #rollbackOptimistic},
+ * and {@link #syncVersion}.&lt;/li&gt;
+ * &lt;li&gt;Override {@link #getUnsupportedOptions} to not include {@link
+ * OpenJPAConfiguration#OPTION_OPTIMISTIC} in the list of unsupported
+ * options.&lt;/li&gt;
+ * &lt;li&gt;Ensure that your flush implementation sets the next
+ * version for each modified object via the {@link
+ * OpenJPAStateManager#setNextVersion} method.&lt;/li&gt;
+ * &lt;li&gt;If your version object does not implement {@link Comparable},
+ * override {@link #compareVersion}, which relies on the
+ * {@link Comparable#compareTo} method.&lt;/li&gt;
+ * &lt;/ul&gt;&lt;/li&gt;
+ * &lt;li&gt;If your data store supports a mechanism for automatically
+ * generating and managing identity values (or if you want to
+ * provide that facility on top of your data store), implement
+ * the {@link #getDataStoreIdSequence} method if you want to use a
+ * &lt;code&gt;long&lt;/code&gt; as your datastore identity type and are
+ * happy with OpenJPA's {@link Id} class. To use another datastore identity
+ * type, override {@link #getManagedType},
+ * {@link #getDataStoreIdType}, {@link #copyDataStoreId}, and
+ * {@link #newDataStoreId} instead. In either case, override
+ * {@link #getUnsupportedOptions} to not include
+ * {@link OpenJPAConfiguration#OPTION_ID_DATASTORE} in the list of
+ * unsupported options.&lt;/li&gt;
+ * &lt;li&gt;If your data store does not support queries (or if you do
+ * not want to convert OpenJPA's query parse tree into a
+ * datastore-specific query), you still have two options in terms
+ * of query execution:
+ * &lt;ul&gt;
+ * &lt;li&gt;&lt;em&gt;In-memory execution&lt;/em&gt;: If you
+ * execute a query against an extent or a class, OpenJPA will
+ * automatically load the full extent of objects into memory and
+ * execute the query in memory.&lt;/li&gt;
+ * &lt;li&gt;&lt;em&gt;openjpa.MethodQL&lt;/em&gt;: MethodQL allows
+ * you to use the query APIs to execute a method that finds
+ * data in your back-end and returns that data as a
+ * {@link org.apache.openjpa.lib.rop.ResultList}. For more details on
+ * MethodQL, see the OpenJPA Reference Guide.&lt;/li&gt;
+ * &lt;/ul&gt;&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * @since 0.3.1
+ */
+<span class="nc" id="L119">public abstract class AbstractStoreManager</span>
+    implements StoreManager {
+
+    protected StoreContext ctx;
+
+    @Override
+    public final void setContext(StoreContext ctx) {
+<span class="nc" id="L126">        this.ctx = ctx;</span>
+<span class="nc" id="L127">        open();</span>
+<span class="nc" id="L128">    }</span>
+
+    /**
+     * Returns the {@link StoreContext} that this store manager is
+     * associated with.
+     */
+    public StoreContext getContext() {
+<span class="nc" id="L135">        return ctx;</span>
+    }
+
+    /**
+     * No-op implementation. Ready this store manager for persistent operations.
+     */
+    protected void open() {
+<span class="nc" id="L142">    }</span>
+
+    /**
+     * No-op implementation. Override this method to provide optimistic
+     * locking semantics for your data store if you need notification of
+     * the beginning of an optimistic transaction.
+     */
+    @Override
+    public void beginOptimistic() {
+<span class="nc" id="L151">    }</span>
+
+    /**
+     * No-op implementation. Override this method to provide optimistic
+     * locking semantics for your data store if you need notification of
+     * a rollback of an optimistic transaction before {@link #begin} is invoked.
+     */
+    @Override
+    public void rollbackOptimistic() {
+<span class="nc" id="L160">    }</span>
+
+    /**
+     * OpenJPA assumes that after this method is invoked, all data
+     * accesses through this store manager will be part of a single
+     * unit of work that can be rolled back.
+     *  This is a no-op implementation. If your data store does not
+     * support any concept of locking or transactions, you need not
+     * override this method.
+     */
+    @Override
+    public void begin() {
+<span class="nc" id="L172">    }</span>
+
+    /**
+     * This is a no-op implementation. If your data store does not
+     * have a concept of transactions or a unit of work, you need not
+     * override this method. If it does, then override this method to
+     * notify the data store that the current transaction should be committed.
+     */
+    @Override
+    public void commit() {
+<span class="nc" id="L182">    }</span>
+
+    /**
+     * This is a no-op implementation. If your data store does not
+     * have a concept of transactions or a unit of work, you need not
+     * override this method. If it does, then override this method to
+     * notify the data store that the current transaction should be rolled back.
+     */
+    @Override
+    public void rollback() {
+<span class="nc" id="L192">    }</span>
+
+    /**
+     * Since this store manager does not provide optimistic locking
+     * support, this method always returns &lt;code&gt;true&lt;/code&gt;.
+     */
+    @Override
+    public boolean syncVersion(OpenJPAStateManager sm, Object edata) {
+<span class="nc" id="L200">        return true;</span>
+    }
+
+    /**
+     * This method is invoked when OpenJPA needs to load an object whose
+     * identity is known but which has not yet been loaded from the data
+     * store. &lt;code&gt;sm&lt;/code&gt; is a partially-set-up state manager for this
+     * object. The ID and least-derived type information for the instance
+     * to load can be obtained by invoking
+     * &lt;code&gt;sm.getObjectId()&lt;/code&gt; and &lt;code&gt;sm.getMetaData()&lt;/code&gt;.
+     *
+     *  When implementing this method, load the data for this object from
+     * the data store, determine the most-derived subclass of the newly-loaded
+     * data, and then use the {@link OpenJPAStateManager#initialize} method to
+     * populate &lt;code&gt;sm&lt;/code&gt; with a new instance of the appropriate type.
+     * Once {@link OpenJPAStateManager#initialize} has been invoked, proceed to
+     * load field data into &lt;code&gt;sm&lt;/code&gt; as in the {@link #load} method, by
+     * using {@link OpenJPAStateManager#store} (or the appropriate
+     * &lt;code&gt;OpenJPAStateManager.store&lt;em&gt;type&lt;/em&gt;&lt;/code&gt; method) to put the
+     * data into the object.
+     */
+    @Override
+    public abstract boolean initialize(OpenJPAStateManager sm, PCState state,
+        FetchConfiguration fetch, Object edata);
+
+    /**
+     * This method is invoked when OpenJPA needs to load additional data
+     * into an object that has already been at least partially loaded by
+     * a previous {@link #initialize} invocation.
+     *  Load data into &lt;code&gt;sm&lt;/code&gt; by using {@link
+     * OpenJPAStateManager#store} (or the appropriate
+     * &lt;code&gt;OpenJPAStateManager.store&lt;em&gt;type&lt;/em&gt;&lt;/code&gt; method) to put the
+     * data into the object.
+     */
+    @Override
+    public abstract boolean load(OpenJPAStateManager sm, BitSet fields,
+        FetchConfiguration fetch, int lockLevel, Object edata);
+
+    /**
+     * This implementation just delegates to the proper singular
+     * method ({@link StoreManager#initialize} or {@link StoreManager#load})
+     * depending on each state manager's state. If your data store provides
+     * bulk loading APIs, overriding this method to be more clever may be
+     * advantageous.
+     */
+    @Override
+    public Collection&lt;Object&gt; loadAll(Collection&lt;OpenJPAStateManager&gt; sms, PCState state, int load,
+        FetchConfiguration fetch, Object edata) {
+<span class="nc" id="L248">        return ImplHelper.loadAll(sms, this, state, load, fetch, edata);</span>
+    }
+
+    /**
+     * Breaks down &lt;code&gt;states&lt;/code&gt; based on the objects' current
+     * states, and delegates to
+     * {@link #flush(Collection,Collection,Collection,Collection,Collection)}.
+     */
+    @Override
+    public Collection&lt;Exception&gt; flush(Collection&lt;OpenJPAStateManager&gt; sms) {
+        // break down state managers by state; initialize as empty lists;
+        // use constants for efficiency
+<span class="nc" id="L260">        Collection&lt;OpenJPAStateManager&gt; pNew = new LinkedList&lt;&gt;();</span>
+<span class="nc" id="L261">        Collection&lt;OpenJPAStateManager&gt; pNewUpdated = new LinkedList&lt;&gt;();</span>
+<span class="nc" id="L262">        Collection&lt;OpenJPAStateManager&gt; pNewFlushedDeleted = new LinkedList&lt;&gt;();</span>
+<span class="nc" id="L263">        Collection&lt;OpenJPAStateManager&gt; pDirty = new LinkedList&lt;&gt;();</span>
+<span class="nc" id="L264">        Collection&lt;OpenJPAStateManager&gt; pDeleted = new LinkedList&lt;&gt;();</span>
+
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        for (OpenJPAStateManager sm : sms) {</span>
+<span class="nc bnc" id="L267" title="All 4 branches missed.">            if (sm.getPCState() == PCState.PNEW &amp;&amp; !sm.isFlushed())</span>
+<span class="nc" id="L268">                pNew.add(sm);</span>
+<span class="nc bnc" id="L269" title="All 4 branches missed.">            else if (sm.getPCState() == PCState.PNEW &amp;&amp; sm.isFlushed())</span>
+<span class="nc" id="L270">                pNewUpdated.add(sm);</span>
+<span class="nc bnc" id="L271" title="All 2 branches missed.">            else if (sm.getPCState() == PCState.PNEWFLUSHEDDELETED)</span>
+<span class="nc" id="L272">                pNewFlushedDeleted.add(sm);</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">            else if (sm.getPCState() == PCState.PDIRTY)</span>
+<span class="nc" id="L274">                pDirty.add(sm);</span>
+<span class="nc bnc" id="L275" title="All 2 branches missed.">            else if (sm.getPCState() == PCState.PDELETED)</span>
+<span class="nc" id="L276">                pDeleted.add(sm);</span>
+<span class="nc" id="L277">        }</span>
+
+        // no dirty instances to flush?
+<span class="nc bnc" id="L280" title="All 4 branches missed.">        if (pNew.isEmpty() &amp;&amp; pNewUpdated.isEmpty()</span>
+<span class="nc bnc" id="L281" title="All 4 branches missed.">            &amp;&amp; pNewFlushedDeleted.isEmpty() &amp;&amp; pDirty.isEmpty()</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">            &amp;&amp; pDeleted.isEmpty())</span>
+<span class="nc" id="L283">            return Collections.EMPTY_LIST;</span>
+
+<span class="nc" id="L285">        return flush(pNew, pNewUpdated, pNewFlushedDeleted, pDirty, pDeleted);</span>
+    }
+
+    @Override
+    public void beforeStateChange(OpenJPAStateManager sm, PCState fromState,
+        PCState toState) {
+<span class="nc" id="L291">    }</span>
+
+    @Override
+    public boolean assignObjectId(OpenJPAStateManager sm, boolean preFlush) {
+<span class="nc" id="L295">        ClassMetaData meta = sm.getMetaData();</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">        if (meta.getIdentityType() == ClassMetaData.ID_APPLICATION)</span>
+<span class="nc" id="L297">            return ApplicationIds.assign(sm, this, preFlush);</span>
+
+        // datastore identity
+<span class="nc" id="L300">        Object val = ImplHelper.generateIdentityValue(ctx, meta,</span>
+            JavaTypes.LONG);
+<span class="nc" id="L302">        return assignDataStoreId(sm, val);</span>
+    }
+
+    /**
+     * Assign a new datastore identity to the given instance. This given
+     * value may be null.
+     */
+    protected boolean assignDataStoreId(OpenJPAStateManager sm, Object val) {
+<span class="nc" id="L310">        ClassMetaData meta = sm.getMetaData();</span>
+<span class="nc bnc" id="L311" title="All 4 branches missed.">        if (val == null &amp;&amp; meta.getIdentityStrategy() != ValueStrategies.NATIVE)</span>
+<span class="nc" id="L312">            return false;</span>
+<span class="nc bnc" id="L313" title="All 2 branches missed.">        if (val == null)</span>
+<span class="nc" id="L314">            val = getDataStoreIdSequence(meta).next(ctx, meta);</span>
+<span class="nc" id="L315">        sm.setObjectId(newDataStoreId(val, meta));</span>
+<span class="nc" id="L316">        return true;</span>
+    }
+
+    @Override
+    public boolean assignField(OpenJPAStateManager sm, int field,
+        boolean preFlush) {
+<span class="nc" id="L322">        FieldMetaData fmd = sm.getMetaData().getField(field);</span>
+<span class="nc" id="L323">        Object val = ImplHelper.generateFieldValue(ctx, fmd);</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">        if (val == null)</span>
+<span class="nc" id="L325">            return false;</span>
+<span class="nc" id="L326">        sm.store(field, val);</span>
+<span class="nc" id="L327">        return true;</span>
+    }
+
+    @Override
+    public Class&lt;?&gt; getManagedType(Object oid) {
+<span class="nc bnc" id="L332" title="All 2 branches missed.">        if (oid instanceof Id)</span>
+<span class="nc" id="L333">            return ((Id) oid).getType();</span>
+<span class="nc" id="L334">        return null;</span>
+    }
+
+    @Override
+    public Class&lt;?&gt; getDataStoreIdType(ClassMetaData meta) {
+<span class="nc" id="L339">        return Id.class;</span>
+    }
+
+    @Override
+    public Object copyDataStoreId(Object oid, ClassMetaData meta) {
+<span class="nc" id="L344">        Id id = (Id) oid;</span>
+<span class="nc" id="L345">        return new Id(meta.getDescribedType(), id.getId(),</span>
+<span class="nc" id="L346">            id.hasSubclasses());</span>
+    }
+
+    @Override
+    public Object newDataStoreId(Object val, ClassMetaData meta) {
+        // we use base types for all oids
+<span class="nc bnc" id="L352" title="All 2 branches missed.">        while (meta.getPCSuperclass() != null)</span>
+<span class="nc" id="L353">            meta = meta.getPCSuperclassMetaData();</span>
+<span class="nc" id="L354">        return Id.newInstance(meta.getDescribedType(), val);</span>
+    }
+
+    /**
+     * Override to retain a dedicated connection.
+     */
+    @Override
+    public void retainConnection() {
+<span class="nc" id="L362">    }</span>
+
+    /**
+     * Override to release previously-retained connection.
+     */
+    @Override
+    public void releaseConnection() {
+<span class="nc" id="L369">    }</span>
+
+    /**
+     * Returns &lt;code&gt;null&lt;/code&gt;. If your data store can provide a
+     * distinct connection object, return it here.
+     */
+    @Override
+    public Object getClientConnection() {
+<span class="nc" id="L377">        return null;</span>
+    }
+
+    /**
+     * Create a {@link ResultObjectProvider} that can return all instances
+     * of &lt;code&gt;type&lt;/code&gt;, optionally including subclasses as defined
+     * by &lt;code&gt;subclasses&lt;/code&gt;.
+     *  The implementation of the result provider will typically execute
+     * some sort of data store query to find all the applicable objects, loop
+     * through the results, extracting object IDs from the data, and invoke
+     * {@link StoreContext#find(Object,FetchConfiguration,BitSet,Object,int)}
+     * on each OID. When invoking this method, the first argument is the OID.
+     * The second is the given fetch configuration. The
+     * third argument is a mask of fields to exclude from loading; it will
+     * typically be null. The fourth argument is an object that will be passed
+     * through to {@link #initialize} or {@link #load}, and typically will
+     * contain the actual data to load. For example, for a JDBC-based store
+     * manager, this might be the result set that is being iterated over. If
+     * this argument is &lt;code&gt;null&lt;/code&gt;, then the {@link #initialize} or
+     * {@link #load} method will have to issue another command to the data
+     * store in order to fetch the data to be loaded.
+     */
+    @Override
+    public abstract ResultObjectProvider executeExtent(ClassMetaData meta,
+        boolean subs, FetchConfiguration fetch);
+
+    @Override
+    public StoreQuery newQuery(String language) {
+<span class="nc" id="L405">        return null;</span>
+    }
+
+    @Override
+    public FetchConfiguration newFetchConfiguration() {
+<span class="nc" id="L410">        return new FetchConfigurationImpl();</span>
+    }
+
+    /**
+     * Casts &lt;code&gt;v1&lt;/code&gt; and &lt;code&gt;v2&lt;/code&gt; to {@link Comparable}, and
+     * invokes &lt;code&gt;v1.compareTo (v2)&lt;/code&gt;. If &lt;code&gt;v1&lt;/code&gt; is less
+     * than &lt;code&gt;v2&lt;/code&gt;, returns {@link #VERSION_EARLIER}. If the same,
+     * returns {@link #VERSION_SAME}. Otherwise, returns {@link
+     * #VERSION_LATER}. If either &lt;code&gt;v1&lt;/code&gt; or &lt;code&gt;v2&lt;/code&gt; are
+     * &lt;code&gt;null&lt;/code&gt;, returns {@link #VERSION_DIFFERENT}.
+     */
+    @Override
+    public int compareVersion(OpenJPAStateManager state, Object v1, Object v2) {
+<span class="nc bnc" id="L423" title="All 4 branches missed.">        if (v1 == null || v2 == null)</span>
+<span class="nc" id="L424">            return VERSION_DIFFERENT;</span>
+
+<span class="nc" id="L426">        int compare = ((Comparable) v1).compareTo((Comparable) v2);</span>
+<span class="nc bnc" id="L427" title="All 2 branches missed.">        if (compare &lt; 0)</span>
+<span class="nc" id="L428">            return VERSION_EARLIER;</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">        if (compare == 0)</span>
+<span class="nc" id="L430">            return VERSION_SAME;</span>
+<span class="nc" id="L431">        return VERSION_LATER;</span>
+    }
+
+    /**
+     * Returns the system-configured sequence. To use some other sort
+     * of datastore identifier (a GUID, string, or someting of that nature),
+     * override {@link #getManagedType},
+     * {@link #getDataStoreIdType}, {@link #copyDataStoreId},
+     * {@link #newDataStoreId}.
+     */
+    @Override
+    public Seq getDataStoreIdSequence(ClassMetaData forClass) {
+<span class="nc" id="L443">        return ctx.getConfiguration().getSequenceInstance();</span>
+    }
+
+    /**
+     * Returns null.
+     */
+    @Override
+    public Seq getValueSequence(FieldMetaData forField) {
+<span class="nc" id="L451">        return null;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;false&lt;/code&gt;. If your data store supports
+     * cancelling queries, this method should cancel any
+     * currently-running queries and return &lt;code&gt;true&lt;/code&gt; if any
+     * were cancelled.
+     */
+    @Override
+    public boolean cancelAll() {
+<span class="nc" id="L462">        return false;</span>
+    }
+
+    @Override
+    public void close() {
+<span class="nc" id="L467">    }</span>
+
+    /**
+     * Responsible for writing modifications happened back to the data
+     * store. If you do not remove the
+     * {@link OpenJPAConfiguration#OPTION_INC_FLUSH} option in
+     * {@link #getUnsupportedOptions}, this will be called only once at the
+     * end	of a transaction. Otherwise, it may be called periodically
+     * throughout the course of a transaction.
+     *  If this store manager supports optimistic transactions, datastore
+     * version information should be updated during flush, and the state
+     * manager's version indicator should be updated through the
+     * {@link OpenJPAStateManager#setNextVersion} method.
+     *  This method will only be invoked if there are meaningful changes
+     * to store. This differs from the behavior of {@link StoreManager#flush},
+     * which may be invoked with a collection of objects in states that
+     * do not require any datastore action (for example, objects in the
+     * transient-transactional state).
+     *
+     * @param pNew Objects that should be added to the store,
+     * and that have not previously been flushed.
+     * @param pNewUpdated New objects that have been modified since
+     * they were initially flushed. These were
+     * in &lt;code&gt;persistentNew&lt;/code&gt; in an earlier flush invocation.
+     * @param pNewFlushedDeleted New objects that have been deleted since
+     * they were initially flushed. These were
+     * in &lt;code&gt;persistentNew&lt;/code&gt; in an earlier flush invocation.
+     * @param pDirty Objects that were loaded from the data
+     * store and have since been modified.
+     * @param pDeleted Objects that were loaded from the data
+     * store and have since been deleted. These
+     * may have been in a previous flush invocation's persistentDirty list.
+     * @return a collection of exceptions encountered during flushing.
+     */
+    protected abstract Collection&lt;Exception&gt; flush(Collection&lt;OpenJPAStateManager&gt; pNew,
+        Collection&lt;OpenJPAStateManager&gt; pNewUpdated, Collection&lt;OpenJPAStateManager&gt; pNewFlushedDeleted,
+        Collection&lt;OpenJPAStateManager&gt; pDirty, Collection&lt;OpenJPAStateManager&gt; pDeleted);
+
+    /**
+     * Return a new configuration instance for this runtime. Configuration
+     * data is maintained at the factory level and is available to all OpenJPA
+     * components; therefore it is a good place to maintain shared resources
+     * such as connection pools, etc.
+     */
+    protected OpenJPAConfiguration newConfiguration() {
+<span class="nc" id="L512">        return new OpenJPAConfigurationImpl();</span>
+    }
+
+    /**
+     * Returns a set of option names that this store manager does
+     * not support. By default, returns the following:
+     * &lt;ul&gt;
+     * &lt;li&gt;{@link OpenJPAConfiguration#OPTION_OPTIMISTIC}&lt;/li&gt;
+     * &lt;li&gt;{@link OpenJPAConfiguration#OPTION_ID_DATASTORE}&lt;/li&gt;
+     * &lt;li&gt;{@link OpenJPAConfiguration#OPTION_INC_FLUSH}&lt;/li&gt;
+     * &lt;li&gt;{@link OpenJPAConfiguration#OPTION_VALUE_AUTOASSIGN}&lt;/li&gt;
+     * &lt;li&gt;{@link OpenJPAConfiguration#OPTION_VALUE_INCREMENT}&lt;/li&gt;
+     * &lt;li&gt;{@link OpenJPAConfiguration#OPTION_DATASTORE_CONNECTION}&lt;/li&gt;
+     * &lt;/ul&gt;
+     */
+    protected Collection&lt;String&gt; getUnsupportedOptions() {
+<span class="nc" id="L528">        Collection&lt;String&gt; c = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L529">        c.add(OpenJPAConfiguration.OPTION_OPTIMISTIC);</span>
+<span class="nc" id="L530">        c.add(OpenJPAConfiguration.OPTION_ID_DATASTORE);</span>
+<span class="nc" id="L531">        c.add(OpenJPAConfiguration.OPTION_INC_FLUSH);</span>
+<span class="nc" id="L532">        c.add(OpenJPAConfiguration.OPTION_VALUE_AUTOASSIGN);</span>
+<span class="nc" id="L533">        c.add(OpenJPAConfiguration.OPTION_VALUE_INCREMENT);</span>
+<span class="nc" id="L534">        c.add(OpenJPAConfiguration.OPTION_DATASTORE_CONNECTION);</span>
+<span class="nc" id="L535">        return c;</span>
+    }
+
+    /**
+     * Returns a string name to identify the platform of this
+     * store manager. Returns the class name of this store manager by default.
+     */
+    protected String getPlatform ()
+	{
+<span class="nc" id="L544">		return getClass ().getName ();</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

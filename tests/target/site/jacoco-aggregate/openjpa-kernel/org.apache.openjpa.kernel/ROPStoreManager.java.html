@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ROPStoreManager.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">ROPStoreManager.java</span></div><h1>ROPStoreManager.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.util.BitSet;
+
+import org.apache.openjpa.util.OpenJPAException;
+import org.apache.openjpa.util.StoreException;
+
+/**
+ * Wraps the native store manager to handle calls using custom
+ * {@link PCResultObjectProvider}s.
+ *
+ * @author Abe White
+ */
+class ROPStoreManager
+    extends DelegatingStoreManager {
+
+    public ROPStoreManager(StoreManager delegate) {
+<span class="nc" id="L36">        super(delegate);</span>
+<span class="nc" id="L37">    }</span>
+
+    @Override
+    public boolean exists(OpenJPAStateManager sm, Object context) {
+<span class="nc bnc" id="L41" title="All 2 branches missed.">        if (context instanceof PCResultObjectProvider)</span>
+<span class="nc" id="L42">            context = null;</span>
+<span class="nc" id="L43">        return super.exists(sm, context);</span>
+    }
+
+    @Override
+    public boolean initialize(OpenJPAStateManager sm, PCState state,
+        FetchConfiguration fetch, Object context) {
+<span class="nc bnc" id="L49" title="All 2 branches missed.">        if (context instanceof PCResultObjectProvider) {</span>
+            try {
+<span class="nc" id="L51">                ((PCResultObjectProvider) context).initialize(sm, state, fetch);</span>
+<span class="nc" id="L52">            } catch (OpenJPAException ke) {</span>
+<span class="nc" id="L53">                throw ke;</span>
+<span class="nc" id="L54">            } catch (Exception e) {</span>
+<span class="nc" id="L55">                throw new StoreException(e);</span>
+<span class="nc" id="L56">            }</span>
+<span class="nc" id="L57">            return true;</span>
+        }
+<span class="nc" id="L59">        return super.initialize(sm, state, fetch, context);</span>
+    }
+
+    @Override
+    public boolean syncVersion(OpenJPAStateManager sm, Object context) {
+        // the only way this gets called with a rop context is if the
+        // rop didn't load any version info on initialize, so just null
+        // it out so we don't get unexpected results when our delegate
+        // expectes a different context type
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (context instanceof PCResultObjectProvider)</span>
+<span class="nc" id="L69">            context = null;</span>
+<span class="nc" id="L70">        return super.syncVersion(sm, context);</span>
+    }
+
+    @Override
+    public boolean load(OpenJPAStateManager sm, BitSet fields,
+        FetchConfiguration fetch, int lockLevel, Object context) {
+        // the only way this gets called with a rop context is if the
+        // rop didn't load the field on initialize, so just null
+        // it out so we don't get unexpected results when our delegate
+        // expectes a different context type
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (context instanceof PCResultObjectProvider)</span>
+<span class="nc" id="L81">            context = null;</span>
+<span class="nc" id="L82">        return super.load(sm, fields, fetch, lockLevel, context);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

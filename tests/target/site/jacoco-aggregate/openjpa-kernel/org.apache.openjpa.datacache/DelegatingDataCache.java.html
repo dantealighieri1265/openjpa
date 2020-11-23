@@ -1,0 +1,426 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DelegatingDataCache.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.datacache</a> &gt; <span class="el_source">DelegatingDataCache.java</span></div><h1>DelegatingDataCache.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.datacache;
+
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+import org.apache.openjpa.util.RuntimeExceptionTranslator;
+
+/**
+ * Delegating data cache that can also perform exception translation for
+ * use in facades. This cache allows its delegate to be null, in which
+ * case it returns default values for all operations.
+ *
+ * @author Abe White
+ */
+public class DelegatingDataCache
+    implements DataCache {
+
+<span class="nc" id="L40">    private static final BitSet EMPTY_BITSET = new BitSet(0);</span>
+
+    private final DataCache _cache;
+    private final DelegatingDataCache _del;
+    private final RuntimeExceptionTranslator _trans;
+
+    /**
+     * Constructor. Supply delegate.
+     */
+    public DelegatingDataCache(DataCache cache) {
+<span class="nc" id="L50">        this(cache, null);</span>
+<span class="nc" id="L51">    }</span>
+
+    public DelegatingDataCache(DataCache cache,
+<span class="nc" id="L54">        RuntimeExceptionTranslator trans) {</span>
+<span class="nc" id="L55">        _cache = cache;</span>
+<span class="nc" id="L56">        _trans = trans;</span>
+<span class="nc bnc" id="L57" title="All 2 branches missed.">        if (cache instanceof DelegatingDataCache)</span>
+<span class="nc" id="L58">            _del = (DelegatingDataCache) _cache;</span>
+        else
+<span class="nc" id="L60">            _del = null;</span>
+<span class="nc" id="L61">    }</span>
+
+    /**
+     * Return the direct delegate.
+     */
+    public DataCache getDelegate() {
+<span class="nc" id="L67">        return _cache;</span>
+    }
+
+    /**
+     * Return the native delegate.
+     */
+    public DataCache getInnermostDelegate() {
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        return (_del == null) ? _cache : _del.getInnermostDelegate();</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L80">            return super.hashCode();</span>
+<span class="nc" id="L81">        return getInnermostDelegate().hashCode();</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        if (other == this)</span>
+<span class="nc" id="L87">            return true;</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (other instanceof DelegatingDataCache)</span>
+<span class="nc" id="L89">            other = ((DelegatingDataCache) other).getInnermostDelegate();</span>
+<span class="nc" id="L90">        return Objects.equals(getInnermostDelegate(), other);</span>
+    }
+
+    /**
+     * Translate the OpenJPA exception.
+     */
+    protected RuntimeException translate(RuntimeException re) {
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        return (_trans == null) ? re : _trans.translate(re);</span>
+    }
+
+    @Override
+    public String getName() {
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L103">            return null;</span>
+        try {
+<span class="nc" id="L105">            return _cache.getName();</span>
+<span class="nc" id="L106">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L107">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setName(String name) {
+<span class="nc bnc" id="L113" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L114">            return;</span>
+        try {
+<span class="nc" id="L116">            _cache.setName(name);</span>
+<span class="nc" id="L117">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L118">            throw translate(re);</span>
+<span class="nc" id="L119">        }</span>
+<span class="nc" id="L120">    }</span>
+
+    @Override
+    public void initialize(DataCacheManager manager) {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L125">            return;</span>
+        try {
+<span class="nc" id="L127">            _cache.initialize(manager);</span>
+<span class="nc" id="L128">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L129">            throw translate(re);</span>
+<span class="nc" id="L130">        }</span>
+<span class="nc" id="L131">    }</span>
+
+    @Override
+    public void commit(Collection&lt;DataCachePCData&gt; additions, Collection&lt;DataCachePCData&gt; newUpdates,
+        Collection&lt;DataCachePCData&gt; existingUpdates, Collection&lt;Object&gt; deletes) {
+<span class="nc bnc" id="L136" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L137">            return;</span>
+        try {
+<span class="nc" id="L139">            _cache.commit(additions, newUpdates, existingUpdates, deletes);</span>
+<span class="nc" id="L140">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L141">            throw translate(re);</span>
+<span class="nc" id="L142">        }</span>
+<span class="nc" id="L143">    }</span>
+
+    @Override
+    public boolean contains(Object oid) {
+<span class="nc bnc" id="L147" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L148">            return false;</span>
+        try {
+<span class="nc" id="L150">            return _cache.contains(oid);</span>
+<span class="nc" id="L151">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L152">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public BitSet containsAll(Collection&lt;Object&gt; oids) {
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L159">            return EMPTY_BITSET;</span>
+        try {
+<span class="nc" id="L161">            return _cache.containsAll(oids);</span>
+<span class="nc" id="L162">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L163">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public DataCachePCData get(Object oid) {
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L170">            return null;</span>
+        try {
+<span class="nc" id="L172">            return _cache.get(oid);</span>
+<span class="nc" id="L173">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L174">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public DataCachePCData put(DataCachePCData value) {
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L181">            return null;</span>
+        try {
+<span class="nc" id="L183">            return _cache.put(value);</span>
+<span class="nc" id="L184">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L185">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void update(DataCachePCData value) {
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L192">            return;</span>
+        try {
+<span class="nc" id="L194">            _cache.update(value);</span>
+<span class="nc" id="L195">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L196">            throw translate(re);</span>
+<span class="nc" id="L197">        }</span>
+<span class="nc" id="L198">    }</span>
+
+    @Override
+    public DataCachePCData remove(Object oid) {
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L203">            return null;</span>
+        try {
+<span class="nc" id="L205">            return _cache.remove(oid);</span>
+<span class="nc" id="L206">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L207">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public BitSet removeAll(Collection&lt;Object&gt; oids) {
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L214">            return EMPTY_BITSET;</span>
+        try {
+<span class="nc" id="L216">            return _cache.removeAll(oids);</span>
+<span class="nc" id="L217">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L218">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void removeAll(Class&lt;?&gt; cls, boolean subclasses) {
+<span class="nc bnc" id="L224" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L225">            return;</span>
+        try {
+<span class="nc" id="L227">            _cache.removeAll(cls, subclasses);</span>
+<span class="nc" id="L228">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L229">            throw translate(re);</span>
+<span class="nc" id="L230">        }</span>
+<span class="nc" id="L231">    }</span>
+
+    @Override
+    public void clear() {
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L236">            return;</span>
+        try {
+<span class="nc" id="L238">            _cache.clear();</span>
+<span class="nc" id="L239">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L240">            throw translate(re);</span>
+<span class="nc" id="L241">        }</span>
+<span class="nc" id="L242">    }</span>
+
+    @Override
+    public boolean pin(Object oid) {
+<span class="nc bnc" id="L246" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L247">            return false;</span>
+        try {
+<span class="nc" id="L249">            return _cache.pin(oid);</span>
+<span class="nc" id="L250">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L251">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public BitSet pinAll(Collection&lt;Object&gt; oids) {
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L258">            return EMPTY_BITSET;</span>
+        try {
+<span class="nc" id="L260">            return _cache.pinAll(oids);</span>
+<span class="nc" id="L261">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L262">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void pinAll(Class&lt;?&gt; cls, boolean subs) {
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L269">            return;</span>
+        try {
+<span class="nc" id="L271">            _cache.pinAll(cls, subs);</span>
+<span class="nc" id="L272">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L273">            throw translate(re);</span>
+<span class="nc" id="L274">        }</span>
+<span class="nc" id="L275">    }</span>
+
+    @Override
+    public boolean unpin(Object oid) {
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L280">            return false;</span>
+        try {
+<span class="nc" id="L282">            return _cache.unpin(oid);</span>
+<span class="nc" id="L283">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L284">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public BitSet unpinAll(Collection&lt;Object&gt; oids) {
+<span class="nc bnc" id="L290" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L291">            return EMPTY_BITSET;</span>
+        try {
+<span class="nc" id="L293">            return _cache.unpinAll(oids);</span>
+<span class="nc" id="L294">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L295">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void unpinAll(Class&lt;?&gt; cls, boolean subs) {
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L302">            return;</span>
+        try {
+<span class="nc" id="L304">            _cache.unpinAll(cls, subs);</span>
+<span class="nc" id="L305">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L306">            throw translate(re);</span>
+<span class="nc" id="L307">        }</span>
+<span class="nc" id="L308">    }</span>
+
+    @Override
+    public void writeLock() {
+<span class="nc bnc" id="L312" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L313">            return;</span>
+        try {
+<span class="nc" id="L315">            _cache.writeLock();</span>
+<span class="nc" id="L316">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L317">            throw translate(re);</span>
+<span class="nc" id="L318">        }</span>
+<span class="nc" id="L319">    }</span>
+
+    @Override
+    public void writeUnlock() {
+<span class="nc bnc" id="L323" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L324">            return;</span>
+        try {
+<span class="nc" id="L326">            _cache.writeUnlock();</span>
+<span class="nc" id="L327">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L328">            throw translate(re);</span>
+<span class="nc" id="L329">        }</span>
+<span class="nc" id="L330">    }</span>
+
+    @Override
+    public void addExpirationListener(ExpirationListener listen) {
+<span class="nc bnc" id="L334" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L335">            return;</span>
+        try {
+<span class="nc" id="L337">            _cache.addExpirationListener(listen);</span>
+<span class="nc" id="L338">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L339">            throw translate(re);</span>
+<span class="nc" id="L340">        }</span>
+<span class="nc" id="L341">    }</span>
+
+    @Override
+    public boolean removeExpirationListener(ExpirationListener listen) {
+<span class="nc bnc" id="L345" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L346">            return false;</span>
+        try {
+<span class="nc" id="L348">            return _cache.removeExpirationListener(listen);</span>
+<span class="nc" id="L349">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L350">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void close() {
+<span class="nc bnc" id="L356" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L357">            return;</span>
+        try {
+<span class="nc" id="L359">            _cache.close();</span>
+<span class="nc" id="L360">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L361">            throw translate(re);</span>
+<span class="nc" id="L362">		}</span>
+<span class="nc" id="L363">	}</span>
+
+    @Override
+    public Map&lt;Object,DataCachePCData&gt; getAll(List&lt;Object&gt; keys) {
+<span class="nc bnc" id="L367" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L368">            return null;</span>
+        try {
+<span class="nc" id="L370">            return _cache.getAll(keys);</span>
+<span class="nc" id="L371">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L372">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public CacheStatistics getStatistics() {
+<span class="nc bnc" id="L378" title="All 2 branches missed.">    	return (_cache == null) ? null : _cache.getStatistics();</span>
+    }
+
+
+    @Override
+    public DataCache getPartition(String name, boolean create) {
+<span class="nc bnc" id="L384" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L385">            return null;</span>
+        try {
+<span class="nc" id="L387">            return _cache.getPartition(name, create);</span>
+<span class="nc" id="L388">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L389">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Set&lt;String&gt; getPartitionNames() {
+<span class="nc bnc" id="L395" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L396">            return null;</span>
+        try {
+<span class="nc" id="L398">            return _cache.getPartitionNames();</span>
+<span class="nc" id="L399">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L400">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean isPartitioned() {
+<span class="nc bnc" id="L406" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L407">            return false;</span>
+        try {
+<span class="nc" id="L409">            return _cache.isPartitioned();</span>
+<span class="nc" id="L410">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L411">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean getEvictOnBulkUpdate() {
+<span class="nc bnc" id="L417" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L418">            return false;</span>
+        try {
+<span class="nc" id="L420">            return _cache.getEvictOnBulkUpdate();</span>
+<span class="nc" id="L421">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L422">            throw translate(re);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

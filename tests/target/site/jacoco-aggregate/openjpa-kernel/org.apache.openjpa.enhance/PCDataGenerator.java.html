@@ -1,0 +1,1082 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PCDataGenerator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.enhance</a> &gt; <span class="el_source">PCDataGenerator.java</span></div><h1>PCDataGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.enhance;
+
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.kernel.AbstractPCData;
+import org.apache.openjpa.kernel.FetchConfiguration;
+import org.apache.openjpa.kernel.OpenJPAStateManager;
+import org.apache.openjpa.kernel.PCData;
+import org.apache.openjpa.kernel.StoreContext;
+import org.apache.openjpa.lib.log.Log;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.StringUtil;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.FieldMetaData;
+import org.apache.openjpa.meta.JavaTypes;
+import org.apache.openjpa.util.InternalException;
+
+import serp.bytecode.BCClass;
+import serp.bytecode.BCField;
+import serp.bytecode.BCMethod;
+import serp.bytecode.Code;
+import serp.bytecode.Constants;
+import serp.bytecode.ExceptionHandler;
+import serp.bytecode.Instruction;
+import serp.bytecode.JumpInstruction;
+import serp.bytecode.LookupSwitchInstruction;
+
+/**
+ * Generates {@link PCData} instances which avoid primitive wrappers
+ * to optimize memory use and performance at the cost of slightly higher
+ * startup time.
+ *
+ * @author Steve Kim
+ * @since 0.3.2
+ */
+public class PCDataGenerator
+    extends DynamicStorageGenerator {
+
+<span class="nc" id="L63">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L64">        (PCDataGenerator.class);</span>
+
+    protected static final String POSTFIX = &quot;$openjpapcdata&quot;;
+
+<span class="nc" id="L68">    private final Map&lt;Class&lt;?&gt;, DynamicStorage&gt; _generated = new ConcurrentHashMap&lt;&gt;();</span>
+    private final OpenJPAConfiguration _conf;
+    private final Log _log;
+
+<span class="nc" id="L72">    public PCDataGenerator(OpenJPAConfiguration conf) {</span>
+<span class="nc" id="L73">        _conf = conf;</span>
+<span class="nc" id="L74">        _log = _conf.getLogFactory().getLog(OpenJPAConfiguration.LOG_ENHANCE);</span>
+<span class="nc" id="L75">    }</span>
+
+    /**
+     * Return the configuration.
+     */
+    public OpenJPAConfiguration getConfiguration() {
+<span class="nc" id="L81">        return _conf;</span>
+    }
+
+    /**
+     * Return a {@link PCData} instance for the given oid and metadata.
+     */
+    public PCData generatePCData(Object oid, ClassMetaData meta) {
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        if (meta == null)</span>
+<span class="nc" id="L89">            return null;</span>
+<span class="nc" id="L90">        Class&lt;?&gt; type = meta.getDescribedType();</span>
+<span class="nc" id="L91">        DynamicStorage storage = _generated.get(type);</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (storage == null) {</span>
+<span class="nc" id="L93">            storage = generateStorage(meta);</span>
+<span class="nc" id="L94">            _generated.put(type, storage);</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (_log.isTraceEnabled())</span>
+<span class="nc" id="L96">                _log.trace(_loc.get(&quot;pcdata-created&quot;, type.getName(), meta));</span>
+        }
+<span class="nc" id="L98">        DynamicPCData data = (DynamicPCData) storage.newInstance();</span>
+<span class="nc" id="L99">        data.setId(oid);</span>
+<span class="nc" id="L100">        data.setStorageGenerator(this);</span>
+<span class="nc" id="L101">        finish(data, meta);</span>
+<span class="nc" id="L102">        return data;</span>
+    }
+
+    /**
+     * Actually generate the factory instance.
+     */
+    private DynamicStorage generateStorage(ClassMetaData meta) {
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (_log.isTraceEnabled())</span>
+<span class="nc" id="L110">            _log.trace(_loc.get(&quot;pcdata-generate&quot;, meta));</span>
+
+<span class="nc" id="L112">        FieldMetaData[] fields = meta.getFields();</span>
+<span class="nc" id="L113">        int[] types = new int[fields.length];</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        for (int i = 0; i &lt; types.length; i++)</span>
+<span class="nc" id="L115">            types[i] = replaceType(fields[i]);</span>
+<span class="nc" id="L116">        return generateStorage(types, meta);</span>
+    }
+
+    /**
+     * Perform any final actions before the pcdata is returned to client code.
+     */
+    protected void finish(DynamicPCData data, ClassMetaData meta) {
+<span class="nc" id="L123">    }</span>
+
+    @Override
+    protected int getCreateFieldMethods(int typeCode) {
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        if (typeCode &gt;= JavaTypes.OBJECT)</span>
+<span class="nc" id="L128">            return POLICY_SILENT;</span>
+        // don't bother creating set/get&lt;Primitive&gt; methods
+<span class="nc" id="L130">        return POLICY_EMPTY;</span>
+    }
+
+    @Override
+    protected void declareClasses(BCClass bc) {
+<span class="nc" id="L135">        super.declareClasses(bc);</span>
+<span class="nc" id="L136">        bc.declareInterface(DynamicPCData.class);</span>
+<span class="nc" id="L137">        bc.setSuperclass(AbstractPCData.class);</span>
+<span class="nc" id="L138">    }</span>
+
+    @Override
+    protected final String getClassName(Object obj) {
+<span class="nc" id="L142">        return getUniqueName(((ClassMetaData) obj).getDescribedType());</span>
+    }
+
+    /**
+     * Creates a unique name for the given type's pcdata implementation.
+     */
+    protected String getUniqueName(Class&lt;?&gt; type) {
+<span class="nc" id="L149">        return type.getName() + &quot;$&quot; + System.identityHashCode(type) + POSTFIX;</span>
+    }
+
+    @Override
+    protected final void decorate(Object obj, BCClass bc, int[] types) {
+<span class="nc" id="L154">        super.decorate(obj, bc, types);</span>
+<span class="nc" id="L155">        ClassMetaData meta = (ClassMetaData) obj;</span>
+
+<span class="nc" id="L157">        enhanceConstructor(bc);</span>
+<span class="nc" id="L158">        addBaseFields(bc);</span>
+<span class="nc" id="L159">        addImplDataMethods(bc, meta);</span>
+<span class="nc" id="L160">        addFieldImplDataMethods(bc, meta);</span>
+<span class="nc" id="L161">        addVersionMethods(bc);</span>
+<span class="nc" id="L162">        addGetType(bc, meta);</span>
+<span class="nc" id="L163">        addLoadMethod(bc, meta);</span>
+<span class="nc" id="L164">        addLoadWithFieldsMethod(bc, meta);</span>
+<span class="nc" id="L165">        addStoreMethods(bc, meta);</span>
+<span class="nc" id="L166">        addNewEmbedded(bc);</span>
+<span class="nc" id="L167">        addGetData(bc);</span>
+<span class="nc" id="L168">        decorate(bc, meta);</span>
+<span class="nc" id="L169">    }</span>
+
+    /**
+     * Apply additional decoration to generated class.
+     */
+    protected void decorate(BCClass bc, ClassMetaData meta) {
+<span class="nc" id="L175">    }</span>
+
+    /**
+     * Enhance constructor to initialize fields
+     */
+    private void enhanceConstructor(BCClass bc) {
+<span class="nc" id="L181">        BCMethod cons = bc.getDeclaredMethod(&quot;&lt;init&gt;&quot;, (String[]) null);</span>
+<span class="nc" id="L182">        Code code = cons.getCode(false);</span>
+<span class="nc" id="L183">        code.afterLast();</span>
+<span class="nc" id="L184">        code.previous();</span>
+
+        // private BitSet loaded = new BitSet();
+<span class="nc" id="L187">        BCField loaded = addBeanField(bc, &quot;loaded&quot;, BitSet.class);</span>
+<span class="nc" id="L188">        loaded.setFinal(true);</span>
+<span class="nc" id="L189">        code.aload().setThis();</span>
+<span class="nc" id="L190">        code.anew().setType(BitSet.class);</span>
+<span class="nc" id="L191">        code.dup();</span>
+<span class="nc" id="L192">        code.constant().setValue(bc.getFields().length);</span>
+<span class="nc" id="L193">        code.invokespecial().setMethod(BitSet.class, &quot;&lt;init&gt;&quot;, void.class,</span>
+            new Class[]{ int.class });
+<span class="nc" id="L195">        code.putfield().setField(loaded);</span>
+
+<span class="nc" id="L197">        code.calculateMaxStack();</span>
+<span class="nc" id="L198">        code.calculateMaxLocals();</span>
+<span class="nc" id="L199">    }</span>
+
+    /**
+     * Have to load the type since it may not be available to the
+     * same classloader (i.e. rar vs. ear). The context classloader
+     * (i.e. the user app classloader) should be fine.
+     */
+    private void addGetType(BCClass bc, ClassMetaData meta) {
+<span class="nc" id="L207">        BCField type = bc.declareField(&quot;type&quot;, Class.class);</span>
+<span class="nc" id="L208">        type.setStatic(true);</span>
+<span class="nc" id="L209">        type.makePrivate();</span>
+        // public Class getType() {
+<span class="nc" id="L211">        BCMethod getter = bc.declareMethod(&quot;getType&quot;, Class.class, null);</span>
+<span class="nc" id="L212">        getter.makePublic();</span>
+<span class="nc" id="L213">        Code code = getter.getCode(true);</span>
+        // if (type == null) {
+        // 		try {
+        // 			type = Class.forName
+        // 	            (meta.getDescribedType().getName(), true,
+        // 	            Thread.currentThread().getContextClassLoader());
+        // 		} catch (ClassNotFoundException cnfe) {
+        // 			throw new InternalException();
+        // 		}
+        // }
+<span class="nc" id="L223">        code.getstatic().setField(type);</span>
+
+<span class="nc" id="L225">        Collection&lt;Instruction&gt; jumps = new LinkedList&lt;&gt;();</span>
+<span class="nc" id="L226">        jumps.add(code.ifnonnull());</span>
+<span class="nc" id="L227">        ExceptionHandler handler = code.addExceptionHandler();</span>
+
+<span class="nc" id="L229">        handler.setTryStart(code.constant().setValue</span>
+<span class="nc" id="L230">            (meta.getDescribedType().getName()));</span>
+<span class="nc" id="L231">        code.constant().setValue(true);</span>
+<span class="nc" id="L232">        code.invokestatic().setMethod(Thread.class, &quot;currentThread&quot;,</span>
+            Thread.class, null);
+<span class="nc" id="L234">        code.invokevirtual().setMethod(Thread.class, &quot;getContextClassLoader&quot;,</span>
+            ClassLoader.class, null);
+<span class="nc" id="L236">        code.invokestatic().setMethod(Class.class, &quot;forName&quot;, Class.class,</span>
+            new Class[]{ String.class, boolean.class, ClassLoader.class });
+<span class="nc" id="L238">        code.putstatic().setField(type);</span>
+<span class="nc" id="L239">        Instruction go2 = code.go2();</span>
+<span class="nc" id="L240">        jumps.add(go2);</span>
+<span class="nc" id="L241">        handler.setTryEnd(go2);</span>
+<span class="nc" id="L242">        handler.setCatch(ClassNotFoundException.class);</span>
+<span class="nc" id="L243">        handler.setHandlerStart(throwException</span>
+<span class="nc" id="L244">            (code, InternalException.class));</span>
+<span class="nc" id="L245">        setTarget(code.getstatic().setField(type), jumps);</span>
+<span class="nc" id="L246">        code.areturn();</span>
+
+<span class="nc" id="L248">        code.calculateMaxStack();</span>
+<span class="nc" id="L249">        code.calculateMaxLocals();</span>
+<span class="nc" id="L250">    }</span>
+
+    /**
+     * Declare standard dynamic pcdata fields.
+     */
+    private void addBaseFields(BCClass bc) {
+<span class="nc" id="L256">        addBeanField(bc, &quot;id&quot;, Object.class);</span>
+<span class="nc" id="L257">        BCField field = addBeanField(bc, &quot;storageGenerator&quot;,</span>
+            PCDataGenerator.class);
+<span class="nc" id="L259">        field.setAccessFlags(field.getAccessFlags()</span>
+            | Constants.ACCESS_TRANSIENT);
+<span class="nc" id="L261">    }</span>
+
+    /**
+     * Add methods for loading and storing class-level impl data.
+     */
+    private void addImplDataMethods(BCClass bc, ClassMetaData meta) {
+        // void storeImplData(OpenJPAStateManager);
+<span class="nc" id="L268">        BCMethod meth = bc.declareMethod(&quot;storeImplData&quot;, void.class,</span>
+            new Class[]{ OpenJPAStateManager.class });
+<span class="nc" id="L270">        Code code = meth.getCode(true);</span>
+
+<span class="nc" id="L272">        BCField impl = null;</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        if (!usesImplData(meta))</span>
+<span class="nc" id="L274">            code.vreturn();</span>
+        else {
+            // if (sm.isImplDataCacheable())
+            // 		setImplData(sm.getImplData());
+<span class="nc" id="L278">            impl = addBeanField(bc, &quot;implData&quot;, Object.class);</span>
+<span class="nc" id="L279">            code.aload().setParam(0);</span>
+<span class="nc" id="L280">            code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+                &quot;isImplDataCacheable&quot;, boolean.class, null);
+<span class="nc" id="L282">            JumpInstruction ifins = code.ifeq();</span>
+<span class="nc" id="L283">            code.aload().setThis();</span>
+<span class="nc" id="L284">            code.aload().setParam(0);</span>
+<span class="nc" id="L285">            code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+                &quot;getImplData&quot;, Object.class, null);
+<span class="nc" id="L287">            code.invokevirtual().setMethod(&quot;setImplData&quot;, void.class,</span>
+                new Class[]{ Object.class });
+<span class="nc" id="L289">            ifins.setTarget(code.vreturn());</span>
+        }
+<span class="nc" id="L291">        code.calculateMaxStack();</span>
+<span class="nc" id="L292">        code.calculateMaxLocals();</span>
+
+        // void loadImplData(OpenJPAStateManager);
+<span class="nc" id="L295">        meth = bc.declareMethod(&quot;loadImplData&quot;, void.class,</span>
+            new Class[]{ OpenJPAStateManager.class });
+<span class="nc" id="L297">        code = meth.getCode(true);</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">        if (!usesImplData(meta))</span>
+<span class="nc" id="L299">            code.vreturn();</span>
+        else {
+            // if (sm.getImplData() == null &amp;&amp; implData != null)
+            // 		sm.setImplData(impl, true);
+<span class="nc" id="L303">            code.aload().setParam(0);</span>
+<span class="nc" id="L304">            code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+                &quot;getImplData&quot;, Object.class, null);
+<span class="nc" id="L306">            JumpInstruction ifins = code.ifnonnull();</span>
+<span class="nc" id="L307">            code.aload().setThis();</span>
+<span class="nc" id="L308">            code.getfield().setField(impl);</span>
+<span class="nc" id="L309">            JumpInstruction ifins2 = code.ifnull();</span>
+<span class="nc" id="L310">            code.aload().setParam(0);</span>
+<span class="nc" id="L311">            code.aload().setThis();</span>
+<span class="nc" id="L312">            code.getfield().setField(impl);</span>
+<span class="nc" id="L313">            code.constant().setValue(true);</span>
+<span class="nc" id="L314">            code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+                &quot;setImplData&quot;, void.class,
+                new Class[]{ Object.class, boolean.class });
+<span class="nc" id="L317">            Instruction ins = code.vreturn();</span>
+<span class="nc" id="L318">            ifins.setTarget(ins);</span>
+<span class="nc" id="L319">            ifins2.setTarget(ins);</span>
+        }
+<span class="nc" id="L321">        code.calculateMaxStack();</span>
+<span class="nc" id="L322">        code.calculateMaxLocals();</span>
+<span class="nc" id="L323">    }</span>
+
+    /**
+     * Add methods for loading and storing class-level impl data.
+     */
+    private void addFieldImplDataMethods(BCClass bc, ClassMetaData meta) {
+        // public void loadImplData(OpenJPAStateManager sm, int i)
+<span class="nc" id="L330">        BCMethod meth = bc.declareMethod(&quot;loadImplData&quot;, void.class,</span>
+            new Class[]{ OpenJPAStateManager.class, int.class });
+<span class="nc" id="L332">        meth.makePrivate();</span>
+<span class="nc" id="L333">        Code code = meth.getCode(true);</span>
+
+<span class="nc" id="L335">        int count = countImplDataFields(meta);</span>
+<span class="nc" id="L336">        BCField impl = null;</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">        if (count == 0)</span>
+<span class="nc" id="L338">            code.vreturn();</span>
+        else {
+            // Object[] fieldImpl
+<span class="nc" id="L341">            impl = bc.declareField(&quot;fieldImpl&quot;, Object[].class);</span>
+<span class="nc" id="L342">            impl.makePrivate();</span>
+
+            // if (fieldImpl != null)
+<span class="nc" id="L345">            code.aload().setThis();</span>
+<span class="nc" id="L346">            code.getfield().setField(impl);</span>
+<span class="nc" id="L347">            JumpInstruction ifins = code.ifnonnull();</span>
+<span class="nc" id="L348">            code.vreturn();</span>
+
+            // Object obj = null;
+<span class="nc" id="L351">            int obj = code.getNextLocalsIndex();</span>
+<span class="nc" id="L352">            ifins.setTarget(code.constant().setNull());</span>
+<span class="nc" id="L353">            code.astore().setLocal(obj);</span>
+
+            // establish switch target, then move before it
+<span class="nc" id="L356">            Instruction target = code.aload().setLocal(obj);</span>
+<span class="nc" id="L357">            code.previous();</span>
+
+            // switch(i)
+<span class="nc" id="L360">            code.iload().setParam(1);</span>
+<span class="nc" id="L361">            LookupSwitchInstruction lswitch = code.lookupswitch();</span>
+<span class="nc" id="L362">            FieldMetaData[] fields = meta.getFields();</span>
+<span class="nc" id="L363">            int cacheable = 0;</span>
+<span class="nc bnc" id="L364" title="All 2 branches missed.">            for (int i = 0; i &lt; fields.length; i++) {</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">                if (!usesImplData(fields[i]))</span>
+<span class="nc" id="L366">                    continue;</span>
+                // case x: obj = fieldImpl[y]; break;
+<span class="nc" id="L368">                lswitch.addCase(i, code.aload().setThis());</span>
+<span class="nc" id="L369">                code.getfield().setField(impl);</span>
+<span class="nc" id="L370">                code.constant().setValue(cacheable++);</span>
+<span class="nc" id="L371">                code.aaload();</span>
+<span class="nc" id="L372">                code.astore().setLocal(obj);</span>
+<span class="nc" id="L373">                code.go2().setTarget(target);</span>
+            }
+<span class="nc" id="L375">            lswitch.setDefaultTarget(target);</span>
+
+            // if (obj != null)
+<span class="nc" id="L378">            code.next();    // jump back over target</span>
+<span class="nc" id="L379">            ifins = code.ifnonnull();</span>
+<span class="nc" id="L380">            code.vreturn();</span>
+
+            // sm.setImplData(index, impl);
+<span class="nc" id="L383">            ifins.setTarget(code.aload().setParam(0));</span>
+<span class="nc" id="L384">            code.iload().setParam(1);</span>
+<span class="nc" id="L385">            code.aload().setLocal(obj);</span>
+<span class="nc" id="L386">            code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+                &quot;setImplData&quot;, void.class,
+                new Class[]{ int.class, Object.class });
+<span class="nc" id="L389">            code.vreturn();</span>
+        }
+<span class="nc" id="L391">        code.calculateMaxLocals();</span>
+<span class="nc" id="L392">        code.calculateMaxStack();</span>
+
+        // void storeImplData(OpenJPAStateManager sm, int index, boolean loaded)
+<span class="nc" id="L395">        meth = bc.declareMethod(&quot;storeImplData&quot;, void.class,</span>
+            new Class[]{ OpenJPAStateManager.class, int.class, boolean.class });
+<span class="nc" id="L397">        code = meth.getCode(true);</span>
+<span class="nc bnc" id="L398" title="All 2 branches missed.">        if (count == 0)</span>
+<span class="nc" id="L399">            code.vreturn();</span>
+        else {
+            // int arrIdx = -1;
+            // switch(index)
+<span class="nc" id="L403">            int arrIdx = code.getNextLocalsIndex();</span>
+<span class="nc" id="L404">            code.constant().setValue(-1);</span>
+<span class="nc" id="L405">            code.istore().setLocal(arrIdx);</span>
+<span class="nc" id="L406">            code.iload().setParam(1);</span>
+<span class="nc" id="L407">            LookupSwitchInstruction lswitch = code.lookupswitch();</span>
+
+            // establish switch target, then move before it
+<span class="nc" id="L410">            Instruction switchTarget = code.iload().setLocal(arrIdx);</span>
+<span class="nc" id="L411">            code.previous();</span>
+
+<span class="nc" id="L413">            FieldMetaData[] fields = meta.getFields();</span>
+<span class="nc" id="L414">            int cacheable = 0;</span>
+<span class="nc bnc" id="L415" title="All 2 branches missed.">            for (int i = 0; i &lt; fields.length; i++) {</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">                if (!usesImplData(fields[i]))</span>
+<span class="nc" id="L417">                    continue;</span>
+                // case x: arrIdx = y; break;
+<span class="nc" id="L419">                lswitch.addCase(i, code.constant().setValue(cacheable++));</span>
+<span class="nc" id="L420">                code.istore().setLocal(arrIdx);</span>
+<span class="nc" id="L421">                code.go2().setTarget(switchTarget);</span>
+            }
+<span class="nc" id="L423">            lswitch.setDefaultTarget(switchTarget);</span>
+<span class="nc" id="L424">            code.next();    // step over switch target</span>
+
+            // if (arrIdx != -1)
+<span class="nc" id="L427">            code.constant().setValue(-1);</span>
+<span class="nc" id="L428">            JumpInstruction ifins = code.ificmpne();</span>
+<span class="nc" id="L429">            code.vreturn();</span>
+
+            // create null target, then move before it
+<span class="nc" id="L432">            Instruction nullTarget = code.aload().setThis();</span>
+<span class="nc" id="L433">            code.previous();</span>
+
+            // if (loaded)
+<span class="nc" id="L436">            ifins.setTarget(code.iload().setParam(2));</span>
+<span class="nc" id="L437">            code.ifeq().setTarget(nullTarget);</span>
+
+            // Object obj = sm.getImplData(index)
+<span class="nc" id="L440">            int obj = code.getNextLocalsIndex();</span>
+<span class="nc" id="L441">            code.aload().setParam(0);</span>
+<span class="nc" id="L442">            code.iload().setParam(1);</span>
+<span class="nc" id="L443">            code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+                &quot;getImplData&quot;, Object.class, new Class[]{ int.class });
+<span class="nc" id="L445">            code.astore().setLocal(obj);</span>
+
+            // if (obj != null)
+<span class="nc" id="L448">            code.aload().setLocal(obj);</span>
+<span class="nc" id="L449">            code.ifnull().setTarget(nullTarget);</span>
+
+            // if (fieldImpl == null)
+            // 		fieldImpl = new Object[fields];
+<span class="nc" id="L453">            code.aload().setThis();</span>
+<span class="nc" id="L454">            code.getfield().setField(impl);</span>
+<span class="nc" id="L455">            ifins = code.ifnonnull();</span>
+<span class="nc" id="L456">            code.aload().setThis();</span>
+<span class="nc" id="L457">            code.constant().setValue(count);</span>
+<span class="nc" id="L458">            code.anewarray().setType(Object.class);</span>
+<span class="nc" id="L459">            code.putfield().setField(impl);</span>
+
+            // fieldImpl[arrIdx] = obj;
+            // return;
+<span class="nc" id="L463">            ifins.setTarget(code.aload().setThis());</span>
+<span class="nc" id="L464">            code.getfield().setField(impl);</span>
+<span class="nc" id="L465">            code.iload().setLocal(arrIdx);</span>
+<span class="nc" id="L466">            code.aload().setLocal(obj);</span>
+<span class="nc" id="L467">            code.aastore();</span>
+<span class="nc" id="L468">            code.vreturn();</span>
+
+            // if (fieldImpl != null)
+            // 		fieldImpl[index] = null;
+<span class="nc" id="L472">            code.next(); // step over nullTarget</span>
+<span class="nc" id="L473">            code.getfield().setField(impl);</span>
+<span class="nc" id="L474">            ifins = code.ifnonnull();</span>
+<span class="nc" id="L475">            code.vreturn();</span>
+<span class="nc" id="L476">            ifins.setTarget(code.aload().setThis());</span>
+<span class="nc" id="L477">            code.getfield().setField(impl);</span>
+<span class="nc" id="L478">            code.iload().setLocal(arrIdx);</span>
+<span class="nc" id="L479">            code.constant().setNull();</span>
+<span class="nc" id="L480">            code.aastore();</span>
+<span class="nc" id="L481">            code.vreturn();</span>
+        }
+<span class="nc" id="L483">        code.calculateMaxStack();</span>
+<span class="nc" id="L484">        code.calculateMaxLocals();</span>
+<span class="nc" id="L485">    }</span>
+
+    /**
+     * Add methods for loading and storing version data.
+     */
+    protected void addVersionMethods(BCClass bc) {
+        // void storeVersion(OpenJPAStateManager sm);
+<span class="nc" id="L492">        addBeanField(bc, &quot;version&quot;, Object.class);</span>
+<span class="nc" id="L493">        BCMethod meth = bc.declareMethod(&quot;storeVersion&quot;, void.class,</span>
+            new Class[]{ OpenJPAStateManager.class });
+<span class="nc" id="L495">        Code code = meth.getCode(true);</span>
+
+        // version = sm.getVersion();
+<span class="nc" id="L498">        code.aload().setThis();</span>
+<span class="nc" id="L499">        code.aload().setParam(0);</span>
+<span class="nc" id="L500">        code.invokeinterface()</span>
+<span class="nc" id="L501">            .setMethod(OpenJPAStateManager.class, &quot;getVersion&quot;,</span>
+                Object.class, null);
+<span class="nc" id="L503">        code.putfield().setField(&quot;version&quot;, Object.class);</span>
+<span class="nc" id="L504">        code.vreturn();</span>
+<span class="nc" id="L505">        code.calculateMaxStack();</span>
+<span class="nc" id="L506">        code.calculateMaxLocals();</span>
+
+        // void loadVersion(OpenJPAStateManager sm)
+<span class="nc" id="L509">        meth = bc.declareMethod(&quot;loadVersion&quot;, void.class,</span>
+            new Class[]{ OpenJPAStateManager.class });
+<span class="nc" id="L511">        code = meth.getCode(true);</span>
+
+        // if (sm.getVersion() == null)
+        // 		sm.setVersion(version);
+<span class="nc" id="L515">        code.aload().setParam(0);</span>
+<span class="nc" id="L516">        code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+            &quot;getVersion&quot;, Object.class, null);
+<span class="nc" id="L518">        JumpInstruction ifins = code.ifnonnull();</span>
+<span class="nc" id="L519">        code.aload().setParam(0);</span>
+<span class="nc" id="L520">        code.aload().setThis();</span>
+<span class="nc" id="L521">        code.getfield().setField(&quot;version&quot;, Object.class);</span>
+<span class="nc" id="L522">        code.invokeinterface()</span>
+<span class="nc" id="L523">            .setMethod(OpenJPAStateManager.class, &quot;setVersion&quot;,</span>
+                void.class, new Class[]{ Object.class });
+<span class="nc" id="L525">        ifins.setTarget(code.vreturn());</span>
+<span class="nc" id="L526">        code.calculateMaxStack();</span>
+<span class="nc" id="L527">        code.calculateMaxLocals();</span>
+<span class="nc" id="L528">    }</span>
+
+    private void addLoadMethod(BCClass bc, ClassMetaData meta) {
+        // public void load(OpenJPAStateManager sm, FetchConfiguration fetch,
+        // 		Object context)
+<span class="nc" id="L533">        Code code = addLoadMethod(bc, false);</span>
+<span class="nc" id="L534">        FieldMetaData[] fmds = meta.getFields();</span>
+<span class="nc" id="L535">        Collection&lt;Instruction&gt; jumps = new LinkedList&lt;&gt;();</span>
+        Collection&lt;Instruction&gt; jumps2;
+
+<span class="nc" id="L538">        int local = code.getNextLocalsIndex();</span>
+<span class="nc" id="L539">        code.constant().setNull();</span>
+<span class="nc" id="L540">        code.astore().setLocal(local);</span>
+<span class="nc" id="L541">        int inter = code.getNextLocalsIndex();</span>
+<span class="nc" id="L542">        code.constant().setNull();</span>
+<span class="nc" id="L543">        code.astore().setLocal(inter);</span>
+
+<span class="nc" id="L545">        int objectCount = 0;</span>
+        boolean intermediate;
+<span class="nc bnc" id="L547" title="All 2 branches missed.">        for (int i = 0; i &lt; fmds.length; i++) {</span>
+<span class="nc" id="L548">            jumps2 = new LinkedList&lt;&gt;();</span>
+<span class="nc" id="L549">            intermediate = usesIntermediate(fmds[i]);</span>
+<span class="nc" id="L550">            setTarget(code.aload().setThis(), jumps);</span>
+            // if (loaded.get(i)) or (!loaded.get(i)) depending on inter resp
+<span class="nc" id="L552">            code.getfield().setField(&quot;loaded&quot;, BitSet.class);</span>
+<span class="nc" id="L553">            code.constant().setValue(i);</span>
+<span class="nc" id="L554">            code.invokevirtual().setMethod(BitSet.class, &quot;get&quot;,</span>
+                boolean.class, new Class[]{ int.class });
+<span class="nc" id="L556">            jumps.add(code.ifne());</span>
+
+<span class="nc bnc" id="L558" title="All 2 branches missed.">            if (intermediate)</span>
+<span class="nc" id="L559">                addLoadIntermediate(code, i, objectCount, jumps2, inter);</span>
+<span class="nc" id="L560">            jumps2.add(code.go2());</span>
+
+            // if (fetch.requiresFetch(fmds[i])!=FetchConfiguration.FETCH_NONE)
+<span class="nc" id="L563">            setTarget(code.aload().setParam(1), jumps);</span>
+<span class="nc" id="L564">            code.aload().setParam(0);</span>
+<span class="nc" id="L565">            code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+                &quot;getMetaData&quot;, ClassMetaData.class, null);
+<span class="nc" id="L567">            code.constant().setValue(fmds[i].getIndex());</span>
+<span class="nc" id="L568">            code.invokevirtual().setMethod(ClassMetaData.class,</span>
+                &quot;getField&quot;, FieldMetaData.class, new Class[]{int.class});
+<span class="nc" id="L570">            code.invokeinterface().setMethod (FetchConfiguration.class,</span>
+                &quot;requiresFetch&quot;, int.class, new Class[]{FieldMetaData.class});
+<span class="nc" id="L572">            code.constant().setValue(FetchConfiguration.FETCH_NONE);</span>
+<span class="nc" id="L573">            jumps2.add(code.ificmpeq());</span>
+<span class="nc" id="L574">            addLoad(bc, code, fmds[i], objectCount, local, false);</span>
+
+<span class="nc" id="L576">            jumps = jumps2;</span>
+<span class="nc bnc" id="L577" title="All 2 branches missed.">            if (replaceType(fmds[i]) &gt;= JavaTypes.OBJECT)</span>
+<span class="nc" id="L578">                objectCount++;</span>
+        }
+<span class="nc" id="L580">        setTarget(code.vreturn(), jumps);</span>
+<span class="nc" id="L581">        code.calculateMaxStack();</span>
+<span class="nc" id="L582">        code.calculateMaxLocals();</span>
+<span class="nc" id="L583">    }</span>
+
+    private void addLoadWithFieldsMethod(BCClass bc, ClassMetaData meta) {
+<span class="nc" id="L586">        Code code = addLoadMethod(bc, true);</span>
+        // public void load(OpenJPAStateManager sm, BitSet fields,
+        // 		FetchConfiguration fetch, Object conn)
+<span class="nc" id="L589">        FieldMetaData[] fmds = meta.getFields();</span>
+<span class="nc" id="L590">        Collection&lt;Instruction&gt; jumps = new LinkedList&lt;&gt;();</span>
+        Collection&lt;Instruction&gt; jumps2;
+<span class="nc" id="L592">        int objectCount = 0;</span>
+        boolean intermediate;
+<span class="nc" id="L594">        int local = code.getNextLocalsIndex();</span>
+<span class="nc" id="L595">        code.constant().setNull();</span>
+<span class="nc" id="L596">        code.astore().setLocal(local);</span>
+<span class="nc" id="L597">        int inter = code.getNextLocalsIndex();</span>
+<span class="nc" id="L598">        code.constant().setNull();</span>
+<span class="nc" id="L599">        code.astore().setLocal(inter);</span>
+
+<span class="nc bnc" id="L601" title="All 2 branches missed.">        for (int i = 0; i &lt; fmds.length; i++) {</span>
+<span class="nc" id="L602">            jumps2 = new LinkedList&lt;&gt;();</span>
+<span class="nc" id="L603">            intermediate = usesIntermediate(fmds[i]);</span>
+            // if (fields.get(i))
+            // {
+            // 		if (loaded.get(i))
+<span class="nc" id="L607">            setTarget(code.aload().setParam(1), jumps);</span>
+<span class="nc" id="L608">            code.constant().setValue(i);</span>
+<span class="nc" id="L609">            code.invokevirtual().setMethod(BitSet.class, &quot;get&quot;,</span>
+                boolean.class, new Class[]{ int.class });
+<span class="nc" id="L611">            jumps2.add(code.ifeq());</span>
+<span class="nc" id="L612">            code.aload().setThis();</span>
+<span class="nc" id="L613">            code.getfield().setField(&quot;loaded&quot;, BitSet.class);</span>
+<span class="nc" id="L614">            code.constant().setValue(i);</span>
+<span class="nc" id="L615">            code.invokevirtual().setMethod(BitSet.class, &quot;get&quot;,</span>
+                boolean.class, new Class[]{ int.class });
+<span class="nc bnc" id="L617" title="All 2 branches missed.">            if (intermediate)</span>
+<span class="nc" id="L618">                jumps.add(code.ifeq());</span>
+            else
+<span class="nc" id="L620">                jumps2.add(code.ifeq());</span>
+
+<span class="nc" id="L622">            addLoad(bc, code, fmds[i], objectCount, local, true);</span>
+<span class="nc bnc" id="L623" title="All 2 branches missed.">            if (usesImplData(fmds[i])) {</span>
+                // loadImplData(sm, i);
+<span class="nc" id="L625">                code.aload().setThis();</span>
+<span class="nc" id="L626">                code.aload().setParam(0);</span>
+<span class="nc" id="L627">                code.constant().setValue(i);</span>
+<span class="nc" id="L628">                code.invokevirtual().setMethod(&quot;loadImplData&quot;, void.class,</span>
+                    new Class[]{ OpenJPAStateManager.class, int.class });
+            }
+
+            // fields.clear(i);
+<span class="nc" id="L633">            code.aload().setParam(1);</span>
+<span class="nc" id="L634">            code.constant().setValue(i);</span>
+<span class="nc" id="L635">            code.invokevirtual().setMethod(BitSet.class, &quot;clear&quot;, void.class,</span>
+                new Class[] { int.class });
+
+<span class="nc" id="L638">            jumps2.add(code.go2());</span>
+
+<span class="nc bnc" id="L640" title="All 2 branches missed.">            if (intermediate)</span>
+<span class="nc" id="L641">                setTarget(addLoadIntermediate</span>
+<span class="nc" id="L642">                    (code, i, objectCount, jumps2, inter), jumps);</span>
+
+<span class="nc" id="L644">            jumps = jumps2;</span>
+<span class="nc bnc" id="L645" title="All 2 branches missed.">            if (replaceType(fmds[i]) &gt;= JavaTypes.OBJECT)</span>
+<span class="nc" id="L646">                objectCount++;</span>
+        }
+<span class="nc" id="L648">        setTarget(code.vreturn(), jumps);</span>
+<span class="nc" id="L649">        code.calculateMaxStack();</span>
+<span class="nc" id="L650">        code.calculateMaxLocals();</span>
+<span class="nc" id="L651">    }</span>
+
+    /**
+     * Declare and start the base load method.
+     */
+    private Code addLoadMethod(BCClass bc, boolean fields) {
+<span class="nc" id="L657">        Class&lt;?&gt;[] args = null;</span>
+<span class="nc bnc" id="L658" title="All 2 branches missed.">        if (fields)</span>
+<span class="nc" id="L659">            args = new Class[]{ OpenJPAStateManager.class, BitSet.class,</span>
+                FetchConfiguration.class, Object.class };
+        else
+<span class="nc" id="L662">            args = new Class[]{ OpenJPAStateManager.class,</span>
+                FetchConfiguration.class, Object.class };
+<span class="nc" id="L664">        BCMethod load = bc.declareMethod(&quot;load&quot;, void.class, args);</span>
+<span class="nc" id="L665">        Code code = load.getCode(true);</span>
+
+        //loadVersion(sm);
+<span class="nc" id="L668">        code.aload().setThis();</span>
+<span class="nc" id="L669">        code.aload().setParam(0);</span>
+<span class="nc" id="L670">        code.invokevirtual().setMethod(&quot;loadVersion&quot;, void.class,</span>
+            new Class[]{ OpenJPAStateManager.class });
+
+        //loadImplData(sm);
+<span class="nc" id="L674">        code.aload().setThis();</span>
+<span class="nc" id="L675">        code.aload().setParam(0);</span>
+<span class="nc" id="L676">        code.invokevirtual().setMethod(&quot;loadImplData&quot;, void.class,</span>
+            new Class[]{ OpenJPAStateManager.class });
+<span class="nc" id="L678">        return code;</span>
+    }
+
+    /**
+     * Add the field load.
+     */
+    private Instruction addLoad(BCClass bc, Code code, FieldMetaData fmd,
+        int objectCount, int local, boolean fields) {
+<span class="nc" id="L686">        int index = fmd.getIndex();</span>
+<span class="nc" id="L687">        int typeCode = replaceType(fmd);</span>
+        Instruction first;
+<span class="nc bnc" id="L689" title="All 2 branches missed.">        if (typeCode &lt; JavaTypes.OBJECT) {</span>
+            // sm.store&lt;type&gt;(i, field&lt;i&gt;)
+<span class="nc" id="L691">            Class&lt;?&gt; type = forType(fmd.getTypeCode());</span>
+<span class="nc" id="L692">            first = code.aload().setParam(0);</span>
+<span class="nc" id="L693">            code.constant().setValue(index);</span>
+<span class="nc" id="L694">            code.aload().setThis();</span>
+<span class="nc" id="L695">            code.getfield().setField(getFieldName(index), type);</span>
+<span class="nc" id="L696">            code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+<span class="nc" id="L697">                &quot;store&quot; + StringUtil.capitalize(type.getName()),</span>
+                void.class, new Class[]{ int.class, type });
+<span class="nc" id="L699">        } else {</span>
+            // fmd = sm.getMetaData().getField(i);
+<span class="nc bnc" id="L701" title="All 2 branches missed.">            int offset = fields ? 1 : 0;</span>
+<span class="nc" id="L702">            first = code.aload().setParam(0);</span>
+<span class="nc" id="L703">            code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+                &quot;getMetaData&quot;, ClassMetaData.class, null);
+<span class="nc" id="L705">            code.constant().setValue(fmd.getIndex());</span>
+<span class="nc" id="L706">            code.invokevirtual().setMethod(ClassMetaData.class, &quot;getField&quot;,</span>
+                FieldMetaData.class, new Class[]{ int.class });
+<span class="nc" id="L708">            code.astore().setLocal(local);</span>
+            // sm.storeField(i, toField(sm, fmd, objects[objectCount],
+            // 		fetch, context);
+<span class="nc" id="L711">            code.aload().setParam(0);</span>
+<span class="nc" id="L712">            code.constant().setValue(index);</span>
+<span class="nc" id="L713">            code.aload().setThis();</span>
+<span class="nc" id="L714">            code.aload().setParam(0);</span>
+<span class="nc" id="L715">            code.aload().setLocal(local);</span>
+<span class="nc" id="L716">            code.aload().setThis();</span>
+<span class="nc" id="L717">            code.getfield().setField(&quot;objects&quot;, Object[].class);</span>
+<span class="nc" id="L718">            code.constant().setValue(objectCount);</span>
+<span class="nc" id="L719">            code.aaload();</span>
+<span class="nc" id="L720">            code.aload().setParam(1 + offset);</span>
+<span class="nc" id="L721">            code.aload().setParam(2 + offset);</span>
+<span class="nc" id="L722">            code.invokevirtual().setMethod(bc.getName(), &quot;toField&quot;,</span>
+<span class="nc" id="L723">                Object.class.getName(), toStrings(new Class[]{</span>
+                OpenJPAStateManager.class, FieldMetaData.class,
+                Object.class, FetchConfiguration.class, Object.class }));
+<span class="nc" id="L726">            code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+                &quot;storeField&quot;, void.class,
+                new Class[]{ int.class, Object.class });
+        }
+<span class="nc" id="L730">        return first;</span>
+    }
+
+    /**
+     * Load intermediate data if possible.
+     */
+    private Instruction addLoadIntermediate(Code code, int index,
+        int objectCount, Collection&lt;Instruction&gt; jumps2, int inter) {
+        // {
+        // 		Object inter = objects[objectCount];
+<span class="nc" id="L740">        Instruction first = code.aload().setThis();</span>
+<span class="nc" id="L741">        code.getfield().setField(&quot;objects&quot;, Object[].class);</span>
+<span class="nc" id="L742">        code.constant().setValue(objectCount);</span>
+<span class="nc" id="L743">        code.aaload();</span>
+<span class="nc" id="L744">        code.astore().setLocal(inter);</span>
+        // 		if (inter != null &amp;&amp; !sm.getLoaded().get(index))
+<span class="nc" id="L746">        code.aload().setLocal(inter);</span>
+<span class="nc" id="L747">        jumps2.add(code.ifnull());</span>
+<span class="nc" id="L748">        code.aload().setParam(0);</span>
+<span class="nc" id="L749">        code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+            &quot;getLoaded&quot;, BitSet.class, null);
+<span class="nc" id="L751">        code.constant().setValue(index);</span>
+<span class="nc" id="L752">        code.invokevirtual().setMethod(BitSet.class, &quot;get&quot;,</span>
+            boolean.class, new Class[]{ int.class });
+<span class="nc" id="L754">        jumps2.add(code.ifne());</span>
+        //			sm.setIntermediate(index, inter);
+        //	}  // end else
+<span class="nc" id="L757">        code.aload().setParam(0);</span>
+<span class="nc" id="L758">        code.constant().setValue(index);</span>
+<span class="nc" id="L759">        code.aload().setLocal(inter);</span>
+<span class="nc" id="L760">        code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+            &quot;setIntermediate&quot;, void.class,
+            new Class[]{ int.class, Object.class });
+<span class="nc" id="L763">        return first;</span>
+    }
+
+    private void addStoreMethods(BCClass bc, ClassMetaData meta) {
+        // i.e. void store(OpenJPAStateManager sm, BitSet fields);
+<span class="nc" id="L768">        addStoreMethod(bc, meta, true);</span>
+        // i.e. void store(OpenJPAStateManager sm);
+<span class="nc" id="L770">        addStoreMethod(bc, meta, false);</span>
+<span class="nc" id="L771">    }</span>
+
+    private void addStoreMethod(BCClass bc, ClassMetaData meta,
+        boolean fields) {
+        BCMethod store;
+<span class="nc bnc" id="L776" title="All 2 branches missed.">        if (fields)</span>
+<span class="nc" id="L777">            store = bc.declareMethod(&quot;store&quot;, void.class,</span>
+                new Class[]{ OpenJPAStateManager.class, BitSet.class });
+        else
+<span class="nc" id="L780">            store = bc.declareMethod(&quot;store&quot;, void.class,</span>
+                new Class[]{ OpenJPAStateManager.class });
+<span class="nc" id="L782">        Code code = store.getCode(true);</span>
+
+        // initialize();
+<span class="nc" id="L785">        code.aload().setThis();</span>
+<span class="nc" id="L786">        code.invokevirtual().setMethod(&quot;initialize&quot;, void.class, null);</span>
+
+        // storeVersion(sm);
+<span class="nc" id="L789">        code.aload().setThis();</span>
+<span class="nc" id="L790">        code.aload().setParam(0);</span>
+<span class="nc" id="L791">        code.invokevirtual().setMethod(&quot;storeVersion&quot;, void.class,</span>
+            new Class[]{ OpenJPAStateManager.class });
+
+        // storeImplData(sm);
+<span class="nc" id="L795">        code.aload().setThis();</span>
+<span class="nc" id="L796">        code.aload().setParam(0);</span>
+<span class="nc" id="L797">        code.invokevirtual().setMethod(&quot;storeImplData&quot;, void.class,</span>
+            new Class[]{ OpenJPAStateManager.class });
+
+<span class="nc" id="L800">        FieldMetaData[] fmds = meta.getFields();</span>
+<span class="nc" id="L801">        Collection&lt;Instruction&gt; jumps = new LinkedList&lt;&gt;();</span>
+<span class="nc" id="L802">        int objectCount = 0;</span>
+<span class="nc bnc" id="L803" title="All 2 branches missed.">        for (int i = 0; i &lt; fmds.length; i++) {</span>
+<span class="nc bnc" id="L804" title="All 2 branches missed.">            if (fields) {</span>
+                //  if (fields != null &amp;&amp; fields.get(index))
+<span class="nc" id="L806">                setTarget(code.aload().setParam(1), jumps);</span>
+<span class="nc" id="L807">                jumps.add(code.ifnull());</span>
+<span class="nc" id="L808">                code.aload().setParam(1);</span>
+<span class="nc" id="L809">                code.constant().setValue(i);</span>
+<span class="nc" id="L810">                code.invokevirtual().setMethod(BitSet.class, &quot;get&quot;,</span>
+                    boolean.class, new Class[]{ int.class });
+<span class="nc" id="L812">                jumps.add(code.ifeq());</span>
+            } else {
+                // if (sm.getLoaded().get(index)))
+<span class="nc" id="L815">                setTarget(code.aload().setParam(0), jumps);</span>
+<span class="nc" id="L816">                code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+                    &quot;getLoaded&quot;, BitSet.class, null);
+<span class="nc" id="L818">                code.constant().setValue(i);</span>
+<span class="nc" id="L819">                code.invokevirtual().setMethod(BitSet.class, &quot;get&quot;,</span>
+                    boolean.class, new Class[]{ int.class });
+<span class="nc" id="L821">                jumps.add(code.ifeq());</span>
+            }
+<span class="nc" id="L823">            addStore(bc, code, fmds[i], objectCount);</span>
+<span class="nc bnc" id="L824" title="All 2 branches missed.">            if (usesIntermediate(fmds[i])) {</span>
+<span class="nc" id="L825">                JumpInstruction elseIns = code.go2();</span>
+                // else if (!loaded.get(index))
+<span class="nc" id="L827">                setTarget(code.aload().setThis(), jumps);</span>
+<span class="nc" id="L828">                jumps.add(elseIns);</span>
+<span class="nc" id="L829">                code.getfield().setField(&quot;loaded&quot;, BitSet.class);</span>
+<span class="nc" id="L830">                code.constant().setValue(i);</span>
+<span class="nc" id="L831">                code.invokevirtual().setMethod(BitSet.class, &quot;get&quot;,</span>
+                    boolean.class, new Class[]{ int.class });
+<span class="nc" id="L833">                jumps.add(code.ifne());</span>
+                // Object val = sm.getIntermediate(index);
+                // if (val != null)
+                // 		objects[objectCount] = val;
+<span class="nc" id="L837">                code.aload().setParam(0);</span>
+<span class="nc" id="L838">                code.constant().setValue(i);</span>
+<span class="nc" id="L839">                code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+                    &quot;getIntermediate&quot;, Object.class, new Class[]{ int.class });
+<span class="nc" id="L841">                int local = code.getNextLocalsIndex();</span>
+<span class="nc" id="L842">                code.astore().setLocal(local);</span>
+<span class="nc" id="L843">                code.aload().setLocal(local);</span>
+<span class="nc" id="L844">                jumps.add(code.ifnull());</span>
+<span class="nc" id="L845">                code.aload().setThis();</span>
+<span class="nc" id="L846">                code.getfield().setField(&quot;objects&quot;, Object[].class);</span>
+<span class="nc" id="L847">                code.constant().setValue(objectCount);</span>
+<span class="nc" id="L848">                code.aload().setLocal(local);</span>
+<span class="nc" id="L849">                code.aastore();</span>
+            }
+<span class="nc bnc" id="L851" title="All 2 branches missed.">            if (replaceType(fmds[i]) &gt;= JavaTypes.OBJECT)</span>
+<span class="nc" id="L852">                objectCount++;</span>
+        }
+<span class="nc" id="L854">        setTarget(code.vreturn(), jumps);</span>
+<span class="nc" id="L855">        code.calculateMaxLocals();</span>
+<span class="nc" id="L856">        code.calculateMaxStack();</span>
+<span class="nc" id="L857">    }</span>
+
+    private void addStore(BCClass bc, Code code, FieldMetaData fmd,
+        int objectCount) {
+<span class="nc" id="L861">        int typeCode = replaceType(fmd);</span>
+<span class="nc" id="L862">        int index = fmd.getIndex();</span>
+<span class="nc bnc" id="L863" title="All 2 branches missed.">        if (typeCode &lt; JavaTypes.OBJECT) {</span>
+<span class="nc" id="L864">            Class&lt;?&gt; type = forType(typeCode);</span>
+            // field&lt;i&gt; = sm.fetch&lt;Type&gt;(index)
+<span class="nc" id="L866">            code.aload().setThis();</span>
+<span class="nc" id="L867">            code.aload().setParam(0);</span>
+<span class="nc" id="L868">            code.constant().setValue(index);</span>
+<span class="nc" id="L869">            code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+<span class="nc" id="L870">                &quot;fetch&quot; + StringUtil.capitalize(type.getName()), type,</span>
+                new Class[]{ int.class });
+<span class="nc" id="L872">            code.putfield().setField(getFieldName(index), type);</span>
+<span class="nc" id="L873">            code.aload().setThis();</span>
+<span class="nc" id="L874">            code.getfield().setField(&quot;loaded&quot;, BitSet.class);</span>
+<span class="nc" id="L875">            code.constant().setValue(index);</span>
+<span class="nc" id="L876">            code.invokevirtual().setMethod(BitSet.class, &quot;set&quot;, void.class,</span>
+                new Class[]{ int.class });
+<span class="nc" id="L878">        } else {</span>
+            // Object val = toData(sm.getMetaData().getField(index),
+            // 		sm.fetchField(index, false), sm.getContext());
+<span class="nc" id="L881">            int local = code.getNextLocalsIndex();</span>
+<span class="nc" id="L882">            code.aload().setThis();</span>
+<span class="nc" id="L883">            code.aload().setParam(0);</span>
+<span class="nc" id="L884">            code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+                &quot;getMetaData&quot;, ClassMetaData.class, null);
+<span class="nc" id="L886">            code.constant().setValue(fmd.getIndex());</span>
+<span class="nc" id="L887">            code.invokevirtual().setMethod(ClassMetaData.class,</span>
+                &quot;getField&quot;, FieldMetaData.class, new Class[]{ int.class });
+<span class="nc" id="L889">            code.aload().setParam(0);</span>
+<span class="nc" id="L890">            code.constant().setValue(fmd.getIndex());</span>
+<span class="nc" id="L891">            code.constant().setValue(false);</span>
+<span class="nc" id="L892">            code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+                &quot;fetchField&quot;, Object.class, new Class[]
+                { int.class, boolean.class });
+<span class="nc" id="L895">            code.aload().setParam(0);</span>
+<span class="nc" id="L896">            code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+                &quot;getContext&quot;, StoreContext.class, null);
+<span class="nc" id="L898">            code.invokevirtual().setMethod(bc.getName(), &quot;toData&quot;,</span>
+<span class="nc" id="L899">                Object.class.getName(), toStrings(new Class []{</span>
+                FieldMetaData.class, Object.class, StoreContext.class }));
+<span class="nc" id="L901">            code.astore().setLocal(local);</span>
+
+            // if (val == NULL) {
+            // 		val = null;
+            // 		loaded.clear(index);
+            // 	} else
+            // 		loaded.set(index);
+            // 	objects[objectCount] = val;
+<span class="nc" id="L909">            code.aload().setLocal(local);</span>
+<span class="nc" id="L910">            code.getstatic().setField(AbstractPCData.class, &quot;NULL&quot;,</span>
+                Object.class);
+<span class="nc" id="L912">            JumpInstruction ifins = code.ifacmpne();</span>
+<span class="nc" id="L913">            code.constant().setNull();</span>
+<span class="nc" id="L914">            code.astore().setLocal(local);</span>
+<span class="nc" id="L915">            code.aload().setThis();</span>
+<span class="nc" id="L916">            code.getfield().setField(&quot;loaded&quot;, BitSet.class);</span>
+<span class="nc" id="L917">            code.constant().setValue(index);</span>
+<span class="nc" id="L918">            code.invokevirtual().setMethod(BitSet.class, &quot;clear&quot;, void.class,</span>
+                new Class[]{ int.class });
+<span class="nc" id="L920">            JumpInstruction go2 = code.go2();</span>
+<span class="nc" id="L921">            ifins.setTarget(code.aload().setThis());</span>
+<span class="nc" id="L922">            code.getfield().setField(&quot;loaded&quot;, BitSet.class);</span>
+<span class="nc" id="L923">            code.constant().setValue(index);</span>
+<span class="nc" id="L924">            code.invokevirtual().setMethod(BitSet.class, &quot;set&quot;, void.class,</span>
+                new Class[]{ int.class });
+<span class="nc" id="L926">            go2.setTarget(code.aload().setThis());</span>
+<span class="nc" id="L927">            code.getfield().setField(&quot;objects&quot;, Object[].class);</span>
+<span class="nc" id="L928">            code.constant().setValue(objectCount);</span>
+<span class="nc" id="L929">            code.aload().setLocal(local);</span>
+<span class="nc" id="L930">            code.aastore();</span>
+        }
+<span class="nc bnc" id="L932" title="All 2 branches missed.">        if (!usesImplData(fmd))</span>
+<span class="nc" id="L933">            return;</span>
+
+        // storeImplData(sm, i, loaded.get(i);
+<span class="nc" id="L936">        code.aload().setThis();</span>
+<span class="nc" id="L937">        code.aload().setParam(0);</span>
+<span class="nc" id="L938">        code.constant().setValue(index);</span>
+<span class="nc" id="L939">        code.aload().setThis();</span>
+<span class="nc" id="L940">        code.getfield().setField(&quot;loaded&quot;, BitSet.class);</span>
+<span class="nc" id="L941">        code.constant().setValue(index);</span>
+<span class="nc" id="L942">        code.invokevirtual().setMethod(BitSet.class, &quot;get&quot;, boolean.class,</span>
+            new Class[]{ int.class });
+<span class="nc" id="L944">        code.invokevirtual().setMethod(&quot;storeImplData&quot;, void.class,</span>
+            new Class[]{ OpenJPAStateManager.class, int.class, boolean.class });
+<span class="nc" id="L946">    }</span>
+
+    private void addNewEmbedded(BCClass bc) {
+        // void newEmbeddedPCData(OpenJPAStateManager embedded)
+<span class="nc" id="L950">        BCMethod meth = bc.declareMethod(&quot;newEmbeddedPCData&quot;, PCData.class,</span>
+            new Class[]{ OpenJPAStateManager.class });
+<span class="nc" id="L952">        Code code = meth.getCode(true);</span>
+        // return getStorageGenerator().generatePCData
+        // 		(sm.getId(), sm.getMetaData());
+<span class="nc" id="L955">        code.aload().setThis();</span>
+<span class="nc" id="L956">        code.getfield().setField(&quot;storageGenerator&quot;, PCDataGenerator.class);</span>
+<span class="nc" id="L957">        code.aload().setParam(0);</span>
+<span class="nc" id="L958">        code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+            &quot;getId&quot;, Object.class, null);
+<span class="nc" id="L960">        code.aload().setParam(0);</span>
+<span class="nc" id="L961">        code.invokeinterface().setMethod(OpenJPAStateManager.class,</span>
+            &quot;getMetaData&quot;, ClassMetaData.class, null);
+<span class="nc" id="L963">        code.invokevirtual().setMethod(PCDataGenerator.class,</span>
+            &quot;generatePCData&quot;, PCData.class, new Class[]
+            { Object.class, ClassMetaData.class });
+<span class="nc" id="L966">        code.areturn();</span>
+<span class="nc" id="L967">        code.calculateMaxLocals();</span>
+<span class="nc" id="L968">        code.calculateMaxStack();</span>
+<span class="nc" id="L969">    }</span>
+
+    private void addGetData(BCClass bc) {
+        // return getObjectField(i);
+<span class="nc" id="L973">        BCMethod method = bc.declareMethod(&quot;getData&quot;, Object.class,</span>
+            new Class[]{ int.class });
+<span class="nc" id="L975">        Code code = method.getCode(true);</span>
+<span class="nc" id="L976">        code.aload().setThis();</span>
+<span class="nc" id="L977">        code.iload().setParam(0);</span>
+<span class="nc" id="L978">        code.invokevirtual().setMethod(&quot;getObject&quot;, Object.class,</span>
+            new Class[]{ int.class });
+<span class="nc" id="L980">        code.areturn();</span>
+<span class="nc" id="L981">        code.calculateMaxLocals();</span>
+<span class="nc" id="L982">        code.calculateMaxStack();</span>
+<span class="nc" id="L983">    }</span>
+
+    /////////////
+    // Utilities
+    /////////////
+
+    /**
+     * Return a valid {@link JavaTypes} constant for the given field
+     */
+    protected int replaceType(FieldMetaData fmd) {
+<span class="nc bnc" id="L993" title="All 2 branches missed.">        if (usesIntermediate(fmd))</span>
+<span class="nc" id="L994">            return JavaTypes.OBJECT;</span>
+<span class="nc" id="L995">        return fmd.getTypeCode();</span>
+    }
+
+    /**
+     * Whether the given field uses a cacheable intermediate value.
+     */
+    protected boolean usesIntermediate(FieldMetaData fmd) {
+<span class="nc" id="L1002">        return fmd.usesIntermediate();</span>
+    }
+
+    /**
+     * Whether the given type might have cacheable class-level impl data.
+     */
+    protected boolean usesImplData(ClassMetaData meta) {
+<span class="nc" id="L1009">        return true;</span>
+    }
+
+    /**
+     * Whether the given field might have cacheable impl data.
+     */
+    protected boolean usesImplData(FieldMetaData fmd) {
+<span class="nc bnc" id="L1016" title="All 2 branches missed.">        return fmd.usesImplData() == null;</span>
+    }
+
+    /**
+     * The number of fields with cacheable impl data.
+     */
+    private int countImplDataFields(ClassMetaData meta) {
+<span class="nc" id="L1023">        FieldMetaData[] fmds = meta.getFields();</span>
+<span class="nc" id="L1024">        int count = 0;</span>
+<span class="nc bnc" id="L1025" title="All 2 branches missed.">        for (int i = 0; i &lt; fmds.length; i++)</span>
+<span class="nc bnc" id="L1026" title="All 2 branches missed.">            if (usesImplData(fmds[i]))</span>
+<span class="nc" id="L1027">                count++;</span>
+<span class="nc" id="L1028">        return count;</span>
+    }
+
+    /**
+     * Add method which defers to AbstractPCData.
+     */
+    protected void callAbstractPCData(BCClass bc, String name, Class&lt;?&gt; retType,
+        Class&lt;?&gt;[] args) {
+<span class="nc" id="L1036">        BCMethod meth = bc.declareMethod(name, retType, args);</span>
+<span class="nc" id="L1037">        Code code = meth.getCode(true);</span>
+<span class="nc" id="L1038">        code.aload().setThis();</span>
+<span class="nc bnc" id="L1039" title="All 2 branches missed.">        for (int i = 0; i &lt; args.length; i++)</span>
+<span class="nc" id="L1040">            code.xload().setParam(i).setType(args[i]);</span>
+<span class="nc" id="L1041">        code.invokevirtual().setMethod(AbstractPCData.class, name, retType,</span>
+            args);
+<span class="nc bnc" id="L1043" title="All 2 branches missed.">        if (!void.class.equals(retType))</span>
+<span class="nc" id="L1044">            code.xreturn().setType(retType);</span>
+<span class="nc" id="L1045">        code.calculateMaxLocals();</span>
+<span class="nc" id="L1046">        code.calculateMaxStack();</span>
+<span class="nc" id="L1047">    }</span>
+
+    /**
+     * Set the collection of {@link JumpInstruction}s to the given instruction,
+     * clearing the collection in the process.
+     */
+    protected void setTarget(Instruction ins, Collection&lt;Instruction&gt; jumps) {
+<span class="nc bnc" id="L1054" title="All 2 branches missed.">        for (Iterator&lt;Instruction&gt; it = jumps.iterator(); it.hasNext();)</span>
+<span class="nc" id="L1055">            ((JumpInstruction) it.next()).setTarget(ins);</span>
+<span class="nc" id="L1056">        jumps.clear();</span>
+<span class="nc" id="L1057">    }</span>
+
+    /**
+     * Transform the given array of classes to strings.
+     */
+    private static String[] toStrings(Class&lt;?&gt;[] cls) {
+<span class="nc" id="L1063">        String[] strings = new String[cls.length];</span>
+<span class="nc bnc" id="L1064" title="All 2 branches missed.">        for (int i = 0; i &lt; strings.length; i++)</span>
+<span class="nc" id="L1065">            strings[i] = cls[i].getName();</span>
+<span class="nc" id="L1066">        return strings;</span>
+    }
+
+    /**
+     * Dynamic {@link PCData}s generated will implement this interface
+     * to simplify initialization.
+     */
+    public interface DynamicPCData extends PCData {
+
+        void setId(Object oid);
+
+        PCDataGenerator getStorageGenerator();
+
+        void setStorageGenerator (PCDataGenerator generator);
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

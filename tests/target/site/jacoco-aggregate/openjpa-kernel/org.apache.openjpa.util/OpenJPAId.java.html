@@ -1,0 +1,156 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>OpenJPAId.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.util</a> &gt; <span class="el_source">OpenJPAId.java</span></div><h1>OpenJPAId.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.util;
+
+import java.io.Serializable;
+
+import org.apache.commons.collections4.map.AbstractReferenceMap.ReferenceStrength;
+import org.apache.openjpa.lib.util.concurrent.ConcurrentReferenceHashMap;
+
+/**
+ * Identity class extended by built-in OpenJPA identity objects.
+ *
+ * @author Steve Kim
+ */
+public abstract class OpenJPAId
+    implements Comparable, Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    public static final char TYPE_VALUE_SEP = '-';
+
+    // cache the types' generated hash codes
+<span class="nc" id="L39">    private static ConcurrentReferenceHashMap _typeCache =</span>
+        new ConcurrentReferenceHashMap(ReferenceStrength.WEAK, ReferenceStrength.HARD);
+
+    protected Class type;
+<span class="nc" id="L43">    protected boolean subs = true;</span>
+
+    // type hash is based on the least-derived non-object class so that
+    // user-given ids with non-exact types match ids with exact types
+<span class="nc" id="L47">    private int _typeHash = 0;</span>
+
+<span class="nc" id="L49">    protected OpenJPAId() {</span>
+<span class="nc" id="L50">    }</span>
+
+<span class="nc" id="L52">    protected OpenJPAId(Class type) {</span>
+<span class="nc" id="L53">        this.type = type;</span>
+<span class="nc" id="L54">    }</span>
+
+<span class="nc" id="L56">    protected OpenJPAId(Class type, boolean subs) {</span>
+<span class="nc" id="L57">        this.type = type;</span>
+<span class="nc" id="L58">        this.subs = subs;</span>
+<span class="nc" id="L59">    }</span>
+
+    /**
+     * Return the persistent class which this id instance represents.
+     */
+    public Class getType() {
+<span class="nc" id="L65">        return type;</span>
+    }
+
+    /**
+     * Whether this oid might be for a subclass of the given type.
+     * Defaults to true.
+     */
+    public boolean hasSubclasses() {
+<span class="nc" id="L73">        return subs;</span>
+    }
+
+    /**
+     * Set the exact type of the described instance once it is known.
+     */
+    public void setManagedInstanceType(Class type) {
+<span class="nc" id="L80">        setManagedInstanceType(type, false);</span>
+<span class="nc" id="L81">    }</span>
+
+    /**
+     * Set the exact type of the described instance once it is known.
+     */
+    public void setManagedInstanceType(Class type, boolean subs) {
+<span class="nc" id="L87">        this.type = type;</span>
+<span class="nc" id="L88">        this.subs = subs;</span>
+<span class="nc" id="L89">    }</span>
+
+    /**
+     * Return the identity value as an object.
+     */
+    public abstract Object getIdObject();
+
+    /**
+     * Return the id's hash code.
+     */
+    protected abstract int idHash();
+
+    /**
+     * Compare the id to the id of the given instance.
+     */
+    protected abstract boolean idEquals(OpenJPAId other);
+
+    /**
+     * Generate the hash code for this Id.  Cache the type's generated hash code
+     * so that it doesn't have to be generated each time.
+     */
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (_typeHash == 0) {</span>
+<span class="nc" id="L113">            Integer typeHashInt = (Integer) _typeCache.get(type);</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">            if (typeHashInt == null) {</span>
+<span class="nc" id="L115">                Class base = type;</span>
+<span class="nc" id="L116">                Class superclass = base.getSuperclass();</span>
+<span class="nc bnc" id="L117" title="All 4 branches missed.">                while (superclass != null &amp;&amp; superclass != Object.class) {</span>
+<span class="nc" id="L118">                    base = base.getSuperclass();</span>
+<span class="nc" id="L119">                    superclass = base.getSuperclass();</span>
+                }
+<span class="nc" id="L121">                _typeHash = base.getName().hashCode();</span>
+<span class="nc" id="L122">                _typeCache.put(type, Integer.valueOf(_typeHash));</span>
+<span class="nc" id="L123">            } else {</span>
+<span class="nc" id="L124">                _typeHash = typeHashInt.intValue();</span>
+            }
+        }
+<span class="nc" id="L127">        return _typeHash ^ idHash();</span>
+    }
+
+    @Override
+    public boolean equals(Object o) {
+<span class="nc bnc" id="L132" title="All 2 branches missed.">        if (o == this)</span>
+<span class="nc" id="L133">            return true;</span>
+<span class="nc bnc" id="L134" title="All 4 branches missed.">        if (o == null || getClass() != o.getClass())</span>
+<span class="nc" id="L135">            return false;</span>
+
+<span class="nc" id="L137">        OpenJPAId id = (OpenJPAId) o;</span>
+<span class="nc bnc" id="L138" title="All 6 branches missed.">        return idEquals(id) &amp;&amp; (id.type.isAssignableFrom(type)</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">            || (subs &amp;&amp; type.isAssignableFrom(id.type)));</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L144">        return type.getName() + TYPE_VALUE_SEP + getIdObject();</span>
+    }
+
+    @Override
+    public int compareTo(Object other) {
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        if (other == this)</span>
+<span class="nc" id="L150">            return 0;</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (other == null)</span>
+<span class="nc" id="L152">            return 1;</span>
+<span class="nc" id="L153">        return ((Comparable) getIdObject()).compareTo(((OpenJPAId) other).getIdObject ());</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

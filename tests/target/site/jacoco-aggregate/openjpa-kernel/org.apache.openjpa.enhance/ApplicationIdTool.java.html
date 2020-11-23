@@ -1,0 +1,1488 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ApplicationIdTool.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.enhance</a> &gt; <span class="el_source">ApplicationIdTool.java</span></div><h1>ApplicationIdTool.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.enhance;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.io.Writer;
+import java.lang.reflect.Modifier;
+import java.security.AccessController;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.conf.OpenJPAConfigurationImpl;
+import org.apache.openjpa.lib.conf.Configuration;
+import org.apache.openjpa.lib.conf.Configurations;
+import org.apache.openjpa.lib.log.Log;
+import org.apache.openjpa.lib.meta.ClassArgParser;
+import org.apache.openjpa.lib.util.ClassUtil;
+import org.apache.openjpa.lib.util.CodeFormat;
+import org.apache.openjpa.lib.util.Files;
+import org.apache.openjpa.lib.util.J2DoPrivHelper;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.Options;
+import org.apache.openjpa.lib.util.StringUtil;
+import org.apache.openjpa.meta.AccessCode;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.DelegatingMetaDataFactory;
+import org.apache.openjpa.meta.FieldMetaData;
+import org.apache.openjpa.meta.JavaTypes;
+import org.apache.openjpa.meta.MetaDataFactory;
+import org.apache.openjpa.meta.MetaDataModes;
+import org.apache.openjpa.meta.MetaDataRepository;
+import org.apache.openjpa.util.InvalidStateException;
+import org.apache.openjpa.util.UserException;
+
+import serp.bytecode.BCClass;
+import serp.bytecode.BCClassLoader;
+import serp.bytecode.Project;
+
+/**
+ * Generates a class appropriate for use as an application identity class.
+ *
+ * @author Patrick Linskey
+ * @author Abe White
+ */
+public class ApplicationIdTool {
+
+    public static final String TOKEN_DEFAULT = &quot;::&quot;;
+
+    private static final String TOKENIZER_CUSTOM = &quot;Tokenizer&quot;;
+    private static final String TOKENIZER_STD = &quot;StringTokenizer&quot;;
+
+<span class="nc" id="L80">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L81">        (ApplicationIdTool.class);</span>
+
+    private final Log _log;
+    private final Class _type;
+    private final ClassMetaData _meta;
+<span class="nc" id="L86">    private boolean _abstract = false;</span>
+<span class="nc" id="L87">    private FieldMetaData[] _fields = null;</span>
+<span class="nc" id="L88">    private boolean _ignore = true;</span>
+<span class="nc" id="L89">    private File _dir = null;</span>
+<span class="nc" id="L90">    private Writer _writer = null;</span>
+<span class="nc" id="L91">    private String _code = null;</span>
+<span class="nc" id="L92">    private String _token = TOKEN_DEFAULT;</span>
+<span class="nc" id="L93">    private CodeFormat _format = null;</span>
+
+    /**
+     * Constructs a new ApplicationIdTool capable of generating an
+     * object id class for &lt;code&gt;type&lt;/code&gt;.
+     */
+<span class="nc" id="L99">    public ApplicationIdTool(OpenJPAConfiguration conf, Class type) {</span>
+<span class="nc" id="L100">        _log = conf.getLog(OpenJPAConfiguration.LOG_ENHANCE);</span>
+<span class="nc" id="L101">        _type = type;</span>
+
+<span class="nc" id="L103">        MetaDataRepository repos = conf.newMetaDataRepositoryInstance();</span>
+<span class="nc" id="L104">        repos.setValidate(MetaDataRepository.VALIDATE_NONE);</span>
+<span class="nc" id="L105">        repos.setSourceMode(MetaDataModes.MODE_MAPPING, false);</span>
+<span class="nc" id="L106">        loadObjectIds(repos, true);</span>
+<span class="nc" id="L107">        _meta = repos.getMetaData(type, null, false);</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (_meta != null) {</span>
+<span class="nc" id="L109">            _abstract = Modifier.isAbstract(_meta.getDescribedType().</span>
+<span class="nc" id="L110">                getModifiers());</span>
+<span class="nc" id="L111">            _fields = getDeclaredPrimaryKeyFields(_meta);</span>
+        }
+<span class="nc" id="L113">    }</span>
+
+    /**
+     * Constructs a new tool instance capable of generating an
+     * object id class for &lt;code&gt;meta&lt;/code&gt;.
+     */
+    public ApplicationIdTool(OpenJPAConfiguration conf, Class type,
+<span class="nc" id="L120">        ClassMetaData meta) {</span>
+<span class="nc" id="L121">        _log = conf.getLog(OpenJPAConfiguration.LOG_ENHANCE);</span>
+
+<span class="nc" id="L123">        _type = type;</span>
+<span class="nc" id="L124">        _meta = meta;</span>
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (_meta != null) {</span>
+<span class="nc" id="L126">            _abstract = Modifier.isAbstract(_meta.getDescribedType().</span>
+<span class="nc" id="L127">                getModifiers());</span>
+<span class="nc" id="L128">            _fields = getDeclaredPrimaryKeyFields(_meta);</span>
+        }
+<span class="nc" id="L130">    }</span>
+
+    /**
+     * Return metadata for primary key fields declared in the given class.
+     */
+    private static FieldMetaData[] getDeclaredPrimaryKeyFields
+        (ClassMetaData meta) {
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (meta.getPCSuperclass() == null)</span>
+<span class="nc" id="L138">            return meta.getPrimaryKeyFields();</span>
+
+        // remove the primary key fields that are not declared
+        // in the current class
+<span class="nc" id="L142">        FieldMetaData[] fields = meta.getPrimaryKeyFields();</span>
+<span class="nc" id="L143">        List decs = new ArrayList(fields.length);</span>
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        for (int i = 0; i &lt; fields.length; i++)</span>
+<span class="nc bnc" id="L145" title="All 2 branches missed.">            if (fields[i].getDeclaringType() == meta.getDescribedType())</span>
+<span class="nc" id="L146">                decs.add(fields[i]);</span>
+<span class="nc" id="L147">        return (FieldMetaData[]) decs.toArray(new FieldMetaData[decs.size()]);</span>
+    }
+
+    /**
+     * Return false if this tool is configured to throw an exception on
+     * an attempt to generate an id class for a type that does not use
+     * application identity.
+     */
+    public boolean getIgnoreErrors() {
+<span class="nc" id="L156">        return _ignore;</span>
+    }
+
+    /**
+     * Set to false if this tool should throw an exception on
+     * an attempt to generate an id class for a type that does not use
+     * application identity.
+     */
+    public void setIgnoreErrors(boolean ignore) {
+<span class="nc" id="L165">        _ignore = ignore;</span>
+<span class="nc" id="L166">    }</span>
+
+    /**
+     * The code formatter for the generated Java code.
+     */
+    public CodeFormat getCodeFormat() {
+<span class="nc" id="L172">        return _format;</span>
+    }
+
+    /**
+     * Set the code formatter for the generated Java code.
+     */
+    public void setCodeFormat(CodeFormat format) {
+<span class="nc" id="L179">        _format = format;</span>
+<span class="nc" id="L180">    }</span>
+
+    /**
+     * The directory to write source to. Defaults to the directory
+     * of the Java file for the set type. If the given directory does not
+     * match the package of the object id, the package structure will be
+     * created below the directory.
+     */
+    public File getDirectory() {
+<span class="nc" id="L189">        return _dir;</span>
+    }
+
+    /**
+     * The directory to write source to. Defaults to the directory
+     * of the Java file for the set type. If the given directory does not
+     * match the package of the object id, the package structure will be
+     * created below the directory.
+     */
+    public void setDirectory(File dir) {
+<span class="nc" id="L199">        _dir = dir;</span>
+<span class="nc" id="L200">    }</span>
+
+    /**
+     * The token to use to separate stringified primary key field values.
+     */
+    public String getToken() {
+<span class="nc" id="L206">        return _token;</span>
+    }
+
+    /**
+     * The token to use to separate stringified primary key field values.
+     */
+    public void setToken(String token) {
+<span class="nc" id="L213">        _token = token;</span>
+<span class="nc" id="L214">    }</span>
+
+    /**
+     * The writer to write source to, or null to write to default file.
+     */
+    public Writer getWriter() {
+<span class="nc" id="L220">        return _writer;</span>
+    }
+
+    /**
+     * The writer to write source to, or null to write to default file.
+     */
+    public void setWriter(Writer writer) {
+<span class="nc" id="L227">        _writer = writer;</span>
+<span class="nc" id="L228">    }</span>
+
+    /**
+     * Return the type we are generating an application id for.
+     */
+    public Class getType() {
+<span class="nc" id="L234">        return _type;</span>
+    }
+
+    /**
+     * Return metadata for the type we are generating an application id for.
+     */
+    public ClassMetaData getMetaData() {
+<span class="nc" id="L241">        return _meta;</span>
+    }
+
+    /**
+     * Return the code generated for the application id, or null
+     * if invalid class or the {@link #run} method has not been called.
+     */
+    public String getCode() {
+<span class="nc" id="L249">        return _code;</span>
+    }
+
+    /**
+     * Returns true if the application identity class should be an inner class.
+     */
+    public boolean isInnerClass() {
+<span class="nc" id="L256">        Class oidClass = _meta.getObjectIdType();</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        return oidClass.getName().indexOf('$') != -1;</span>
+    }
+
+    /**
+     * Returns the short class name for the object id class.
+     */
+    private String getClassName() {
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        if (_meta.isOpenJPAIdentity())</span>
+<span class="nc" id="L265">            return null;</span>
+
+        // convert from SomeClass$ID to ID
+<span class="nc" id="L268">        String className = ClassUtil.getClassName(_meta.getObjectIdType());</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">        if (isInnerClass())</span>
+<span class="nc" id="L270">            className = className.substring(className.lastIndexOf('$') + 1);</span>
+<span class="nc" id="L271">        return className;</span>
+    }
+
+    /**
+     * Generates the sourcecode for the application id class; returns
+     * false if the class is invalid.
+     */
+    public boolean run() {
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        if (_log.isInfoEnabled())</span>
+<span class="nc" id="L280">            _log.info(_loc.get(&quot;appid-start&quot;, _type));</span>
+
+        // ensure that this type is a candidate for application identity
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        if (_meta == null</span>
+<span class="nc bnc" id="L284" title="All 2 branches missed.">            || _meta.getIdentityType() != ClassMetaData.ID_APPLICATION</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">            || _meta.isOpenJPAIdentity()) {</span>
+<span class="nc bnc" id="L286" title="All 2 branches missed.">            if (!_ignore)</span>
+<span class="nc" id="L287">                throw new UserException(_loc.get(&quot;appid-invalid&quot;, _type));</span>
+
+            // else just warn
+<span class="nc bnc" id="L290" title="All 2 branches missed.">            if (_log.isWarnEnabled())</span>
+<span class="nc" id="L291">                _log.warn(_loc.get(&quot;appid-warn&quot;, _type));</span>
+<span class="nc" id="L292">            return false;</span>
+        }
+
+<span class="nc" id="L295">        Class oidClass = _meta.getObjectIdType();</span>
+<span class="nc" id="L296">        Class superOidClass = null;</span>
+
+        // allow diff oid class in subclass (horizontal)
+<span class="nc bnc" id="L299" title="All 2 branches missed.">        if (_meta.getPCSuperclass() != null) {</span>
+<span class="nc" id="L300">            superOidClass = _meta.getPCSuperclassMetaData().getObjectIdType();</span>
+<span class="nc bnc" id="L301" title="All 4 branches missed.">            if (oidClass == null || oidClass.equals(superOidClass)) {</span>
+                // just warn
+<span class="nc bnc" id="L303" title="All 2 branches missed.">                if (_log.isWarnEnabled())</span>
+<span class="nc" id="L304">                    _log.warn(_loc.get(&quot;appid-warn&quot;, _type));</span>
+<span class="nc" id="L305">                return false;</span>
+            }
+        }
+
+        // ensure that an id class is declared
+<span class="nc bnc" id="L310" title="All 2 branches missed.">        if (oidClass == null)</span>
+<span class="nc" id="L311">            throw new UserException(_loc.get(&quot;no-id-class&quot;, _type)).</span>
+<span class="nc" id="L312">                setFatal(true);</span>
+
+        // ensure there is at least one pk field if we are
+        // non-absract, and see if we have any byte[]
+<span class="nc" id="L316">        boolean bytes = false;</span>
+<span class="nc bnc" id="L317" title="All 4 branches missed.">        for (int i = 0; !bytes &amp;&amp; i &lt; _fields.length; i++)</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">            bytes = _fields[i].getDeclaredType() == byte[].class;</span>
+
+        // collect info on id type
+<span class="nc" id="L321">        String className = getClassName();</span>
+<span class="nc" id="L322">        String packageName = ClassUtil.getPackageName(oidClass);</span>
+<span class="nc" id="L323">        String packageDec = &quot;&quot;;</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">        if (packageName.length() &gt; 0)</span>
+<span class="nc" id="L325">            packageDec = &quot;package &quot; + packageName + &quot;;&quot;;</span>
+
+<span class="nc" id="L327">        String imports = getImports();</span>
+<span class="nc" id="L328">        String fieldDecs = getFieldDeclarations();</span>
+<span class="nc bnc" id="L329" title="All 2 branches missed.">        String constructor = getConstructor(superOidClass != null);</span>
+<span class="nc" id="L330">        String properties = getProperties();</span>
+<span class="nc bnc" id="L331" title="All 2 branches missed.">        String fromStringCode = getFromStringCode(superOidClass != null);</span>
+<span class="nc bnc" id="L332" title="All 2 branches missed.">        String toStringCode = getToStringCode(superOidClass != null);</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">        String equalsCode = getEqualsCode(superOidClass != null);</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">        String hashCodeCode = getHashCodeCode(superOidClass != null);</span>
+
+        // build the java code
+<span class="nc" id="L337">        CodeFormat code = newCodeFormat();</span>
+<span class="nc bnc" id="L338" title="All 4 branches missed.">        if (!isInnerClass() &amp;&amp; packageDec.length() &gt; 0)</span>
+<span class="nc" id="L339">            code.append(packageDec).afterSection();</span>
+
+<span class="nc bnc" id="L341" title="All 4 branches missed.">        if (!isInnerClass() &amp;&amp; imports.length() &gt; 0)</span>
+<span class="nc" id="L342">            code.append(imports).afterSection();</span>
+
+<span class="nc" id="L344">        code.append(&quot;/**&quot;).endl().</span>
+<span class="nc" id="L345">            append(&quot; * &quot;).</span>
+<span class="nc" id="L346">            append(_loc.get(&quot;appid-comment-for&quot;, _type.getName())).</span>
+<span class="nc" id="L347">            endl().</span>
+<span class="nc" id="L348">            append(&quot; *&quot;).endl().</span>
+<span class="nc" id="L349">            append(&quot; * &quot;).append(_loc.get(&quot;appid-comment-gen&quot;)).endl().</span>
+<span class="nc" id="L350">            append(&quot; * &quot;).append(getClass().getName()).endl().</span>
+<span class="nc" id="L351">            append(&quot; */&quot;).endl();</span>
+<span class="nc" id="L352">        code.append(&quot;public &quot;);</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">        if (isInnerClass())</span>
+<span class="nc" id="L354">            code.append(&quot;static &quot;);</span>
+<span class="nc" id="L355">        code.append(&quot;class &quot;).append(className);</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">        if (code.getBraceOnSameLine())</span>
+<span class="nc" id="L357">            code.append(&quot; &quot;);</span>
+        else
+<span class="nc" id="L359">            code.endl().tab();</span>
+
+<span class="nc bnc" id="L361" title="All 2 branches missed.">        if (superOidClass != null) {</span>
+<span class="nc" id="L362">            code.append(&quot;extends &quot; + ClassUtil.getClassName(superOidClass));</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">            if (code.getBraceOnSameLine())</span>
+<span class="nc" id="L364">                code.append(&quot; &quot;);</span>
+            else
+<span class="nc" id="L366">                code.endl().tab();</span>
+        }
+<span class="nc" id="L368">        code.append(&quot;implements Serializable&quot;).openBrace(1).endl();</span>
+
+        // if we use a byte array we need a static array for encoding to string
+<span class="nc bnc" id="L371" title="All 2 branches missed.">        if (bytes) {</span>
+<span class="nc" id="L372">            code.tab().append(&quot;private static final char[] HEX = &quot;).</span>
+<span class="nc" id="L373">                append(&quot;new char[] {&quot;).endl();</span>
+<span class="nc" id="L374">            code.tab(2).append(&quot;'0', '1', '2', '3', '4', '5', '6', '7',&quot;).</span>
+<span class="nc" id="L375">                endl();</span>
+<span class="nc" id="L376">            code.tab(2).append(&quot;'8', '9', 'A', 'B', 'C', 'D', 'E', 'F'&quot;).</span>
+<span class="nc" id="L377">                endl();</span>
+<span class="nc" id="L378">            code.tab().append(&quot;};&quot;).endl(2);</span>
+        }
+
+        // static block to register class
+<span class="nc" id="L382">        code.tab().append(&quot;static&quot;).openBrace(2).endl();</span>
+<span class="nc" id="L383">        code.tab(2).append(&quot;// register persistent class in JVM&quot;).endl();</span>
+<span class="nc" id="L384">        code.tab(2).append(&quot;try { Class.forName&quot;).openParen(true).</span>
+<span class="nc" id="L385">                append(&quot;\&quot;&quot;).append(_type.getName()).append(&quot;\&quot;&quot;).</span>
+<span class="nc" id="L386">                closeParen().append(&quot;;&quot;).append(&quot; }&quot;).endl();</span>
+<span class="nc" id="L387">        code.tab(2).append(&quot;catch&quot;).openParen(true).</span>
+<span class="nc" id="L388">                append(&quot;Exception e&quot;).closeParen().append(&quot; {}&quot;).endl();</span>
+
+<span class="nc" id="L390">        code.closeBrace(2);</span>
+
+        // field declarations
+<span class="nc bnc" id="L393" title="All 2 branches missed.">        if (fieldDecs.length() &gt; 0)</span>
+<span class="nc" id="L394">            code.endl(2).append(fieldDecs);</span>
+
+        // default constructor
+<span class="nc" id="L397">        code.afterSection().tab().append(&quot;public &quot;).append(className).</span>
+<span class="nc" id="L398">            parens().openBrace(2).endl();</span>
+<span class="nc" id="L399">        code.closeBrace(2);</span>
+
+        // string constructor
+<span class="nc" id="L402">        code.afterSection().append(constructor);</span>
+
+        // properties
+<span class="nc bnc" id="L405" title="All 2 branches missed.">        if (properties.length() &gt; 0)</span>
+<span class="nc" id="L406">            code.afterSection().append(properties);</span>
+
+        // toString, equals, hashCode methods
+<span class="nc bnc" id="L409" title="All 2 branches missed.">        if (toStringCode.length() &gt; 0)</span>
+<span class="nc" id="L410">            code.afterSection().append(toStringCode);</span>
+<span class="nc bnc" id="L411" title="All 2 branches missed.">        if (hashCodeCode.length() &gt; 0)</span>
+<span class="nc" id="L412">            code.afterSection().append(hashCodeCode);</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">        if (equalsCode.length() &gt; 0)</span>
+<span class="nc" id="L414">            code.afterSection().append(equalsCode);</span>
+<span class="nc bnc" id="L415" title="All 2 branches missed.">        if (fromStringCode.length() &gt; 0)</span>
+<span class="nc" id="L416">            code.afterSection().append(fromStringCode);</span>
+
+        // if we have any byte array fields, we have to add the extra
+        // methods for handling byte arrays
+<span class="nc bnc" id="L420" title="All 2 branches missed.">        if (bytes) {</span>
+<span class="nc" id="L421">            code.afterSection().append(getToBytesByteArrayCode());</span>
+<span class="nc" id="L422">            code.afterSection().append(getToStringByteArrayCode());</span>
+<span class="nc" id="L423">            code.afterSection().append(getEqualsByteArrayCode());</span>
+<span class="nc" id="L424">            code.afterSection().append(getHashCodeByteArrayCode());</span>
+        }
+
+        // base classes might need to define a custom tokenizer
+<span class="nc bnc" id="L428" title="All 4 branches missed.">        if (superOidClass == null &amp;&amp; getTokenizer(false) == TOKENIZER_CUSTOM)</span>
+<span class="nc" id="L429">            code.afterSection().append(getCustomTokenizerClass());</span>
+
+<span class="nc" id="L431">        code.endl();</span>
+<span class="nc" id="L432">        code.closeBrace(1);</span>
+
+<span class="nc" id="L434">        _code = code.toString();</span>
+
+        // if this is an inner class, then indent the entire
+        // code unit one tab level
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        if (isInnerClass()) {</span>
+            // indent the entire code block one level to make it
+            // a propertly indented innder class
+<span class="nc" id="L441">            _code = code.getTab() +</span>
+<span class="nc" id="L442">                    StringUtil.replace(_code,</span>
+<span class="nc" id="L443">                                       J2DoPrivHelper.getLineSeparator(),</span>
+<span class="nc" id="L444">                                       J2DoPrivHelper.getLineSeparator() + code.getTab());</span>
+        }
+
+<span class="nc" id="L447">        return true;</span>
+    }
+
+    /**
+     * Writes the generated code to the proper file.
+     */
+    public void record()
+        throws IOException {
+<span class="nc bnc" id="L455" title="All 2 branches missed.">        if (_code == null)</span>
+<span class="nc" id="L456">            return;</span>
+
+<span class="nc" id="L458">        Writer writer = _writer;</span>
+<span class="nc bnc" id="L459" title="All 2 branches missed.">        if (writer == null) {</span>
+<span class="nc" id="L460">            File file = getFile();</span>
+<span class="nc" id="L461">            Files.backup(file, false);</span>
+<span class="nc" id="L462">            writer = new FileWriter(file);</span>
+        }
+
+<span class="nc" id="L465">        PrintWriter printer = new PrintWriter(writer);</span>
+<span class="nc" id="L466">        printer.print(_code);</span>
+<span class="nc" id="L467">        printer.flush();</span>
+
+<span class="nc bnc" id="L469" title="All 2 branches missed.">        if (_writer == null)</span>
+<span class="nc" id="L470">            writer.close();</span>
+<span class="nc" id="L471">    }</span>
+
+    /**
+     * Return the necessary imports for the class.
+     */
+    private String getImports() {
+<span class="nc" id="L477">        Set pkgs = getImportPackages();</span>
+
+<span class="nc" id="L479">        CodeFormat imports = newCodeFormat();</span>
+<span class="nc" id="L480">        String base = ClassUtil.getPackageName(_meta.getObjectIdType());</span>
+        String pkg;
+<span class="nc bnc" id="L482" title="All 2 branches missed.">        for (Iterator itr = pkgs.iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L483">            pkg = (String) itr.next();</span>
+<span class="nc bnc" id="L484" title="All 4 branches missed.">            if (pkg.length() &gt; 0 &amp;&amp; !&quot;java.lang&quot;.equals(pkg)</span>
+<span class="nc bnc" id="L485" title="All 2 branches missed.">                &amp;&amp; !base.equals(pkg)) {</span>
+<span class="nc bnc" id="L486" title="All 2 branches missed.">                if (imports.length() &gt; 0)</span>
+<span class="nc" id="L487">                    imports.endl();</span>
+<span class="nc" id="L488">                imports.append(&quot;import &quot;).append(pkg).append(&quot;.*;&quot;);</span>
+            }
+        }
+<span class="nc" id="L491">        return imports.toString();</span>
+    }
+
+    /**
+     * Returns the collection of packages that need to be imported.
+     */
+    public Set getImportPackages() {
+<span class="nc" id="L498">        Set pkgs = new TreeSet();</span>
+<span class="nc" id="L499">        pkgs.add(ClassUtil.getPackageName(_type));</span>
+
+<span class="nc" id="L501">        Class superOidClass = null;</span>
+<span class="nc bnc" id="L502" title="All 4 branches missed.">        if (_meta != null &amp;&amp; _meta.getPCSuperclassMetaData() != null)</span>
+<span class="nc" id="L503">            superOidClass = _meta.getPCSuperclassMetaData().getObjectIdType();</span>
+<span class="nc bnc" id="L504" title="All 2 branches missed.">        if (superOidClass != null)</span>
+<span class="nc" id="L505">            pkgs.add(ClassUtil.getPackageName(superOidClass));</span>
+
+<span class="nc" id="L507">        pkgs.add(&quot;java.io&quot;);</span>
+<span class="nc" id="L508">        pkgs.add(&quot;java.util&quot;);</span>
+        Class type;
+<span class="nc bnc" id="L510" title="All 2 branches missed.">        for (int i = 0; i &lt; _fields.length; i++) {</span>
+<span class="nc" id="L511">            type = _fields[i].getObjectIdFieldType();</span>
+<span class="nc bnc" id="L512" title="All 4 branches missed.">            if (type != byte[].class &amp;&amp; type != char[].class</span>
+<span class="nc bnc" id="L513" title="All 2 branches missed.">                &amp;&amp; !type.getName().startsWith(&quot;java.sql.&quot;)) {</span>
+<span class="nc" id="L514">                pkgs.add(ClassUtil.getPackageName(type));</span>
+            }
+        }
+<span class="nc" id="L517">        return pkgs;</span>
+    }
+
+    /**
+     * Return the code to declare all primary key fields.
+     */
+    private String getFieldDeclarations() {
+<span class="nc" id="L524">        CodeFormat code = newCodeFormat();</span>
+<span class="nc bnc" id="L525" title="All 2 branches missed.">        for (int i = 0; i &lt; _fields.length; i++) {</span>
+<span class="nc bnc" id="L526" title="All 2 branches missed.">            if (i &gt; 0)</span>
+<span class="nc" id="L527">                code.endl();</span>
+<span class="nc" id="L528">            code.tab().append(&quot;public &quot;).append(getTypeName(_fields[i])).</span>
+<span class="nc" id="L529">                append(&quot; &quot;).append(_fields[i].getName()).append(&quot;;&quot;);</span>
+        }
+<span class="nc" id="L531">        return code.toString();</span>
+    }
+
+    /**
+     * Return the type name to declare the given field as.
+     */
+    private String getTypeName(FieldMetaData fmd) {
+<span class="nc" id="L538">        Class type = fmd.getObjectIdFieldType();</span>
+<span class="nc bnc" id="L539" title="All 2 branches missed.">        if (type == byte[].class)</span>
+<span class="nc" id="L540">            return &quot;byte[]&quot;;</span>
+<span class="nc bnc" id="L541" title="All 2 branches missed.">        if (type == char[].class)</span>
+<span class="nc" id="L542">            return &quot;char[]&quot;;</span>
+<span class="nc bnc" id="L543" title="All 2 branches missed.">        if (type.getName().startsWith(&quot;java.sql.&quot;))</span>
+<span class="nc" id="L544">            return type.getName();</span>
+<span class="nc" id="L545">        return ClassUtil.getClassName(type);</span>
+    }
+
+    /**
+     * Return the getters and setters for all primary key fields.
+     */
+    private String getProperties() {
+<span class="nc bnc" id="L552" title="All 2 branches missed.">        if (AccessCode.isExplicit(_meta.getAccessType())</span>
+<span class="nc bnc" id="L553" title="All 2 branches missed.">         &amp;&amp; AccessCode.isField(_meta.getAccessType()))</span>
+<span class="nc" id="L554">            return &quot;&quot;;</span>
+
+<span class="nc" id="L556">        CodeFormat code = newCodeFormat();</span>
+        String propName;
+        String typeName;
+<span class="nc bnc" id="L559" title="All 2 branches missed.">        for (int i = 0; i &lt; _fields.length; i++) {</span>
+<span class="nc bnc" id="L560" title="All 2 branches missed.">            if (i &gt; 0)</span>
+<span class="nc" id="L561">                code.afterSection();</span>
+<span class="nc" id="L562">            typeName = getTypeName(_fields[i]);</span>
+<span class="nc" id="L563">            propName = StringUtil.capitalize(_fields[i].getName());</span>
+
+<span class="nc" id="L565">            code.tab().append(&quot;public &quot;).append(typeName).append(&quot; &quot;);</span>
+<span class="nc bnc" id="L566" title="All 2 branches missed.">            if (_fields[i].getDeclaredTypeCode() == JavaTypes.BOOLEAN</span>
+<span class="nc bnc" id="L567" title="All 2 branches missed.">                || _fields[i].getDeclaredTypeCode() == JavaTypes.BOOLEAN_OBJ)</span>
+<span class="nc" id="L568">                code.append(&quot;is&quot;);</span>
+            else
+<span class="nc" id="L570">                code.append(&quot;get&quot;);</span>
+<span class="nc" id="L571">            code.append(propName).parens().openBrace(2).endl();</span>
+<span class="nc" id="L572">            code.tab(2).append(&quot;return &quot;).append(_fields[i].getName()).</span>
+<span class="nc" id="L573">                append(&quot;;&quot;).endl();</span>
+<span class="nc" id="L574">            code.closeBrace(2);</span>
+<span class="nc" id="L575">            code.afterSection();</span>
+
+<span class="nc" id="L577">            code.tab().append(&quot;public void set&quot;).append(propName);</span>
+<span class="nc" id="L578">            code.openParen(true).append(typeName).append(&quot; &quot;).</span>
+<span class="nc" id="L579">                append(_fields[i].getName()).closeParen();</span>
+<span class="nc" id="L580">            code.openBrace(2).endl();</span>
+<span class="nc" id="L581">            code.tab(2).append(&quot;this.&quot;).append(_fields[i].getName()).</span>
+<span class="nc" id="L582">                append(&quot; = &quot;).append(_fields[i].getName()).append(&quot;;&quot;).</span>
+<span class="nc" id="L583">                endl();</span>
+<span class="nc" id="L584">            code.closeBrace(2);</span>
+        }
+<span class="nc" id="L586">        return code.toString();</span>
+    }
+
+    /**
+     * Return the string constructor code.
+     */
+    private String getConstructor(boolean hasSuperclass) {
+<span class="nc" id="L593">        CodeFormat code = newCodeFormat();</span>
+<span class="nc" id="L594">        code.tab().append(&quot;public &quot;);</span>
+<span class="nc" id="L595">        code.append(getClassName());</span>
+<span class="nc" id="L596">        code.openParen(true).append(&quot;String str&quot;).closeParen();</span>
+<span class="nc" id="L597">        code.openBrace(2).endl();</span>
+
+<span class="nc bnc" id="L599" title="All 4 branches missed.">        if (_fields.length != 0 || (hasSuperclass</span>
+<span class="nc bnc" id="L600" title="All 2 branches missed.">            &amp;&amp; _meta.getPrimaryKeyFields().length &gt; 0)) {</span>
+<span class="nc" id="L601">            code.tab(2).append(&quot;fromString&quot;).openParen(true).</span>
+<span class="nc" id="L602">                append(&quot;str&quot;).closeParen().append(&quot;;&quot;).endl();</span>
+        }
+
+<span class="nc" id="L605">        code.closeBrace(2);</span>
+<span class="nc" id="L606">        return code.toString();</span>
+    }
+
+    /**
+     * Create the fromString method that parses the result of our toString
+     * method. If we have superclasses with id fields, this will call
+     * super.fromString() so that the parent class can parse its own fields.
+     */
+    private String getFromStringCode(boolean hasSuperclass) {
+        // if we are below a concrete class then we cannot declare any
+        // more primary key fields; thus, just use the parent invocation
+<span class="nc bnc" id="L617" title="All 2 branches missed.">        if (hasConcreteSuperclass())</span>
+<span class="nc" id="L618">            return &quot;&quot;;</span>
+<span class="nc bnc" id="L619" title="All 2 branches missed.">        if (_fields.length == 0)</span>
+<span class="nc" id="L620">            return &quot;&quot;;</span>
+<span class="nc bnc" id="L621" title="All 2 branches missed.">        hasSuperclass = hasSuperclass &amp;&amp; getDeclaredPrimaryKeyFields</span>
+<span class="nc bnc" id="L622" title="All 2 branches missed.">            (_meta.getPCSuperclassMetaData()).length &gt; 0;</span>
+
+<span class="nc" id="L624">        String toke = getTokenizer(hasSuperclass);</span>
+<span class="nc" id="L625">        CodeFormat code = newCodeFormat();</span>
+<span class="nc bnc" id="L626" title="All 4 branches missed.">        if (_abstract || hasSuperclass)</span>
+<span class="nc" id="L627">            code.tab().append(&quot;protected &quot;).append(toke).</span>
+<span class="nc" id="L628">                append(&quot; fromString&quot;);</span>
+        else
+<span class="nc" id="L630">            code.tab().append(&quot;private void fromString&quot;);</span>
+<span class="nc" id="L631">        code.openParen(true).append(&quot;String str&quot;).closeParen();</span>
+<span class="nc" id="L632">        code.openBrace(2).endl();</span>
+
+        // if we have any Object-type fields, die immediately
+<span class="nc bnc" id="L635" title="All 2 branches missed.">        for (int i = 0; i &lt; _fields.length; i++) {</span>
+<span class="nc bnc" id="L636" title="All 2 branches missed.">            if (_fields[i].getObjectIdFieldType() != Object.class)</span>
+<span class="nc" id="L637">                continue;</span>
+<span class="nc" id="L638">            code.tab(2).append(&quot;throw new UnsupportedOperationException&quot;).</span>
+<span class="nc" id="L639">                parens().append(&quot;;&quot;).endl();</span>
+<span class="nc" id="L640">            code.closeBrace(2);</span>
+<span class="nc" id="L641">            return code.toString();</span>
+        }
+
+<span class="nc bnc" id="L644" title="All 2 branches missed.">        if (toke != null) {</span>
+<span class="nc" id="L645">            code.tab(2).append(toke).append(&quot; toke = &quot;);</span>
+<span class="nc bnc" id="L646" title="All 2 branches missed.">            if (hasSuperclass) {</span>
+                // call super.fromString(str) to get the tokenizer that was
+                // used to parse the superclass
+<span class="nc" id="L649">                code.append(&quot;super.fromString&quot;).openParen(true).</span>
+<span class="nc" id="L650">                    append(&quot;str&quot;).closeParen();</span>
+            } else {
+                // otherwise construct a new tokenizer with the string
+<span class="nc" id="L653">                code.append(&quot;new &quot;).append(toke).openParen(true).</span>
+<span class="nc" id="L654">                    append(&quot;str&quot;);</span>
+<span class="nc bnc" id="L655" title="All 2 branches missed.">                if (toke == TOKENIZER_STD)</span>
+<span class="nc" id="L656">                    code.append(&quot;, \&quot;&quot;).append(_token).append(&quot;\&quot;&quot;);</span>
+<span class="nc" id="L657">                code.closeParen();</span>
+            }
+<span class="nc" id="L659">            code.append(&quot;;&quot;).endl();</span>
+        }
+
+<span class="nc bnc" id="L662" title="All 2 branches missed.">        for (int i = 0; i &lt; _fields.length; i++) {</span>
+<span class="nc bnc" id="L663" title="All 2 branches missed.">            if (toke != null) {</span>
+<span class="nc" id="L664">                code.tab(2).append(&quot;str = toke.nextToken&quot;).parens().</span>
+<span class="nc" id="L665">                    append(&quot;;&quot;).endl();</span>
+            }
+<span class="nc" id="L667">            code.tab(2).append(getConversionCode(_fields[i], &quot;str&quot;)).endl();</span>
+        }
+<span class="nc bnc" id="L669" title="All 4 branches missed.">        if (_abstract || hasSuperclass)</span>
+<span class="nc" id="L670">            code.tab(2).append(&quot;return toke;&quot;).endl();</span>
+<span class="nc" id="L671">        code.closeBrace(2);</span>
+<span class="nc" id="L672">        return code.toString();</span>
+    }
+
+    /**
+     * Returns the type of tokenizer to use, or null if none.
+     */
+    private String getTokenizer(boolean hasSuperclass) {
+<span class="nc bnc" id="L679" title="All 6 branches missed.">        if (!_abstract &amp;&amp; !hasSuperclass &amp;&amp; _fields.length == 1)</span>
+<span class="nc" id="L680">            return null;</span>
+<span class="nc bnc" id="L681" title="All 2 branches missed.">        if (_token.length() == 1)</span>
+<span class="nc" id="L682">            return TOKENIZER_STD;</span>
+<span class="nc" id="L683">        return TOKENIZER_CUSTOM;</span>
+    }
+
+    /**
+     * Get parsing code for the given field.
+     */
+    private String getConversionCode(FieldMetaData field, String var) {
+<span class="nc" id="L690">        CodeFormat parse = newCodeFormat();</span>
+<span class="nc bnc" id="L691" title="All 2 branches missed.">        if (field.getName().equals(var))</span>
+<span class="nc" id="L692">            parse.append(&quot;this.&quot;);</span>
+<span class="nc" id="L693">        parse.append(field.getName()).append(&quot; = &quot;);</span>
+
+<span class="nc" id="L695">        Class type = field.getObjectIdFieldType();</span>
+<span class="nc bnc" id="L696" title="All 2 branches missed.">        if (type == Date.class) {</span>
+<span class="nc" id="L697">            parse.append(&quot;new Date&quot;).openParen(true).</span>
+<span class="nc" id="L698">                append(&quot;Long.parseLong&quot;).openParen(true).</span>
+<span class="nc" id="L699">                append(var).closeParen().closeParen();</span>
+<span class="nc bnc" id="L700" title="All 6 branches missed.">        } else if (type == java.sql.Date.class</span>
+            || type == java.sql.Timestamp.class
+            || type == java.sql.Time.class) {
+<span class="nc" id="L703">            parse.append(type.getName()).append(&quot;.valueOf&quot;).openParen(true).</span>
+<span class="nc" id="L704">                append(var).closeParen();</span>
+<span class="nc bnc" id="L705" title="All 2 branches missed.">        } else if (type == String.class)</span>
+<span class="nc" id="L706">            parse.append(var);</span>
+<span class="nc bnc" id="L707" title="All 2 branches missed.">        else if (type == Character.class) {</span>
+<span class="nc" id="L708">            parse.append(&quot;new Character&quot;).openParen(true).append(var).</span>
+<span class="nc" id="L709">                append(&quot;.charAt&quot;).openParen(true).append(0).</span>
+<span class="nc" id="L710">                closeParen().closeParen();</span>
+<span class="nc bnc" id="L711" title="All 2 branches missed.">        } else if (type == byte[].class)</span>
+<span class="nc" id="L712">            parse.append(&quot;toBytes&quot;).openParen(true).append(var).closeParen();</span>
+<span class="nc bnc" id="L713" title="All 2 branches missed.">        else if (type == char[].class)</span>
+<span class="nc" id="L714">            parse.append(var).append(&quot;.toCharArray&quot;).parens();</span>
+<span class="nc bnc" id="L715" title="All 2 branches missed.">        else if (!type.isPrimitive()) {</span>
+<span class="nc" id="L716">            parse.append(&quot;new &quot;).append(ClassUtil.getClassName(type)).</span>
+<span class="nc" id="L717">                openParen(true).append(var).closeParen();</span>
+        } else // primitive
+        {
+<span class="nc bnc" id="L720" title="All 8 branches missed.">            switch (type.getName().charAt(0)) {</span>
+                case 'b':
+<span class="nc bnc" id="L722" title="All 2 branches missed.">                    if (type == boolean.class)</span>
+<span class="nc" id="L723">                        parse.append(&quot;\&quot;true\&quot;.equals&quot;).openParen(true).</span>
+<span class="nc" id="L724">                            append(var).closeParen();</span>
+                    else
+<span class="nc" id="L726">                        parse.append(&quot;Byte.parseByte&quot;).openParen(true).</span>
+<span class="nc" id="L727">                            append(var).closeParen();</span>
+<span class="nc" id="L728">                    break;</span>
+                case 'c':
+<span class="nc" id="L730">                    parse.append(var).append(&quot;.charAt&quot;).openParen(true).</span>
+<span class="nc" id="L731">                        append(0).closeParen();</span>
+<span class="nc" id="L732">                    break;</span>
+                case 'd':
+<span class="nc" id="L734">                    parse.append(&quot;Double.parseDouble&quot;).openParen(true).</span>
+<span class="nc" id="L735">                        append(var).closeParen();</span>
+<span class="nc" id="L736">                    break;</span>
+                case 'f':
+<span class="nc" id="L738">                    parse.append(&quot;Float.parseFloat&quot;).openParen(true).</span>
+<span class="nc" id="L739">                        append(var).closeParen();</span>
+<span class="nc" id="L740">                    break;</span>
+                case 'i':
+<span class="nc" id="L742">                    parse.append(&quot;Integer.parseInt&quot;).openParen(true).</span>
+<span class="nc" id="L743">                        append(var).closeParen();</span>
+<span class="nc" id="L744">                    break;</span>
+                case 'l':
+<span class="nc" id="L746">                    parse.append(&quot;Long.parseLong&quot;).openParen(true).</span>
+<span class="nc" id="L747">                        append(var).closeParen();</span>
+<span class="nc" id="L748">                    break;</span>
+                case 's':
+<span class="nc" id="L750">                    parse.append(&quot;Short.parseShort&quot;).openParen(true).</span>
+<span class="nc" id="L751">                        append(var).closeParen();</span>
+                    break;
+            }
+        }
+
+<span class="nc bnc" id="L756" title="All 4 branches missed.">        if (!type.isPrimitive() &amp;&amp; type != byte[].class) {</span>
+<span class="nc" id="L757">            CodeFormat isNull = newCodeFormat();</span>
+<span class="nc" id="L758">            isNull.append(&quot;if&quot;).openParen(true).append(&quot;\&quot;null\&quot;.equals&quot;).</span>
+<span class="nc" id="L759">                openParen(true).append(var).closeParen().closeParen().</span>
+<span class="nc" id="L760">                endl().tab(3);</span>
+<span class="nc bnc" id="L761" title="All 2 branches missed.">            if (field.getName().equals(var))</span>
+<span class="nc" id="L762">                isNull.append(&quot;this.&quot;);</span>
+<span class="nc" id="L763">            isNull.append(field.getName()).append(&quot; = null;&quot;).endl();</span>
+<span class="nc" id="L764">            isNull.tab(2).append(&quot;else&quot;).endl();</span>
+<span class="nc" id="L765">            isNull.tab(3).append(parse);</span>
+<span class="nc" id="L766">            parse = isNull;</span>
+        }
+
+<span class="nc" id="L769">        return parse.append(&quot;;&quot;).toString();</span>
+    }
+
+    /**
+     * Return an equality method that compares all pk variables.
+     * Must deal correctly with both primitives and objects.
+     */
+    private String getEqualsCode(boolean hasSuperclass) {
+        // if we are below a concrete class then we cannot declare any
+        // more primary key fields; thus, just use the parent invocation
+<span class="nc bnc" id="L779" title="All 6 branches missed.">        if (hasConcreteSuperclass() || (hasSuperclass &amp;&amp; _fields.length == 0))</span>
+<span class="nc" id="L780">            return &quot;&quot;;</span>
+
+<span class="nc" id="L782">        CodeFormat code = newCodeFormat();</span>
+<span class="nc" id="L783">        code.tab().append(&quot;public boolean equals&quot;).openParen(true).</span>
+<span class="nc" id="L784">            append(&quot;Object obj&quot;).closeParen().openBrace(2).endl();</span>
+
+<span class="nc" id="L786">        code.tab(2).append(&quot;if&quot;).openParen(true).</span>
+<span class="nc" id="L787">            append(&quot;this == obj&quot;).closeParen().endl();</span>
+<span class="nc" id="L788">        code.tab(3).append(&quot;return true;&quot;).endl();</span>
+
+        // call super.equals() if we have a superclass
+<span class="nc" id="L791">        String className = getClassName();</span>
+<span class="nc bnc" id="L792" title="All 2 branches missed.">        if (hasSuperclass) {</span>
+<span class="nc" id="L793">            code.tab(2).append(&quot;if&quot;).openParen(true).</span>
+<span class="nc" id="L794">                append(&quot;!super.equals&quot;).openParen(true).</span>
+<span class="nc" id="L795">                append(&quot;obj&quot;).closeParen().closeParen().endl();</span>
+<span class="nc" id="L796">            code.tab(3).append(&quot;return false;&quot;).endl();</span>
+        } else {
+<span class="nc" id="L798">            code.tab(2).append(&quot;if&quot;).openParen(true).</span>
+<span class="nc" id="L799">                append(&quot;obj == null || obj.getClass&quot;).parens().</span>
+<span class="nc" id="L800">                append(&quot; != &quot;).append(&quot;getClass&quot;).parens().</span>
+<span class="nc" id="L801">                closeParen().endl();</span>
+<span class="nc" id="L802">            code.tab(3).append(&quot;return false;&quot;).endl();</span>
+        }
+
+        String name;
+        Class type;
+<span class="nc bnc" id="L807" title="All 2 branches missed.">        for (int i = 0; i &lt; _fields.length; i++) {</span>
+<span class="nc bnc" id="L808" title="All 2 branches missed.">            if (i == 0) {</span>
+<span class="nc" id="L809">                code.endl().tab(2).append(className).append(&quot; other = &quot;).</span>
+<span class="nc" id="L810">                    openParen(false).append(className).closeParen().</span>
+<span class="nc" id="L811">                    append(&quot; obj;&quot;).endl();</span>
+            }
+
+            // if this is not the first field, add an &amp;&amp;
+<span class="nc bnc" id="L815" title="All 2 branches missed.">            if (i == 0)</span>
+<span class="nc" id="L816">                code.tab(2).append(&quot;return &quot;);</span>
+            else
+<span class="nc" id="L818">                code.endl().tab(3).append(&quot;&amp;&amp; &quot;);</span>
+
+<span class="nc" id="L820">            name = _fields[i].getName();</span>
+<span class="nc" id="L821">            type = _fields[i].getObjectIdFieldType();</span>
+<span class="nc bnc" id="L822" title="All 2 branches missed.">            if (type.isPrimitive()) {</span>
+<span class="nc" id="L823">                code.openParen(false).append(name).append(&quot; == &quot;).</span>
+<span class="nc" id="L824">                    append(&quot;other.&quot;).append(name).closeParen();</span>
+<span class="nc bnc" id="L825" title="All 2 branches missed.">            } else if (type == byte[].class) {</span>
+<span class="nc" id="L826">                code.openParen(false).append(&quot;equals&quot;).openParen(true).</span>
+<span class="nc" id="L827">                    append(name).append(&quot;, &quot;).append(&quot;other.&quot;).</span>
+<span class="nc" id="L828">                    append(name).closeParen().closeParen();</span>
+<span class="nc bnc" id="L829" title="All 2 branches missed.">            } else if (type == char[].class) {</span>
+                // ((name == null &amp;&amp; other.name == null)
+                //	|| (name != null &amp;&amp; String.valueOf (name).
+                //	equals (String.valueOf (other.name))))
+<span class="nc" id="L833">                code.append(&quot;(&quot;).openParen(false).append(name).</span>
+<span class="nc" id="L834">                    append(&quot; == null &amp;&amp; other.&quot;).append(name).</span>
+<span class="nc" id="L835">                    append(&quot; == null&quot;).closeParen().endl();</span>
+<span class="nc" id="L836">                code.tab(3).append(&quot;|| &quot;);</span>
+<span class="nc" id="L837">                code.openParen(false).append(name).append(&quot; != null &quot;).</span>
+<span class="nc" id="L838">                    append(&quot;&amp;&amp; String.valueOf&quot;).openParen(true).append(name).</span>
+<span class="nc" id="L839">                    closeParen().append(&quot;.&quot;).endl();</span>
+<span class="nc" id="L840">                code.tab(3).append(&quot;equals&quot;).openParen(true).</span>
+<span class="nc" id="L841">                    append(&quot;String.valueOf&quot;).openParen(true).</span>
+<span class="nc" id="L842">                    append(&quot;other.&quot;).append(name).closeParen().closeParen().</span>
+<span class="nc" id="L843">                    closeParen().append(&quot;)&quot;);</span>
+            } else {
+                // ((name == null &amp;&amp; other.name == null)
+                //	|| (name != null &amp;&amp; name.equals (other.name)))
+<span class="nc" id="L847">                code.append(&quot;(&quot;).openParen(false).append(name).</span>
+<span class="nc" id="L848">                    append(&quot; == null &amp;&amp; other.&quot;).append(name).</span>
+<span class="nc" id="L849">                    append(&quot; == null&quot;).closeParen().endl();</span>
+<span class="nc" id="L850">                code.tab(3).append(&quot;|| &quot;);</span>
+<span class="nc" id="L851">                code.openParen(false).append(name).append(&quot; != null &quot;).</span>
+<span class="nc" id="L852">                    append(&quot;&amp;&amp; &quot;).append(name).append(&quot;.equals&quot;).</span>
+<span class="nc" id="L853">                    openParen(true).append(&quot;other.&quot;).append(name).</span>
+<span class="nc" id="L854">                    closeParen().closeParen().append(&quot;)&quot;);</span>
+            }
+        }
+
+        // no _fields: just return true after checking instanceof
+<span class="nc bnc" id="L859" title="All 2 branches missed.">        if (_fields.length == 0)</span>
+<span class="nc" id="L860">            code.tab(2).append(&quot;return true;&quot;).endl();</span>
+        else
+<span class="nc" id="L862">            code.append(&quot;;&quot;).endl();</span>
+
+<span class="nc" id="L864">        code.closeBrace(2);</span>
+<span class="nc" id="L865">        return code.toString();</span>
+    }
+
+    /**
+     * Return a hashCode method that takes into account all
+     * primary key values. Must deal correctly with both primitives and objects.
+     */
+    private String getHashCodeCode(boolean hasSuperclass) {
+        // if we are below a concrete class then we cannot declare any
+        // more primary key fields; thus, just use the parent invocation
+<span class="nc bnc" id="L875" title="All 6 branches missed.">        if (hasConcreteSuperclass() || (hasSuperclass &amp;&amp; _fields.length == 0))</span>
+<span class="nc" id="L876">            return &quot;&quot;;</span>
+
+<span class="nc" id="L878">        CodeFormat code = newCodeFormat();</span>
+<span class="nc" id="L879">        code.tab().append(&quot;public int hashCode&quot;).parens().</span>
+<span class="nc" id="L880">            openBrace(2).endl();</span>
+
+<span class="nc bnc" id="L882" title="All 2 branches missed.">        if (_fields.length == 0)</span>
+<span class="nc" id="L883">            code.tab(2).append(&quot;return 17;&quot;).endl();</span>
+<span class="nc bnc" id="L884" title="All 4 branches missed.">        else if (_fields.length == 1 &amp;&amp; !hasSuperclass) {</span>
+<span class="nc" id="L885">            code.tab(2).append(&quot;return &quot;);</span>
+<span class="nc" id="L886">            appendHashCodeCode(_fields[0], code);</span>
+<span class="nc" id="L887">            code.append(&quot;;&quot;).endl();</span>
+        } else {
+<span class="nc" id="L889">            code.tab(2).append(&quot;int rs = &quot;);</span>
+<span class="nc bnc" id="L890" title="All 2 branches missed.">            if (hasSuperclass) {</span>
+                // call super.hashCode() if we have a superclass
+<span class="nc" id="L892">                code.append(&quot;super.hashCode&quot;).openParen(true).</span>
+<span class="nc" id="L893">                    closeParen().append(&quot;;&quot;);</span>
+            } else
+<span class="nc" id="L895">                code.append(&quot;17;&quot;);</span>
+<span class="nc" id="L896">            code.endl();</span>
+
+<span class="nc bnc" id="L898" title="All 2 branches missed.">            for (int i = 0; i &lt; _fields.length; i++) {</span>
+<span class="nc" id="L899">                code.tab(2).append(&quot;rs = rs * 37 + &quot;);</span>
+<span class="nc" id="L900">                appendHashCodeCode(_fields[i], code);</span>
+<span class="nc" id="L901">                code.append(&quot;;&quot;).endl();</span>
+            }
+<span class="nc" id="L903">            code.tab(2).append(&quot;return rs;&quot;).endl();</span>
+        }
+<span class="nc" id="L905">        code.closeBrace(2);</span>
+<span class="nc" id="L906">        return code.toString();</span>
+    }
+
+    /**
+     * Return true if this class has a concrete superclass.
+     */
+    private boolean hasConcreteSuperclass() {
+<span class="nc" id="L913">        for (ClassMetaData sup = _meta.getPCSuperclassMetaData();</span>
+<span class="nc bnc" id="L914" title="All 2 branches missed.">            sup != null; sup = sup.getPCSuperclassMetaData()) {</span>
+<span class="nc bnc" id="L915" title="All 2 branches missed.">            if (!Modifier.isAbstract(sup.getDescribedType().getModifiers()))</span>
+<span class="nc" id="L916">                return true;</span>
+        }
+<span class="nc" id="L918">        return false;</span>
+    }
+
+    /**
+     * Append code calculating the hashcode for the given field.
+     */
+    private void appendHashCodeCode(FieldMetaData field, CodeFormat code) {
+<span class="nc" id="L925">        String name = field.getName();</span>
+<span class="nc bnc" id="L926" title="All 2 branches missed.">        if (&quot;rs&quot;.equals(name))</span>
+<span class="nc" id="L927">            name = &quot;this.&quot; + name;</span>
+<span class="nc" id="L928">        Class type = field.getObjectIdFieldType();</span>
+<span class="nc bnc" id="L929" title="All 2 branches missed.">        if (type.isPrimitive()) {</span>
+<span class="nc bnc" id="L930" title="All 2 branches missed.">            if (type == boolean.class) {</span>
+                // ((name) ? 1 : 0)
+<span class="nc" id="L932">                code.append(&quot;(&quot;).openParen(false).append(name).closeParen().</span>
+<span class="nc" id="L933">                    append(&quot; ? 1 : 0&quot;).append(&quot;)&quot;);</span>
+<span class="nc bnc" id="L934" title="All 2 branches missed.">            } else if (type == long.class) {</span>
+                // (int) (name ^ (name &gt;&gt;&gt; 32))
+<span class="nc" id="L936">                code.openParen(false).append(&quot;int&quot;).closeParen().</span>
+<span class="nc" id="L937">                    append(&quot; &quot;).openParen(false).append(name).</span>
+<span class="nc" id="L938">                    append(&quot; ^ &quot;).openParen(false).append(name).</span>
+<span class="nc" id="L939">                    append(&quot; &gt;&gt;&gt; 32&quot;).closeParen().closeParen();</span>
+<span class="nc bnc" id="L940" title="All 2 branches missed.">            } else if (type == double.class) {</span>
+                // (int) (Double.doubleToLongBits (name)
+                //     ^ (Double.doubleToLongBits (name) &gt;&gt;&gt; 32))
+<span class="nc" id="L943">                code.openParen(false).append(&quot;int&quot;).closeParen().</span>
+<span class="nc" id="L944">                    append(&quot; &quot;).openParen(false).</span>
+<span class="nc" id="L945">                    append(&quot;Double.doubleToLongBits&quot;).openParen(true).</span>
+<span class="nc" id="L946">                    append(name).closeParen().endl();</span>
+<span class="nc" id="L947">                code.tab(3).append(&quot;^ &quot;).openParen(false).</span>
+<span class="nc" id="L948">                    append(&quot;Double.doubleToLongBits&quot;).openParen(true).</span>
+<span class="nc" id="L949">                    append(name).closeParen().append(&quot; &gt;&gt;&gt; 32&quot;).</span>
+<span class="nc" id="L950">                    closeParen().closeParen();</span>
+<span class="nc bnc" id="L951" title="All 2 branches missed.">            } else if (type == float.class) {</span>
+                // Float.floatToIntBits (name)
+<span class="nc" id="L953">                code.append(&quot;Float.floatToIntBits&quot;).openParen(true).</span>
+<span class="nc" id="L954">                    append(name).closeParen();</span>
+<span class="nc bnc" id="L955" title="All 2 branches missed.">            } else if (type == int.class)</span>
+<span class="nc" id="L956">                code.append(name);</span>
+            else {
+                // (int) name
+<span class="nc" id="L959">                code.openParen(false).append(&quot;int&quot;).closeParen().</span>
+<span class="nc" id="L960">                    append(&quot; &quot;).append(name);</span>
+            }
+<span class="nc bnc" id="L962" title="All 2 branches missed.">        } else if (type == byte[].class) {</span>
+            // hashCode (name);
+<span class="nc" id="L964">            code.append(&quot;hashCode&quot;).openParen(true).append(name).</span>
+<span class="nc" id="L965">                closeParen();</span>
+<span class="nc bnc" id="L966" title="All 2 branches missed.">        } else if (type == char[].class) {</span>
+            // ((name == null) ? 0 : String.valueOf (name).hashCode ())
+<span class="nc" id="L968">            code.append(&quot;(&quot;).openParen(false).append(name).</span>
+<span class="nc" id="L969">                append(&quot; == null&quot;).closeParen().append(&quot; ? 0 : &quot;).</span>
+<span class="nc" id="L970">                append(&quot;String.valueOf&quot;).openParen(true).append(name).</span>
+<span class="nc" id="L971">                closeParen().append(&quot;.hashCode&quot;).parens().append(&quot;)&quot;);</span>
+        } else {
+            // ((name == null) ? 0 : name.hashCode ())
+<span class="nc" id="L974">            code.append(&quot;(&quot;).openParen(false).append(name).</span>
+<span class="nc" id="L975">                append(&quot; == null&quot;).closeParen().append(&quot; ? 0 : &quot;).</span>
+<span class="nc" id="L976">                append(name).append(&quot;.hashCode&quot;).parens().append(&quot;)&quot;);</span>
+        }
+<span class="nc" id="L978">    }</span>
+
+    /**
+     * Return a method to create a string containing the primary key
+     * values that define the application id object.
+     */
+    private String getToStringCode(boolean hasSuperclass) {
+        // if we are below a concrete class then we cannot declare any
+        // more primary key fields; thus, just use the parent invocation
+<span class="nc bnc" id="L987" title="All 6 branches missed.">        if (hasConcreteSuperclass() || (hasSuperclass &amp;&amp; _fields.length == 0))</span>
+<span class="nc" id="L988">            return &quot;&quot;;</span>
+
+<span class="nc" id="L990">        CodeFormat code = newCodeFormat();</span>
+<span class="nc" id="L991">        code.tab().append(&quot;public String toString&quot;).parens().</span>
+<span class="nc" id="L992">            openBrace(2).endl();</span>
+
+        String name;
+        Class type;
+<span class="nc" id="L996">        String appendDelimiter = &quot;+ \&quot;&quot; + _token + &quot;\&quot; + &quot;;</span>
+<span class="nc bnc" id="L997" title="All 2 branches missed.">        for (int i = 0; i &lt; _fields.length; i++) {</span>
+            // if this is not the first field, add a +
+<span class="nc bnc" id="L999" title="All 2 branches missed.">            if (i == 0) {</span>
+<span class="nc" id="L1000">                code.tab(2).append(&quot;return &quot;);</span>
+
+                // add in the super.toString() if we have a parent
+<span class="nc bnc" id="L1003" title="All 2 branches missed.">                if (hasSuperclass &amp;&amp; getDeclaredPrimaryKeyFields</span>
+<span class="nc bnc" id="L1004" title="All 2 branches missed.">                    (_meta.getPCSuperclassMetaData()).length &gt; 0) {</span>
+<span class="nc" id="L1005">                    code.append(&quot;super.toString&quot;).parens();</span>
+<span class="nc" id="L1006">                    code.endl().tab(3).append(appendDelimiter);</span>
+                }
+            } else
+<span class="nc" id="L1009">                code.endl().tab(3).append(appendDelimiter);</span>
+
+<span class="nc" id="L1011">            name = _fields[i].getName();</span>
+<span class="nc" id="L1012">            type = _fields[i].getObjectIdFieldType();</span>
+<span class="nc bnc" id="L1013" title="All 2 branches missed.">            if (type == String.class)</span>
+<span class="nc" id="L1014">                code.append(name);</span>
+<span class="nc bnc" id="L1015" title="All 2 branches missed.">            else if (type == byte[].class)</span>
+<span class="nc" id="L1016">                code.append(&quot;toString&quot;).openParen(true).</span>
+<span class="nc" id="L1017">                    append(name).closeParen();</span>
+<span class="nc bnc" id="L1018" title="All 2 branches missed.">            else if (type == char[].class)</span>
+<span class="nc" id="L1019">                code.openParen(true).openParen(true).append(name).</span>
+<span class="nc" id="L1020">                    append(&quot; == null&quot;).closeParen().append(&quot; ? \&quot;null\&quot;&quot;).</span>
+<span class="nc" id="L1021">                    append(&quot;: String.valueOf&quot;).openParen(true).</span>
+<span class="nc" id="L1022">                    append(name).closeParen().closeParen();</span>
+<span class="nc bnc" id="L1023" title="All 2 branches missed.">            else if (type == Date.class)</span>
+<span class="nc" id="L1024">                code.openParen(true).openParen(true).append(name).</span>
+<span class="nc" id="L1025">                    append(&quot; == null&quot;).closeParen().append(&quot; ? \&quot;null\&quot;&quot;).</span>
+<span class="nc" id="L1026">                    endl().tab(4).append(&quot;: String.valueOf&quot;).</span>
+<span class="nc" id="L1027">                    openParen(true).append(name).append(&quot;.getTime&quot;).</span>
+<span class="nc" id="L1028">                    parens().closeParen().closeParen();</span>
+            else
+<span class="nc" id="L1030">                code.append(&quot;String.valueOf&quot;).openParen(true).</span>
+<span class="nc" id="L1031">                    append(name).closeParen();</span>
+        }
+
+        // no fields; just use &quot;&quot;
+<span class="nc bnc" id="L1035" title="All 2 branches missed.">        if (_fields.length == 0)</span>
+<span class="nc" id="L1036">            code.tab(2).append(&quot;return \&quot;\&quot;&quot;);</span>
+<span class="nc" id="L1037">        code.append(&quot;;&quot;).endl();</span>
+<span class="nc" id="L1038">        code.closeBrace(2);</span>
+<span class="nc" id="L1039">        return code.toString();</span>
+    }
+
+    /**
+     * Code to convert a string to a byte array.
+     *
+     * @see org.apache.openjpa.lib.util.Base16Encoder#decode
+     */
+    private String getToBytesByteArrayCode() {
+<span class="nc" id="L1048">        CodeFormat code = newCodeFormat();</span>
+<span class="nc" id="L1049">        code.tab().append(&quot;private static byte[] toBytes&quot;).openParen(true).</span>
+<span class="nc" id="L1050">            append(&quot;String s&quot;).closeParen().openBrace(2).endl();</span>
+
+<span class="nc" id="L1052">        code.tab(2).append(&quot;if&quot;).openParen(true).append(&quot;\&quot;null\&quot;.equals&quot;).</span>
+<span class="nc" id="L1053">            openParen(true).append(&quot;s&quot;).closeParen().closeParen().endl();</span>
+<span class="nc" id="L1054">        code.tab(3).append(&quot;return null;&quot;).endl(2);</span>
+
+<span class="nc" id="L1056">        code.tab(2).append(&quot;int len = s.length&quot;).parens().</span>
+<span class="nc" id="L1057">            append(&quot;;&quot;).endl();</span>
+<span class="nc" id="L1058">        code.tab(2).append(&quot;byte[] r = new byte[len / 2];&quot;).endl();</span>
+<span class="nc" id="L1059">        code.tab(2).append(&quot;for&quot;).openParen(true).</span>
+<span class="nc" id="L1060">            append(&quot;int i = 0; i &lt; r.length; i++&quot;).closeParen().</span>
+<span class="nc" id="L1061">            openBrace(3).endl();</span>
+<span class="nc" id="L1062">        code.tab(3).append(&quot;int digit1 = s.charAt&quot;).openParen(true).</span>
+<span class="nc" id="L1063">            append(&quot;i * 2&quot;).closeParen().append(&quot;, &quot;).</span>
+<span class="nc" id="L1064">            append(&quot;digit2 = s.charAt&quot;).openParen(true).</span>
+<span class="nc" id="L1065">            append(&quot;i * 2 + 1&quot;).closeParen().append(&quot;;&quot;).endl();</span>
+<span class="nc" id="L1066">        code.tab(3).append(&quot;if&quot;).openParen(true).</span>
+<span class="nc" id="L1067">            append(&quot;digit1 &gt;= '0' &amp;&amp; digit1 &lt;= '9'&quot;).closeParen().endl();</span>
+<span class="nc" id="L1068">        code.tab(4).append(&quot;digit1 -= '0';&quot;).endl();</span>
+<span class="nc" id="L1069">        code.tab(3).append(&quot;else if&quot;).openParen(true).</span>
+<span class="nc" id="L1070">            append(&quot;digit1 &gt;= 'A' &amp;&amp; digit1 &lt;= 'F'&quot;).closeParen().endl();</span>
+<span class="nc" id="L1071">        code.tab(4).append(&quot;digit1 -= 'A' - 10;&quot;).endl();</span>
+<span class="nc" id="L1072">        code.tab(3).append(&quot;if&quot;).openParen(true).</span>
+<span class="nc" id="L1073">            append(&quot;digit2 &gt;= '0' &amp;&amp; digit2 &lt;= '9'&quot;).closeParen().endl();</span>
+<span class="nc" id="L1074">        code.tab(4).append(&quot;digit2 -= '0';&quot;).endl();</span>
+<span class="nc" id="L1075">        code.tab(3).append(&quot;else if&quot;).openParen(true).</span>
+<span class="nc" id="L1076">            append(&quot;digit2 &gt;= 'A' &amp;&amp; digit2 &lt;= 'F'&quot;).closeParen().endl();</span>
+<span class="nc" id="L1077">        code.tab(4).append(&quot;digit2 -= 'A' - 10;&quot;).endl(2);</span>
+<span class="nc" id="L1078">        code.tab(3).append(&quot;r[i] = (byte) &quot;).openParen(false).</span>
+<span class="nc" id="L1079">            openParen(false).append(&quot;digit1 &lt;&lt; 4&quot;).closeParen().</span>
+<span class="nc" id="L1080">            append(&quot; + digit2&quot;).closeParen().append(&quot;;&quot;).endl();</span>
+<span class="nc" id="L1081">        code.closeBrace(3).endl();</span>
+<span class="nc" id="L1082">        code.tab(2).append(&quot;return r;&quot;).endl();</span>
+
+<span class="nc" id="L1084">        code.closeBrace(2);</span>
+<span class="nc" id="L1085">        return code.toString();</span>
+    }
+
+    /**
+     * Code to convert a byte array to a string.
+     *
+     * @see org.apache.openjpa.lib.util.Base16Encoder#encode
+     */
+    private String getToStringByteArrayCode() {
+<span class="nc" id="L1094">        CodeFormat code = newCodeFormat();</span>
+<span class="nc" id="L1095">        code.tab().append(&quot;private static String toString&quot;).openParen(true).</span>
+<span class="nc" id="L1096">            append(&quot;byte[] b&quot;).closeParen().openBrace(2).endl();</span>
+
+<span class="nc" id="L1098">        code.tab(2).append(&quot;if&quot;).openParen(true).</span>
+<span class="nc" id="L1099">            append(&quot;b == null&quot;).closeParen().endl();</span>
+<span class="nc" id="L1100">        code.tab(3).append(&quot;return \&quot;null\&quot;;&quot;).endl(2);</span>
+
+<span class="nc" id="L1102">        code.tab(2).append(&quot;StringBuilder r = new StringBuilder&quot;).</span>
+<span class="nc" id="L1103">            openParen(true).append(&quot;b.length * 2&quot;).closeParen().</span>
+<span class="nc" id="L1104">            append(&quot;;&quot;).endl();</span>
+<span class="nc" id="L1105">        code.tab(2).append(&quot;for&quot;).openParen(true).</span>
+<span class="nc" id="L1106">            append(&quot;int i = 0; i &lt; b.length; i++&quot;).closeParen().endl();</span>
+<span class="nc" id="L1107">        code.tab(3).append(&quot;for&quot;).openParen(true).</span>
+<span class="nc" id="L1108">            append(&quot;int j = 1; j &gt;= 0; j--&quot;).closeParen().endl();</span>
+<span class="nc" id="L1109">        code.tab(4).append(&quot;r.append&quot;).openParen(true).</span>
+<span class="nc" id="L1110">            append(&quot;HEX[&quot;).openParen(false).append(&quot;b[i] &gt;&gt; &quot;).</span>
+<span class="nc" id="L1111">            openParen(false).append(&quot;j * 4&quot;).closeParen().closeParen().</span>
+<span class="nc" id="L1112">            append(&quot; &amp; 0xF]&quot;).closeParen().append(&quot;;&quot;).endl();</span>
+<span class="nc" id="L1113">        code.tab(2).append(&quot;return r.toString&quot;).parens().</span>
+<span class="nc" id="L1114">            append(&quot;;&quot;).endl();</span>
+
+<span class="nc" id="L1116">        code.closeBrace(2);</span>
+<span class="nc" id="L1117">        return code.toString();</span>
+    }
+
+    /**
+     * Code to test if two byte arrays are equal.
+     */
+    private String getEqualsByteArrayCode() {
+<span class="nc" id="L1124">        CodeFormat code = newCodeFormat();</span>
+<span class="nc" id="L1125">        code.tab().append(&quot;private static boolean equals&quot;).openParen(true).</span>
+<span class="nc" id="L1126">            append(&quot;byte[] b1, byte[] b2&quot;).closeParen().openBrace(2).endl();</span>
+
+<span class="nc" id="L1128">        code.tab(2).append(&quot;if&quot;).openParen(true).</span>
+<span class="nc" id="L1129">            append(&quot;b1 == null &amp;&amp; b2 == null&quot;).closeParen().endl();</span>
+<span class="nc" id="L1130">        code.tab(3).append(&quot;return true;&quot;).endl();</span>
+<span class="nc" id="L1131">        code.tab(2).append(&quot;if&quot;).openParen(true).</span>
+<span class="nc" id="L1132">            append(&quot;b1 == null || b2 == null&quot;).closeParen().endl();</span>
+<span class="nc" id="L1133">        code.tab(3).append(&quot;return false;&quot;).endl();</span>
+<span class="nc" id="L1134">        code.tab(2).append(&quot;if&quot;).openParen(true).</span>
+<span class="nc" id="L1135">            append(&quot;b1.length != b2.length&quot;).closeParen().endl();</span>
+<span class="nc" id="L1136">        code.tab(3).append(&quot;return false;&quot;).endl();</span>
+<span class="nc" id="L1137">        code.tab(2).append(&quot;for&quot;).openParen(true).</span>
+<span class="nc" id="L1138">            append(&quot;int i = 0; i &lt; b1.length; i++&quot;).closeParen().endl();</span>
+<span class="nc" id="L1139">        code.tab(3).append(&quot;if&quot;).openParen(true).</span>
+<span class="nc" id="L1140">            append(&quot;b1[i] != b2[i]&quot;).closeParen().endl();</span>
+<span class="nc" id="L1141">        code.tab(4).append(&quot;return false;&quot;).endl();</span>
+<span class="nc" id="L1142">        code.tab(2).append(&quot;return true;&quot;).endl();</span>
+
+<span class="nc" id="L1144">        code.closeBrace(2);</span>
+<span class="nc" id="L1145">        return code.toString();</span>
+    }
+
+    private String getHashCodeByteArrayCode() {
+<span class="nc" id="L1149">        CodeFormat code = newCodeFormat();</span>
+<span class="nc" id="L1150">        code.tab().append(&quot;private static int hashCode&quot;).openParen(true).</span>
+<span class="nc" id="L1151">            append(&quot;byte[] b&quot;).closeParen().openBrace(2).endl();</span>
+
+<span class="nc" id="L1153">        code.tab(2).append(&quot;if&quot;).openParen(true).append(&quot;b == null&quot;).</span>
+<span class="nc" id="L1154">            closeParen().endl();</span>
+<span class="nc" id="L1155">        code.tab(3).append(&quot;return 0;&quot;).endl();</span>
+<span class="nc" id="L1156">        code.tab(2).append(&quot;int sum = 0;&quot;).endl();</span>
+<span class="nc" id="L1157">        code.tab(2).append(&quot;for&quot;).openParen(true).</span>
+<span class="nc" id="L1158">            append(&quot;int i = 0; i &lt; b.length; i++&quot;).closeParen().endl();</span>
+<span class="nc" id="L1159">        code.tab(3).append(&quot;sum += b[i];&quot;).endl();</span>
+<span class="nc" id="L1160">        code.tab(2).append(&quot;return sum;&quot;).endl();</span>
+
+<span class="nc" id="L1162">        code.closeBrace(2);</span>
+<span class="nc" id="L1163">        return code.toString();</span>
+    }
+
+    /**
+     * Code defining a tokenizer class.
+     */
+    private String getCustomTokenizerClass() {
+<span class="nc" id="L1170">        CodeFormat code = newCodeFormat();</span>
+<span class="nc" id="L1171">        code.tab().append(&quot;protected static class &quot;).</span>
+<span class="nc" id="L1172">            append(TOKENIZER_CUSTOM).openBrace(2).endl();</span>
+
+<span class="nc" id="L1174">        code.tab(2).append(&quot;private final String str;&quot;).endl();</span>
+<span class="nc" id="L1175">        code.tab(2).append(&quot;private int last;&quot;).afterSection();</span>
+
+<span class="nc" id="L1177">        code.tab(2).append(&quot;public Tokenizer (String str)&quot;).</span>
+<span class="nc" id="L1178">            openBrace(3).endl();</span>
+<span class="nc" id="L1179">        code.tab(3).append(&quot;this.str = str;&quot;).endl();</span>
+<span class="nc" id="L1180">        code.closeBrace(3).afterSection();</span>
+
+<span class="nc" id="L1182">        code.tab(2).append(&quot;public String nextToken ()&quot;).</span>
+<span class="nc" id="L1183">            openBrace(3).endl();</span>
+<span class="nc" id="L1184">        code.tab(3).append(&quot;int next = str.indexOf&quot;).openParen(true).</span>
+<span class="nc" id="L1185">            append(&quot;\&quot;&quot;).append(_token).append(&quot;\&quot;, last&quot;).closeParen().</span>
+<span class="nc" id="L1186">            append(&quot;;&quot;).endl();</span>
+<span class="nc" id="L1187">        code.tab(3).append(&quot;String part;&quot;).endl();</span>
+<span class="nc" id="L1188">        code.tab(3).append(&quot;if&quot;).openParen(true).append(&quot;next == -1&quot;).</span>
+<span class="nc" id="L1189">            closeParen().openBrace(4).endl();</span>
+<span class="nc" id="L1190">        code.tab(4).append(&quot;part = str.substring&quot;).openParen(true).</span>
+<span class="nc" id="L1191">            append(&quot;last&quot;).closeParen().append(&quot;;&quot;).endl();</span>
+<span class="nc" id="L1192">        code.tab(4).append(&quot;last = str.length&quot;).parens().append(&quot;;&quot;).</span>
+<span class="nc" id="L1193">            endl().closeBrace(4);</span>
+<span class="nc bnc" id="L1194" title="All 2 branches missed.">        if (!code.getBraceOnSameLine())</span>
+<span class="nc" id="L1195">            code.endl().tab(3);</span>
+        else
+<span class="nc" id="L1197">            code.append(&quot; &quot;);</span>
+<span class="nc" id="L1198">        code.append(&quot;else&quot;).openBrace(4).endl();</span>
+<span class="nc" id="L1199">        code.tab(4).append(&quot;part = str.substring&quot;).openParen(true).</span>
+<span class="nc" id="L1200">            append(&quot;last, next&quot;).closeParen().append(&quot;;&quot;).endl();</span>
+<span class="nc" id="L1201">        code.tab(4).append(&quot;last = next + &quot;).append(_token.length()).</span>
+<span class="nc" id="L1202">            append(&quot;;&quot;).endl().closeBrace(4).endl();</span>
+
+<span class="nc" id="L1204">        code.tab(3).append(&quot;return part;&quot;).endl();</span>
+<span class="nc" id="L1205">        code.closeBrace(3);</span>
+<span class="nc" id="L1206">        code.endl().closeBrace(2);</span>
+<span class="nc" id="L1207">        return code.toString();</span>
+    }
+
+    /**
+     * Return the file that this tool should output to.
+     */
+    private File getFile() {
+<span class="nc bnc" id="L1214" title="All 2 branches missed.">        if (_meta == null)</span>
+<span class="nc" id="L1215">            return null;</span>
+
+<span class="nc" id="L1217">        String packageName = ClassUtil.getPackageName(_meta.getObjectIdType());</span>
+<span class="nc" id="L1218">        String fileName = ClassUtil.getClassName(_meta.getObjectIdType())</span>
+            + &quot;.java&quot;;
+
+        // if pc class in same package as oid class, try to find pc .java file
+<span class="nc" id="L1222">        File dir = null;</span>
+<span class="nc bnc" id="L1223" title="All 4 branches missed.">        if (_dir == null &amp;&amp; ClassUtil.getPackageName(_type).equals(packageName)) {</span>
+<span class="nc" id="L1224">            dir = Files.getSourceFile(_type);</span>
+<span class="nc bnc" id="L1225" title="All 2 branches missed.">            if (dir != null)</span>
+<span class="nc" id="L1226">                dir = dir.getParentFile();</span>
+        }
+<span class="nc bnc" id="L1228" title="All 2 branches missed.">        if (dir == null)</span>
+<span class="nc" id="L1229">            dir = Files.getPackageFile(_dir, packageName, true);</span>
+<span class="nc" id="L1230">        return new File(dir, fileName);</span>
+    }
+
+    /**
+     * Return a copy of the correct code format.
+     */
+    private CodeFormat newCodeFormat() {
+<span class="nc bnc" id="L1237" title="All 2 branches missed.">        return (_format == null) ? new CodeFormat()</span>
+<span class="nc" id="L1238">            : (CodeFormat) _format.clone();</span>
+    }
+
+    /**
+     * Usage: java org.apache.openjpa.enhance.ApplicationIdTool [option]*
+     * &amp;lt;class name | .java file | .class file | .jdo file&amp;gt;+
+     *  Where the following options are recognized.
+     * &lt;ul&gt;
+     * &lt;li&gt;&lt;i&gt;-properties/-p &amp;lt;properties file&amp;gt;&lt;/i&gt;: The path to a OpenJPA
+     * properties file containing information as outlined in
+     * {@link Configuration}; optional.&lt;/li&gt;
+     * &lt;li&gt;&lt;i&gt;-&amp;lt;property name&amp;gt; &amp;lt;property value&amp;gt;&lt;/i&gt;: All bean
+     * properties of the standard OpenJPA {@link OpenJPAConfiguration} can be
+     * set by using their names and supplying a value.&lt;/li&gt;
+     * &lt;li&gt;&lt;i&gt;-directory/-d &amp;lt;output directory&amp;gt;&lt;/i&gt;: Path to the base
+     * source directory. The package structure will be created beneath
+     * this directory if necessary. If not specified, the tool will try
+     * to locate the .java file in the CLASSPATH and output to the same
+     * directory; failing that, it will use the current directory as
+     * the base directory.
+     * &lt;li&gt;&lt;i&gt;-ignoreErrors/-i &amp;lt;true/t | false/f&amp;gt;&lt;/i&gt;: If false, an
+     * exception will be thrown if the tool encounters any class that
+     * does not use application identity or uses the identity class of
+     * its superclass; defaults to true.&lt;/li&gt;
+     * &lt;li&gt;&lt;i&gt;-token/-t &amp;lt;token&amp;gt;&lt;/i&gt;: The token to use to separate
+     * stingified primary key field values in the stringified oid.&lt;/li&gt;
+     * &lt;li&gt;&lt;i&gt;-name/-n &amp;lt;id class name&amp;gt;&lt;/i&gt;: The name of the identity
+     * class to generate. If this option is specified, you must only
+     * give a single class argument. If the class metadata names an object
+     * id class, this argument is ignored.&lt;/li&gt;
+     * &lt;li&gt;&lt;i&gt;-suffix/-s &amp;lt;id class suffix&amp;gt;&lt;/i&gt;: A string to suffix each
+     * persistent class with to create the identity class name. This is
+     * overridden by &lt;code&gt;-name&lt;/code&gt; or by any identity class name
+     * specified in metadata.&lt;/li&gt;
+     * &lt;li&gt;&lt;i&gt;-codeFormat/-cf.&amp;lt;property name&amp;gt; &amp;lt; property value&amp;gt;&lt;/i&gt;
+     * : Arguments like this will be used to configure the bean
+     * properties of the internal {@link CodeFormat}.&lt;/li&gt;
+     * &lt;/ul&gt;
+     *  Each additional argument can be either the full class name of the
+     * type to create an id class for, the path to the .java file for the type,
+     * the path to the .class file for the type, or the path to a .jdo file
+     * listing one or more types. If a .java file already exists for an
+     * application id, it will be backed up to a file named
+     * &amp;lt;orig file name&amp;gt;~.
+     */
+    public static void main(String[] args)
+        throws IOException, ClassNotFoundException {
+<span class="nc" id="L1285">        Options opts = new Options();</span>
+<span class="nc" id="L1286">        final String[] arguments = opts.setFromCmdLine(args);</span>
+<span class="nc" id="L1287">        boolean ret = Configurations.runAgainstAllAnchors(opts,</span>
+<span class="nc" id="L1288">            new Configurations.Runnable() {</span>
+            @Override
+            public boolean run(Options opts)
+                throws ClassNotFoundException, IOException {
+<span class="nc" id="L1292">                OpenJPAConfiguration conf = new OpenJPAConfigurationImpl();</span>
+                try {
+<span class="nc" id="L1294">                    return ApplicationIdTool.run(conf, arguments, opts);</span>
+                } finally {
+<span class="nc" id="L1296">                    conf.close();</span>
+                }
+            }
+        });
+        // START - ALLOW PRINT STATEMENTS
+<span class="nc bnc" id="L1301" title="All 2 branches missed.">        if (!ret)</span>
+<span class="nc" id="L1302">            System.err.println(_loc.get(&quot;appid-usage&quot;));</span>
+        // STOP - ALLOW PRINT STATEMENTS
+<span class="nc" id="L1304">    }</span>
+
+    /**
+     * Run the application id tool with the given command-line and
+     * given configuration. Returns false if invalid options were given.
+     */
+    public static boolean run(OpenJPAConfiguration conf, String[] args,
+        Options opts)
+        throws IOException, ClassNotFoundException {
+<span class="nc" id="L1313">        Flags flags = new Flags();</span>
+<span class="nc" id="L1314">        flags.ignoreErrors = opts.removeBooleanProperty</span>
+<span class="nc" id="L1315">            (&quot;ignoreErrors&quot;, &quot;i&quot;, flags.ignoreErrors);</span>
+<span class="nc" id="L1316">        flags.directory = Files.getFile(opts.removeProperty(&quot;directory&quot;, &quot;d&quot;,</span>
+            null), null);
+<span class="nc" id="L1318">        flags.token = opts.removeProperty(&quot;token&quot;, &quot;t&quot;, flags.token);</span>
+<span class="nc" id="L1319">        flags.name = opts.removeProperty(&quot;name&quot;, &quot;n&quot;, flags.name);</span>
+<span class="nc" id="L1320">        flags.suffix = opts.removeProperty(&quot;suffix&quot;, &quot;s&quot;, flags.suffix);</span>
+
+        // separate the properties for the customizer and code format
+<span class="nc" id="L1323">        Options formatOpts = new Options();</span>
+        Map.Entry entry;
+        String key;
+<span class="nc bnc" id="L1326" title="All 2 branches missed.">        for (Iterator itr = opts.entrySet().iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L1327">            entry = (Map.Entry) itr.next();</span>
+<span class="nc" id="L1328">            key = (String) entry.getKey();</span>
+<span class="nc bnc" id="L1329" title="All 2 branches missed.">            if (key.startsWith(&quot;codeFormat.&quot;)) {</span>
+<span class="nc" id="L1330">                formatOpts.put(key.substring(11), entry.getValue());</span>
+<span class="nc" id="L1331">                itr.remove();</span>
+<span class="nc bnc" id="L1332" title="All 2 branches missed.">            } else if (key.startsWith(&quot;cf.&quot;)) {</span>
+<span class="nc" id="L1333">                formatOpts.put(key.substring(3), entry.getValue());</span>
+<span class="nc" id="L1334">                itr.remove();</span>
+            }
+        }
+<span class="nc bnc" id="L1337" title="All 2 branches missed.">        if (!formatOpts.isEmpty()) {</span>
+<span class="nc" id="L1338">            flags.format = new CodeFormat();</span>
+<span class="nc" id="L1339">            formatOpts.setInto(flags.format);</span>
+        }
+
+<span class="nc" id="L1342">        Configurations.populateConfiguration(conf, opts);</span>
+<span class="nc" id="L1343">        ClassLoader loader = conf.getClassResolverInstance().</span>
+<span class="nc" id="L1344">            getClassLoader(ApplicationIdTool.class, null);</span>
+<span class="nc" id="L1345">        return run(conf, args, flags, loader);</span>
+    }
+
+    /**
+     * Run the tool. Returns false if invalid options were given.
+     */
+    public static boolean run(OpenJPAConfiguration conf, String[] args,
+        Flags flags, ClassLoader loader)
+        throws IOException, ClassNotFoundException {
+<span class="nc" id="L1354">        MetaDataRepository repos = conf.newMetaDataRepositoryInstance();</span>
+<span class="nc" id="L1355">        repos.setValidate(MetaDataRepository.VALIDATE_NONE, true);</span>
+<span class="nc bnc" id="L1356" title="All 4 branches missed.">        loadObjectIds(repos, flags.name == null &amp;&amp; flags.suffix == null);</span>
+
+<span class="nc" id="L1358">        Log log = conf.getLog(OpenJPAConfiguration.LOG_TOOL);</span>
+        Collection classes;
+<span class="nc bnc" id="L1360" title="All 2 branches missed.">        if (args.length == 0) {</span>
+<span class="nc" id="L1361">            log.info(_loc.get(&quot;running-all-classes&quot;));</span>
+<span class="nc" id="L1362">            classes = repos.loadPersistentTypes(true, loader);</span>
+        } else {
+<span class="nc" id="L1364">            ClassArgParser cap = conf.getMetaDataRepositoryInstance().</span>
+<span class="nc" id="L1365">                getMetaDataFactory().newClassArgParser();</span>
+<span class="nc" id="L1366">            cap.setClassLoader(loader);</span>
+<span class="nc" id="L1367">            classes = new HashSet();</span>
+<span class="nc bnc" id="L1368" title="All 2 branches missed.">            for (int i = 0; i &lt; args.length; i++)</span>
+<span class="nc" id="L1369">                classes.addAll(Arrays.asList(cap.parseTypes(args[i])));</span>
+        }
+<span class="nc bnc" id="L1371" title="All 4 branches missed.">        if (flags.name != null &amp;&amp; classes.size() &gt; 1)</span>
+<span class="nc" id="L1372">            throw new UserException(_loc.get(&quot;name-mult-args&quot;, classes));</span>
+
+        ApplicationIdTool tool;
+        Class cls;
+        ClassMetaData meta;
+<span class="nc" id="L1377">        BCClassLoader bc = AccessController</span>
+<span class="nc" id="L1378">            .doPrivileged(J2DoPrivHelper.newBCClassLoaderAction(new Project()));</span>
+<span class="nc bnc" id="L1379" title="All 2 branches missed.">        for (Iterator itr = classes.iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L1380">            cls = (Class) itr.next();</span>
+<span class="nc" id="L1381">            log.info(_loc.get(&quot;appid-running&quot;, cls));</span>
+
+<span class="nc" id="L1383">            meta = repos.getMetaData(cls, null, false);</span>
+<span class="nc" id="L1384">            setObjectIdType(meta, flags, bc);</span>
+
+<span class="nc" id="L1386">            tool = new ApplicationIdTool(conf, cls, meta);</span>
+<span class="nc" id="L1387">            tool.setDirectory(flags.directory);</span>
+<span class="nc" id="L1388">            tool.setIgnoreErrors(flags.ignoreErrors);</span>
+<span class="nc" id="L1389">            tool.setToken(flags.token);</span>
+<span class="nc" id="L1390">            tool.setCodeFormat(flags.format);</span>
+<span class="nc bnc" id="L1391" title="All 2 branches missed.">            if (tool.run()) {</span>
+<span class="nc" id="L1392">                log.info(_loc.get(&quot;appid-output&quot;, tool.getFile()));</span>
+<span class="nc" id="L1393">                tool.record();</span>
+            } else
+<span class="nc" id="L1395">                log.info(_loc.get(&quot;appid-norun&quot;));</span>
+        }
+<span class="nc" id="L1397">        bc.getProject().clear();</span>
+<span class="nc" id="L1398">        return true;</span>
+    }
+
+    /**
+     * Set the object id type of the given metadata.
+     */
+    private static void setObjectIdType(ClassMetaData meta, Flags flags,
+        BCClassLoader bc)
+        throws ClassNotFoundException {
+<span class="nc bnc" id="L1407" title="All 4 branches missed.">        if (meta == null || (meta.getObjectIdType() != null</span>
+<span class="nc bnc" id="L1408" title="All 4 branches missed.">            &amp;&amp; (!meta.isOpenJPAIdentity() || flags.name == null))</span>
+<span class="nc bnc" id="L1409" title="All 2 branches missed.">            || getDeclaredPrimaryKeyFields(meta).length == 0)</span>
+<span class="nc" id="L1410">            return;</span>
+
+<span class="nc" id="L1412">        Class desc = meta.getDescribedType();</span>
+<span class="nc" id="L1413">        Class cls = null;</span>
+<span class="nc bnc" id="L1414" title="All 2 branches missed.">        if (flags.name != null)</span>
+<span class="nc" id="L1415">            cls = loadClass(desc, flags.name, bc);</span>
+<span class="nc bnc" id="L1416" title="All 2 branches missed.">        else if (flags.suffix != null)</span>
+<span class="nc" id="L1417">            cls = loadClass(desc, desc.getName() + flags.suffix, bc);</span>
+<span class="nc" id="L1418">        meta.setObjectIdType(cls, false);</span>
+<span class="nc" id="L1419">    }</span>
+
+    /**
+     * Load the given class name even if it does not exist.
+     */
+    private static Class loadClass(Class context, String name,
+        BCClassLoader bc)
+        throws ClassNotFoundException {
+<span class="nc bnc" id="L1427" title="All 4 branches missed.">        if (name.indexOf('.') == -1 &amp;&amp; context.getName().indexOf('.') != -1)</span>
+<span class="nc" id="L1428">            name = ClassUtil.getPackageName(context) + &quot;.&quot; + name;</span>
+
+        // first try with regular class loader
+<span class="nc" id="L1431">        ClassLoader loader = AccessController.doPrivileged(</span>
+<span class="nc" id="L1432">            J2DoPrivHelper.getClassLoaderAction(context));</span>
+<span class="nc bnc" id="L1433" title="All 2 branches missed.">        if (loader == null)</span>
+<span class="nc" id="L1434">            loader = AccessController.doPrivileged(</span>
+<span class="nc" id="L1435">                J2DoPrivHelper.getContextClassLoaderAction());</span>
+        try {
+<span class="nc" id="L1437">            return Class.forName(name, false, loader);</span>
+<span class="nc" id="L1438">        } catch (Throwable t) {</span>
+        }
+
+        // create class
+<span class="nc" id="L1442">        BCClass oid = bc.getProject().loadClass(name, null);</span>
+<span class="nc" id="L1443">        oid.addDefaultConstructor();</span>
+<span class="nc" id="L1444">        return Class.forName(name, false, bc);</span>
+    }
+
+    /**
+     * Tell the metadata factory to load object id classes even if they don't
+     * exist.
+     */
+    private static void loadObjectIds(MetaDataRepository repos, boolean fatal) {
+<span class="nc" id="L1452">        MetaDataFactory mdf = repos.getMetaDataFactory();</span>
+<span class="nc bnc" id="L1453" title="All 2 branches missed.">        if (mdf instanceof DelegatingMetaDataFactory)</span>
+<span class="nc" id="L1454">            mdf = ((DelegatingMetaDataFactory) mdf).getInnermostDelegate();</span>
+<span class="nc bnc" id="L1455" title="All 2 branches missed.">        if (mdf instanceof ObjectIdLoader)</span>
+<span class="nc" id="L1456">            ((ObjectIdLoader) mdf).setLoadObjectIds();</span>
+<span class="nc bnc" id="L1457" title="All 2 branches missed.">        else if (fatal)</span>
+<span class="nc" id="L1458">            throw new InvalidStateException(_loc.get(&quot;factory-not-oidloader&quot;)).</span>
+<span class="nc" id="L1459">                setFatal(true);</span>
+<span class="nc" id="L1460">    }</span>
+
+    /**
+     * Run flags.
+     */
+<span class="nc" id="L1465">    public static class Flags {</span>
+
+<span class="nc" id="L1467">        public File directory = null;</span>
+<span class="nc" id="L1468">        public boolean ignoreErrors = true;</span>
+<span class="nc" id="L1469">        public String token = TOKEN_DEFAULT;</span>
+<span class="nc" id="L1470">        public CodeFormat format = null;</span>
+<span class="nc" id="L1471">        public String name = null;</span>
+<span class="nc" id="L1472">        public String suffix = null;</span>
+    }
+
+    /**
+     * Interface implemented by metadata factories that can load non-existant
+     * object id classes.
+     */
+    public interface ObjectIdLoader
+	{
+		/**
+         * Turn on the loading of all identity classes, even if they don't
+         * exist.
+	 	 */
+		void setLoadObjectIds ();
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

@@ -1,0 +1,672 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DelayedVectorProxy.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.util</a> &gt; <span class="el_source">DelayedVectorProxy.java</span></div><h1>DelayedVectorProxy.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.util;
+
+import java.io.ObjectStreamException;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Enumeration;
+import java.util.Iterator;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Vector;
+
+import org.apache.openjpa.kernel.AutoDetach;
+import org.apache.openjpa.kernel.Broker;
+import org.apache.openjpa.kernel.BrokerFactory;
+import org.apache.openjpa.kernel.DetachedStateManager;
+import org.apache.openjpa.kernel.OpenJPAStateManager;
+
+/**
+ * Vector proxy with delay loading capability.  Allows non-indexed
+ * add and remove operations to occur on an unloaded collection.  Operations
+ * that require a load will trigger a load.
+ */
+@SuppressWarnings({&quot;rawtypes&quot;,&quot;unchecked&quot;})
+public class DelayedVectorProxy extends Vector implements ProxyCollection, DelayedProxy {
+    private transient OpenJPAStateManager sm;
+    private transient int field;
+    private transient CollectionChangeTracker changeTracker;
+    private transient Class elementType;
+
+    private transient OpenJPAStateManager _ownerSm;
+<span class="nc" id="L49">    private transient boolean _directAccess = false;</span>
+<span class="nc" id="L50">    private transient BrokerFactory _brokerFactory = null;</span>
+<span class="nc" id="L51">    private transient Broker _broker = null;</span>
+    private transient OpenJPAStateManager _delayedSm;
+    private transient int _delayedField;
+<span class="nc" id="L54">    private transient boolean _detached = false;</span>
+
+    public DelayedVectorProxy(int paramInt) {
+<span class="nc" id="L57">        super(paramInt);</span>
+<span class="nc" id="L58">    }</span>
+
+<span class="nc" id="L60">    public DelayedVectorProxy() {</span>
+<span class="nc" id="L61">    }</span>
+
+    public DelayedVectorProxy(Collection paramCollection) {
+<span class="nc" id="L64">        super(paramCollection);</span>
+<span class="nc" id="L65">    }</span>
+
+    public DelayedVectorProxy(int paramInt1, int paramInt2) {
+<span class="nc" id="L68">        super(paramInt1, paramInt2);</span>
+<span class="nc" id="L69">    }</span>
+
+    @Override
+    public void setOwner(OpenJPAStateManager paramOpenJPAStateManager,
+            int paramInt) {
+        // If clearing the owner of this proxy, store away what is necessary for
+        // delayed loading
+<span class="nc bnc" id="L76" title="All 4 branches missed.">        if (sm != null &amp;&amp; detaching(paramOpenJPAStateManager, paramInt)) {</span>
+<span class="nc" id="L77">            _detached = true;</span>
+<span class="nc" id="L78">            _delayedSm = sm;</span>
+<span class="nc" id="L79">            _delayedField = field;</span>
+        } else {
+<span class="nc" id="L81">            _detached = false;</span>
+        }
+
+<span class="nc" id="L84">        this.sm = paramOpenJPAStateManager;</span>
+<span class="nc bnc" id="L85" title="All 4 branches missed.">        if (sm != null &amp;&amp; sm.getPersistenceCapable() != null) {</span>
+<span class="nc" id="L86">            _ownerSm = (OpenJPAStateManager) sm.getPersistenceCapable()</span>
+<span class="nc" id="L87">                    .pcGetStateManager();</span>
+        }
+<span class="nc" id="L89">        this.field = paramInt;</span>
+<span class="nc bnc" id="L90" title="All 4 branches missed.">        if (sm != null &amp;&amp; sm.getContext() != null) {</span>
+<span class="nc" id="L91">            _brokerFactory = sm.getContext().getBroker().getBrokerFactory();</span>
+        }
+<span class="nc" id="L93">    }</span>
+
+    private boolean detaching(OpenJPAStateManager paramOpenJPAStateManager,
+            int paramInt) {
+<span class="nc bnc" id="L97" title="All 8 branches missed.">        if ((paramOpenJPAStateManager == null &amp;&amp; paramInt == -1)</span>
+                || (paramOpenJPAStateManager != null &amp;&amp; paramOpenJPAStateManager instanceof DetachedStateManager)) {
+<span class="nc" id="L99">            return true;</span>
+        }
+<span class="nc" id="L101">        return false;</span>
+    }
+
+    @Override
+    public int getDelayedField() {
+<span class="nc bnc" id="L106" title="All 4 branches missed.">        if (field == -1 || _detached) {</span>
+<span class="nc" id="L107">            return _delayedField;</span>
+        }
+<span class="nc" id="L109">        return field;</span>
+    }
+
+    @Override
+    public OpenJPAStateManager getDelayedOwner() {
+<span class="nc bnc" id="L114" title="All 4 branches missed.">        if (sm == null || _detached) {</span>
+<span class="nc" id="L115">            return _delayedSm;</span>
+        }
+<span class="nc" id="L117">        return sm;</span>
+    }
+
+    @Override
+    public OpenJPAStateManager getOwner() {
+<span class="nc" id="L122">        return this.sm;</span>
+    }
+
+    @Override
+    public int getOwnerField() {
+<span class="nc" id="L127">        return this.field;</span>
+    }
+
+    @Override
+    public boolean isDirectAccess() {
+<span class="nc" id="L132">        return _directAccess;</span>
+    }
+
+    @Override
+    public void setDirectAccess(boolean direct) {
+<span class="nc" id="L137">        _directAccess = direct;</span>
+<span class="nc" id="L138">    }</span>
+
+    public BrokerFactory getBrokerFactory() {
+<span class="nc" id="L141">        return _brokerFactory;</span>
+    }
+
+    @Override
+    public void load() {
+<span class="nc" id="L146">        ProxyCollections.loadCollection(this);</span>
+<span class="nc" id="L147">    }</span>
+
+    @Override
+    public Broker getBroker() {
+<span class="nc bnc" id="L151" title="All 4 branches missed.">        if (_broker == null || _broker.isClosed()) {</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            if (_brokerFactory != null) {</span>
+<span class="nc" id="L153">                _broker = _brokerFactory.newBroker();</span>
+            }
+        }
+<span class="nc" id="L156">        return _broker;</span>
+    }
+
+    @Override
+    public void closeBroker() {
+<span class="nc bnc" id="L161" title="All 4 branches missed.">        if (_broker != null &amp;&amp; !_broker.isClosed()) {</span>
+<span class="nc" id="L162">            _broker.setAutoDetach(AutoDetach.DETACH_CLOSE);</span>
+<span class="nc" id="L163">            _broker.close();</span>
+<span class="nc" id="L164">            _broker = null;</span>
+        }
+<span class="nc" id="L166">    }</span>
+
+    @Override
+    public OpenJPAStateManager getOwnerStateManager() {
+<span class="nc" id="L170">        return _ownerSm;</span>
+    }
+
+    @Override
+    public boolean isDetached() {
+<span class="nc" id="L175">        return _detached;</span>
+    }
+
+    public boolean isDelayLoad() {
+<span class="nc" id="L179">        return ProxyCollections.isDelayed(this);</span>
+    }
+
+    @Override
+    public synchronized Object clone() {
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        if (isDirectAccess()) {</span>
+<span class="nc" id="L185">            return super.clone();</span>
+        }
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L188">            load();</span>
+        }
+
+<span class="nc" id="L191">        Proxy localProxy = (Proxy) super.clone();</span>
+<span class="nc" id="L192">        localProxy.setOwner(null, 0);</span>
+<span class="nc" id="L193">        return localProxy;</span>
+    }
+
+    @Override
+    public ChangeTracker getChangeTracker() {
+<span class="nc" id="L198">        return this.changeTracker;</span>
+    }
+
+    protected void setChangeTracker(CollectionChangeTracker ct) {
+<span class="nc" id="L202">        changeTracker = ct;</span>
+<span class="nc" id="L203">    }</span>
+
+    @Override
+    public Object copy(Object paramObject) {
+<span class="nc bnc" id="L207" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L208">            load();</span>
+        }
+<span class="nc" id="L210">        return new Vector((Collection) paramObject);</span>
+    }
+
+    @Override
+    public Class getElementType() {
+<span class="nc" id="L215">        return this.elementType;</span>
+    }
+
+    protected void setElementType(Class&lt;?&gt; elemType) {
+<span class="nc" id="L219">        elementType = elemType;</span>
+<span class="nc" id="L220">    }</span>
+
+    @Override
+    public ProxyCollection newInstance(Class paramClass,
+            Comparator paramComparator, boolean paramBoolean1,
+            boolean paramBoolean2) {
+<span class="nc" id="L226">        DelayedVectorProxy localproxy = new DelayedVectorProxy();</span>
+<span class="nc" id="L227">        localproxy.elementType = paramClass;</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (paramBoolean1) {</span>
+<span class="nc" id="L229">            localproxy.changeTracker = new DelayedCollectionChangeTrackerImpl(</span>
+                    localproxy, true, true, paramBoolean2);
+        }
+<span class="nc" id="L232">        return localproxy;</span>
+    }
+
+    @Override
+    public synchronized boolean add(Object paramObject) {
+<span class="nc bnc" id="L237" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L238">            return super.add(paramObject);</span>
+        }
+
+<span class="nc" id="L241">        ProxyCollections.beforeAdd(this, paramObject);</span>
+<span class="nc" id="L242">        boolean bool = super.add(paramObject);</span>
+<span class="nc" id="L243">        return ProxyCollections.afterAdd(this, paramObject, bool);</span>
+    }
+
+    @Override
+    public synchronized void add(int paramInt, Object paramObject) {
+<span class="nc bnc" id="L248" title="All 2 branches missed.">        if (!_directAccess) {</span>
+<span class="nc bnc" id="L249" title="All 2 branches missed.">            if (isDelayLoad()) {</span>
+<span class="nc" id="L250">                load();</span>
+            }
+        }
+<span class="nc" id="L253">        ProxyCollections.beforeAdd(this, paramInt, paramObject);</span>
+<span class="nc" id="L254">        super.add(paramInt, paramObject);</span>
+<span class="nc" id="L255">    }</span>
+
+    @Override
+    public void clear() {
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (!_directAccess) {</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            if (isDelayLoad()) {</span>
+<span class="nc" id="L261">                load();</span>
+            }
+<span class="nc" id="L263">            ProxyCollections.beforeClear(this);</span>
+        }
+<span class="nc" id="L265">        super.clear();</span>
+<span class="nc" id="L266">    }</span>
+
+    @Override
+    public synchronized boolean addAll(int paramInt, Collection paramCollection) {
+<span class="nc bnc" id="L270" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L271">            return super.addAll(paramInt, paramCollection);</span>
+        }
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L274">            load();</span>
+        }
+<span class="nc" id="L276">        return ProxyCollections.addAll(this, paramInt, paramCollection);</span>
+    }
+
+    @Override
+    public synchronized boolean addAll(Collection paramCollection) {
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L282">            return super.addAll(paramCollection);</span>
+        }
+<span class="nc" id="L284">        return ProxyCollections.addAll(this, paramCollection);</span>
+    }
+
+    @Override
+    public synchronized void addElement(Object paramObject) {
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L290">            super.addElement(paramObject);</span>
+<span class="nc" id="L291">            return;</span>
+        }
+
+<span class="nc" id="L294">        ProxyCollections.beforeAddElement(this, paramObject);</span>
+<span class="nc" id="L295">        super.addElement(paramObject);</span>
+<span class="nc" id="L296">        ProxyCollections.afterAddElement(this, paramObject);</span>
+<span class="nc" id="L297">    }</span>
+
+    @Override
+    public synchronized Object remove(int paramInt) {
+<span class="nc bnc" id="L301" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L302">            return super.remove(paramInt);</span>
+        }
+<span class="nc bnc" id="L304" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L305">            load();</span>
+        }
+
+<span class="nc" id="L308">        ProxyCollections.beforeRemove(this, paramInt);</span>
+<span class="nc" id="L309">        Object localObject = super.remove(paramInt);</span>
+<span class="nc" id="L310">        return ProxyCollections.afterRemove(this, paramInt, localObject);</span>
+    }
+
+    @Override
+    public synchronized boolean remove(Object paramObject) {
+<span class="nc bnc" id="L315" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L316">            return super.remove(paramObject);</span>
+        }
+<span class="nc" id="L318">        ProxyCollections.beforeRemove(this, paramObject);</span>
+<span class="nc" id="L319">        setDirectAccess(true);</span>
+<span class="nc" id="L320">        boolean bool = super.remove(paramObject);</span>
+<span class="nc" id="L321">        setDirectAccess(false);</span>
+<span class="nc" id="L322">        return ProxyCollections.afterRemove(this, paramObject, bool);</span>
+    }
+
+    @Override
+    public synchronized Object set(int paramInt, Object paramObject) {
+<span class="nc bnc" id="L327" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L328">            return super.set(paramInt, paramObject);</span>
+        }
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L331">            load();</span>
+        }
+<span class="nc" id="L333">        ProxyCollections.beforeSet(this, paramInt, paramObject);</span>
+<span class="nc" id="L334">        Object localObject = super.set(paramInt, paramObject);</span>
+<span class="nc" id="L335">        return ProxyCollections.afterSet(this, paramInt, paramObject,</span>
+                localObject);
+    }
+
+    @Override
+    public synchronized boolean removeAll(Collection paramCollection) {
+<span class="nc bnc" id="L341" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L342">            return super.removeAll(paramCollection);</span>
+        }
+<span class="nc" id="L344">        return ProxyCollections.removeAll(this, paramCollection);</span>
+    }
+
+    @Override
+    public synchronized boolean retainAll(Collection paramCollection) {
+<span class="nc bnc" id="L349" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L350">            return super.retainAll(paramCollection);</span>
+        }
+<span class="nc bnc" id="L352" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L353">            load();</span>
+        }
+<span class="nc" id="L355">        return ProxyCollections.retainAll(this, paramCollection);</span>
+    }
+
+    @Override
+    public synchronized void insertElementAt(Object paramObject, int paramInt) {
+<span class="nc bnc" id="L360" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L361">            super.insertElementAt(paramObject, paramInt);</span>
+<span class="nc" id="L362">            return;</span>
+        }
+<span class="nc bnc" id="L364" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L365">            load();</span>
+        }
+
+<span class="nc" id="L368">        ProxyCollections.beforeInsertElementAt(this, paramObject, paramInt);</span>
+<span class="nc" id="L369">        super.insertElementAt(paramObject, paramInt);</span>
+<span class="nc" id="L370">    }</span>
+
+    @Override
+    public synchronized void removeAllElements() {
+<span class="nc bnc" id="L374" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L375">            super.removeAllElements();</span>
+<span class="nc" id="L376">            return;</span>
+        }
+<span class="nc bnc" id="L378" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L379">            load();</span>
+        }
+<span class="nc" id="L381">        ProxyCollections.beforeRemoveAllElements(this);</span>
+<span class="nc" id="L382">        super.removeAllElements();</span>
+<span class="nc" id="L383">    }</span>
+
+    @Override
+    public synchronized boolean removeElement(Object paramObject) {
+<span class="nc bnc" id="L387" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L388">            return super.removeElement(paramObject);</span>
+        }
+<span class="nc" id="L390">        ProxyCollections.beforeRemoveElement(this, paramObject);</span>
+<span class="nc" id="L391">        setDirectAccess(true);</span>
+<span class="nc" id="L392">        boolean bool = super.removeElement(paramObject);</span>
+<span class="nc" id="L393">        setDirectAccess(false);</span>
+<span class="nc" id="L394">        return ProxyCollections.afterRemoveElement(this, paramObject, bool);</span>
+    }
+
+    @Override
+    public synchronized void removeElementAt(int paramInt) {
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L400">            super.removeElementAt(paramInt);</span>
+<span class="nc" id="L401">            return;</span>
+        }
+<span class="nc bnc" id="L403" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L404">            load();</span>
+        }
+<span class="nc" id="L406">        ProxyCollections.beforeRemoveElementAt(this, paramInt);</span>
+<span class="nc" id="L407">        super.removeElementAt(paramInt);</span>
+<span class="nc" id="L408">    }</span>
+
+    @Override
+    public synchronized void setElementAt(Object paramObject, int paramInt) {
+<span class="nc bnc" id="L412" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L413">            super.setElementAt(paramObject, paramInt);</span>
+<span class="nc" id="L414">            return;</span>
+        }
+<span class="nc bnc" id="L416" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L417">            load();</span>
+        }
+<span class="nc" id="L419">        ProxyCollections.beforeSetElementAt(this, paramObject, paramInt);</span>
+<span class="nc" id="L420">        super.setElementAt(paramObject, paramInt);</span>
+<span class="nc" id="L421">    }</span>
+
+    @Override
+    public Iterator iterator() {
+<span class="nc bnc" id="L425" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L426">            return super.iterator();</span>
+        }
+<span class="nc bnc" id="L428" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L429">            load();</span>
+        }
+<span class="nc" id="L431">        Iterator localIterator = super.iterator();</span>
+<span class="nc" id="L432">        return ProxyCollections.afterIterator(this, localIterator);</span>
+    }
+
+    @Override
+    public ListIterator listIterator(int paramInt) {
+<span class="nc bnc" id="L437" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L438">            return super.listIterator(paramInt);</span>
+        }
+<span class="nc bnc" id="L440" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L441">            load();</span>
+        }
+<span class="nc" id="L443">        ListIterator localListIterator = super.listIterator(paramInt);</span>
+<span class="nc" id="L444">        return ProxyCollections.afterListIterator(this, paramInt,</span>
+                localListIterator);
+    }
+
+    @Override
+    public ListIterator listIterator() {
+<span class="nc bnc" id="L450" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L451">            return super.listIterator();</span>
+        }
+<span class="nc bnc" id="L453" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L454">            load();</span>
+        }
+<span class="nc" id="L456">        ListIterator localListIterator = super.listIterator();</span>
+<span class="nc" id="L457">        return ProxyCollections.afterListIterator(this, localListIterator);</span>
+    }
+
+    @Override
+    public synchronized void setSize(int paramInt) {
+<span class="nc bnc" id="L462" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L463">            super.setSize(paramInt);</span>
+<span class="nc" id="L464">            return;</span>
+        }
+<span class="nc bnc" id="L466" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L467">            load();</span>
+        }
+<span class="nc" id="L469">        Proxies.dirty(this, true);</span>
+<span class="nc" id="L470">        super.setSize(paramInt);</span>
+<span class="nc" id="L471">    }</span>
+
+    protected synchronized Object writeReplace() throws ObjectStreamException {
+<span class="nc bnc" id="L474" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L475">            load();</span>
+        }
+<span class="nc" id="L477">        return Proxies.writeReplace(this, true);</span>
+    }
+
+    @Override
+    public synchronized boolean contains(Object object) {
+<span class="nc bnc" id="L482" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L483">            load();</span>
+        }
+<span class="nc" id="L485">        return super.contains(object);</span>
+    }
+
+    @Override
+    public synchronized boolean containsAll(Collection collection) {
+<span class="nc bnc" id="L490" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L491">            load();</span>
+        }
+<span class="nc" id="L493">        return super.containsAll(collection);</span>
+    }
+
+    @Override
+    public synchronized boolean isEmpty() {
+<span class="nc bnc" id="L498" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L499">            load();</span>
+        }
+<span class="nc" id="L501">        return super.isEmpty();</span>
+    }
+
+    @Override
+    public synchronized int size() {
+<span class="nc bnc" id="L506" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L507">            load();</span>
+        }
+<span class="nc" id="L509">        return super.size();</span>
+    }
+
+    @Override
+    public synchronized Object[] toArray() {
+<span class="nc bnc" id="L514" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L515">            load();</span>
+        }
+<span class="nc" id="L517">        return super.toArray();</span>
+    }
+
+    @Override
+    public synchronized Object[] toArray(Object[] array) {
+<span class="nc bnc" id="L522" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L523">            load();</span>
+        }
+<span class="nc" id="L525">        return super.toArray(array);</span>
+    }
+
+    @Override
+    public synchronized boolean equals(Object paramObject) {
+<span class="nc bnc" id="L530" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L531">            load();</span>
+        }
+<span class="nc" id="L533">        return super.equals(paramObject);</span>
+    }
+
+    @Override
+    public synchronized int hashCode() {
+<span class="nc bnc" id="L538" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L539">            load();</span>
+        }
+<span class="nc" id="L541">        return super.hashCode();</span>
+    }
+
+    @Override
+    public synchronized int lastIndexOf(Object object) {
+<span class="nc bnc" id="L546" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L547">            load();</span>
+        }
+<span class="nc" id="L549">        return super.lastIndexOf(object);</span>
+    }
+
+    @Override
+    public synchronized List subList(int start, int end) {
+<span class="nc bnc" id="L554" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L555">            load();</span>
+        }
+<span class="nc" id="L557">        return super.subList(start, end);</span>
+    }
+
+    @Override
+    public synchronized Object get(int location) {
+<span class="nc bnc" id="L562" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L563">            load();</span>
+        }
+<span class="nc" id="L565">        return super.get(location);</span>
+    }
+
+    @Override
+    public synchronized int indexOf(Object object) {
+<span class="nc bnc" id="L570" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L571">            load();</span>
+        }
+<span class="nc" id="L573">        return super.indexOf(object);</span>
+    }
+
+    @Override
+    public synchronized int indexOf(Object object, int index) {
+<span class="nc bnc" id="L578" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L579">            load();</span>
+        }
+<span class="nc" id="L581">        return super.indexOf(object, index);</span>
+    }
+
+    @Override
+    public synchronized void copyInto(Object[] anArray) {
+<span class="nc bnc" id="L586" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L587">            load();</span>
+        }
+<span class="nc" id="L589">        super.copyInto(anArray);</span>
+<span class="nc" id="L590">    }</span>
+
+    @Override
+    public synchronized void trimToSize() {
+<span class="nc bnc" id="L594" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L595">            load();</span>
+        }
+<span class="nc" id="L597">        super.trimToSize();</span>
+<span class="nc" id="L598">    }</span>
+
+    @Override
+    public synchronized void ensureCapacity(int minCapacity) {
+<span class="nc bnc" id="L602" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L603">            load();</span>
+        }
+<span class="nc" id="L605">        super.ensureCapacity(minCapacity);</span>
+<span class="nc" id="L606">    }</span>
+
+    @Override
+    public synchronized int capacity() {
+<span class="nc bnc" id="L610" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L611">            load();</span>
+        }
+<span class="nc" id="L613">        return super.capacity();</span>
+    }
+
+    @Override
+    public Enumeration elements() {
+<span class="nc bnc" id="L618" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L619">            load();</span>
+        }
+<span class="nc" id="L621">        return super.elements();</span>
+    }
+
+    @Override
+    public synchronized int lastIndexOf(Object o, int index) {
+<span class="nc bnc" id="L626" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L627">            load();</span>
+        }
+<span class="nc" id="L629">        return super.lastIndexOf(o, index);</span>
+    }
+
+    @Override
+    public synchronized Object elementAt(int index) {
+<span class="nc bnc" id="L634" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L635">            load();</span>
+        }
+<span class="nc" id="L637">        return super.elementAt(index);</span>
+    }
+
+    @Override
+    public synchronized Object firstElement() {
+<span class="nc bnc" id="L642" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L643">            load();</span>
+        }
+<span class="nc" id="L645">        return super.firstElement();</span>
+    }
+
+    @Override
+    public synchronized Object lastElement() {
+<span class="nc bnc" id="L650" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L651">            load();</span>
+        }
+<span class="nc" id="L653">        return super.lastElement();</span>
+    }
+
+    @Override
+    public synchronized String toString() {
+<span class="nc bnc" id="L658" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L659">            load();</span>
+        }
+<span class="nc" id="L661">        return super.toString();</span>
+    }
+
+    @Override
+    protected synchronized void removeRange(int fromIndex, int toIndex) {
+<span class="nc bnc" id="L666" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L667">            load();</span>
+        }
+<span class="nc" id="L669">        super.removeRange(fromIndex, toIndex);</span>
+<span class="nc" id="L670">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

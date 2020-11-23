@@ -1,0 +1,2444 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>QueryImpl.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">QueryImpl.java</span></div><h1>QueryImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.io.Serializable;
+import java.security.AccessController;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Objects;
+import java.util.concurrent.locks.ReentrantLock;
+
+import org.apache.commons.collections4.map.AbstractReferenceMap.ReferenceStrength;
+import org.apache.commons.collections4.map.LinkedMap;
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.enhance.PersistenceCapable;
+import org.apache.openjpa.kernel.exps.AggregateListener;
+import org.apache.openjpa.kernel.exps.Constant;
+import org.apache.openjpa.kernel.exps.FilterListener;
+import org.apache.openjpa.kernel.exps.Literal;
+import org.apache.openjpa.kernel.exps.Path;
+import org.apache.openjpa.kernel.exps.QueryExpressions;
+import org.apache.openjpa.kernel.exps.Val;
+import org.apache.openjpa.lib.log.Log;
+import org.apache.openjpa.lib.rop.BatchedResultObjectProvider;
+import org.apache.openjpa.lib.rop.EagerResultList;
+import org.apache.openjpa.lib.rop.ListResultList;
+import org.apache.openjpa.lib.rop.MergedResultObjectProvider;
+import org.apache.openjpa.lib.rop.RangeResultObjectProvider;
+import org.apache.openjpa.lib.rop.ResultList;
+import org.apache.openjpa.lib.rop.ResultObjectProvider;
+import org.apache.openjpa.lib.util.ClassUtil;
+import org.apache.openjpa.lib.util.J2DoPrivHelper;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.OrderedMap;
+import org.apache.openjpa.lib.util.ReferenceHashSet;
+import org.apache.openjpa.lib.util.StringUtil;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.FieldMetaData;
+import org.apache.openjpa.meta.JavaTypes;
+import org.apache.openjpa.meta.MetaDataRepository;
+import org.apache.openjpa.util.GeneralException;
+import org.apache.openjpa.util.ImplHelper;
+import org.apache.openjpa.util.InvalidStateException;
+import org.apache.openjpa.util.NoResultException;
+import org.apache.openjpa.util.NonUniqueResultException;
+import org.apache.openjpa.util.OpenJPAException;
+import org.apache.openjpa.util.UnsupportedException;
+import org.apache.openjpa.util.UserException;
+
+
+/**
+ * Implementation of the {@link Query} interface.
+ *
+ * @author Abe White
+ */
+public class QueryImpl implements Query {
+    private static final long serialVersionUID = 1L;
+
+<span class="nc" id="L83">    private static final Localizer _loc = Localizer.forPackage(QueryImpl.class);</span>
+
+    private final String _language;
+    private final StoreQuery _storeQuery;
+    private transient final BrokerImpl _broker;
+    private transient final Log _log;
+<span class="nc" id="L89">    private transient ClassLoader _loader = null;</span>
+
+    // query has its own internal lock
+    private ReentrantLock _lock;
+
+    // unparsed state
+<span class="nc" id="L95">    private Class&lt;?&gt; _class = null;</span>
+<span class="nc" id="L96">    private boolean _subclasses = true;</span>
+<span class="nc" id="L97">    private boolean _readOnly = false;</span>
+<span class="nc" id="L98">    private String _query = null;</span>
+<span class="nc" id="L99">    private String _params = null;</span>
+
+    // parsed state
+<span class="nc" id="L102">    private transient Compilation _compiled = null;</span>
+<span class="nc" id="L103">    private transient boolean _compiling = false;</span>
+<span class="nc" id="L104">    private transient ResultPacker _packer = null;</span>
+
+    // candidates
+<span class="nc" id="L107">    private transient Collection&lt;?&gt; _collection = null;</span>
+<span class="nc" id="L108">    private transient Extent _extent = null;</span>
+
+    // listeners
+<span class="nc" id="L111">    private Map&lt;String,FilterListener&gt; _filtListeners = null;</span>
+<span class="nc" id="L112">    private Map&lt;String,AggregateListener&gt; _aggListeners = null;</span>
+
+    // configuration for loading objects
+<span class="nc" id="L115">    private FetchConfiguration _fc = null;</span>
+<span class="nc" id="L116">    private boolean _ignoreChanges = false;</span>
+<span class="nc" id="L117">    private Class&lt;?&gt; _resultMappingScope = null;</span>
+<span class="nc" id="L118">    private String _resultMappingName = null;</span>
+
+    // these fields should only be used directly after we have a compilation,
+    // because their values may be encoded in the query string
+<span class="nc" id="L122">    private Boolean _unique = null;</span>
+<span class="nc" id="L123">    private Class&lt;?&gt; _resultClass = null;</span>
+<span class="nc" id="L124">    private transient long _startIdx = 0;</span>
+<span class="nc" id="L125">    private transient long _endIdx = Long.MAX_VALUE;</span>
+<span class="nc" id="L126">    private transient boolean _rangeSet = false;</span>
+
+    // remember the list of all the results we have returned so we
+    // can free their resources when close or closeAll is called
+<span class="nc" id="L130">    private transient final Collection&lt;RemoveOnCloseResultList&gt; _resultLists =</span>
+        new ReferenceHashSet(ReferenceStrength.WEAK);
+
+<span class="nc" id="L133">    private boolean _printParameters = false;</span>
+    /**
+     * Construct a query managed by the given broker.
+     */
+<span class="nc" id="L137">    public QueryImpl(Broker broker, String language, StoreQuery storeQuery) {</span>
+<span class="nc" id="L138">        _broker = (BrokerImpl) broker;</span>
+<span class="nc" id="L139">        _language = language;</span>
+<span class="nc" id="L140">        _storeQuery = storeQuery;</span>
+<span class="nc" id="L141">        _fc = (FetchConfiguration) broker.getFetchConfiguration().clone();</span>
+<span class="nc" id="L142">        _log = broker.getConfiguration().getLog(OpenJPAConfiguration.LOG_QUERY);</span>
+<span class="nc" id="L143">        _storeQuery.setContext(this);</span>
+<span class="nc" id="L144">        _printParameters = _broker.getPrintParameters();</span>
+<span class="nc bnc" id="L145" title="All 4 branches missed.">        if (_broker != null &amp;&amp; _broker.getMultithreaded())</span>
+<span class="nc" id="L146">            _lock = new ReentrantLock();</span>
+<span class="nc" id="L147">    }</span>
+
+    /**
+     * Internal store query.
+     */
+    public StoreQuery getStoreQuery() {
+<span class="nc" id="L153">        return _storeQuery;</span>
+    }
+
+    @Override
+    public Broker getBroker() {
+<span class="nc" id="L158">        return _broker;</span>
+    }
+
+    @Override
+    public Query getQuery() {
+<span class="nc" id="L163">        return this;</span>
+    }
+
+    @Override
+    public StoreContext getStoreContext() {
+<span class="nc" id="L168">        return _broker;</span>
+    }
+
+    @Override
+    public String getLanguage() {
+<span class="nc" id="L173">        return _language;</span>
+    }
+
+    @Override
+    public FetchConfiguration getFetchConfiguration() {
+<span class="nc" id="L178">        return _fc;</span>
+    }
+
+    @Override
+    public String getQueryString() {
+<span class="nc" id="L183">        return _query;</span>
+    }
+
+    @Override
+    public boolean getIgnoreChanges() {
+<span class="nc" id="L188">        assertOpen();</span>
+<span class="nc" id="L189">        return _ignoreChanges;</span>
+    }
+
+    @Override
+    public void setIgnoreChanges(boolean flag) {
+<span class="nc" id="L194">        lock();</span>
+        try {
+<span class="nc" id="L196">            assertOpen();</span>
+            // allowed modification: no read-only check
+<span class="nc" id="L198">            _ignoreChanges = flag;</span>
+        } finally {
+<span class="nc" id="L200">            unlock();</span>
+        }
+<span class="nc" id="L202">    }</span>
+
+    @Override
+    public boolean isReadOnly() {
+<span class="nc" id="L206">        assertOpen();</span>
+<span class="nc" id="L207">        return _readOnly;</span>
+    }
+
+    @Override
+    public void setReadOnly(boolean flag) {
+<span class="nc" id="L212">        lock();</span>
+        try {
+<span class="nc" id="L214">            assertOpen();</span>
+<span class="nc" id="L215">            _readOnly = flag;</span>
+        } finally {
+<span class="nc" id="L217">            unlock();</span>
+        }
+<span class="nc" id="L219">    }</span>
+
+    @Override
+    public void addFilterListener(FilterListener listener) {
+<span class="nc" id="L223">        lock();</span>
+        try {
+<span class="nc" id="L225">            assertOpen();</span>
+<span class="nc" id="L226">            assertNotReadOnly();</span>
+<span class="nc bnc" id="L227" title="All 2 branches missed.">            if (_filtListeners == null)</span>
+<span class="nc" id="L228">                _filtListeners = new HashMap&lt;&gt;(5);</span>
+<span class="nc" id="L229">            _filtListeners.put(listener.getTag(), listener);</span>
+        } finally {
+<span class="nc" id="L231">            unlock();</span>
+        }
+<span class="nc" id="L233">    }</span>
+
+    @Override
+    public void removeFilterListener(FilterListener listener) {
+<span class="nc" id="L237">        lock();</span>
+        try {
+<span class="nc" id="L239">            assertOpen();</span>
+<span class="nc" id="L240">            assertNotReadOnly();</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            if (_filtListeners != null)</span>
+<span class="nc" id="L242">                _filtListeners.remove(listener.getTag());</span>
+        } finally {
+<span class="nc" id="L244">            unlock();</span>
+        }
+<span class="nc" id="L246">    }</span>
+
+    @Override
+    public Collection&lt;FilterListener&gt; getFilterListeners() {
+<span class="nc bnc" id="L250" title="All 2 branches missed.">        if (_filtListeners == null)</span>
+<span class="nc" id="L251">            return Collections.emptyList();</span>
+        else
+<span class="nc" id="L253">            return _filtListeners.values();</span>
+    }
+
+    @Override
+    public FilterListener getFilterListener(String tag) {
+        // first check listeners for this query
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        if (_filtListeners != null) {</span>
+<span class="nc" id="L260">            FilterListener listen = _filtListeners.get(tag);</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            if (listen != null)</span>
+<span class="nc" id="L262">                return listen;</span>
+        }
+
+        // check user-defined listeners from configuration
+<span class="nc" id="L266">        FilterListener[] confListeners = _broker.getConfiguration().</span>
+<span class="nc" id="L267">            getFilterListenerInstances();</span>
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        for (int i = 0; i &lt; confListeners.length; i++)</span>
+<span class="nc bnc" id="L269" title="All 2 branches missed.">            if (confListeners[i].getTag().equals(tag))</span>
+<span class="nc" id="L270">                return confListeners[i];</span>
+
+        // check store listeners
+<span class="nc" id="L273">        return _storeQuery.getFilterListener(tag);</span>
+    }
+
+    @Override
+    public void addAggregateListener(AggregateListener listener) {
+<span class="nc" id="L278">        lock();</span>
+        try {
+<span class="nc" id="L280">            assertOpen();</span>
+<span class="nc" id="L281">            assertNotReadOnly();</span>
+<span class="nc bnc" id="L282" title="All 2 branches missed.">            if (_aggListeners == null)</span>
+<span class="nc" id="L283">                _aggListeners = new HashMap&lt;&gt;(5);</span>
+<span class="nc" id="L284">            _aggListeners.put(listener.getTag(), listener);</span>
+        } finally {
+<span class="nc" id="L286">            unlock();</span>
+        }
+<span class="nc" id="L288">    }</span>
+
+    @Override
+    public void removeAggregateListener(AggregateListener listener) {
+<span class="nc" id="L292">        lock();</span>
+        try {
+<span class="nc" id="L294">            assertOpen();</span>
+<span class="nc" id="L295">            assertNotReadOnly();</span>
+<span class="nc bnc" id="L296" title="All 2 branches missed.">            if (_aggListeners != null)</span>
+<span class="nc" id="L297">                _aggListeners.remove(listener.getTag());</span>
+        } finally {
+<span class="nc" id="L299">            unlock();</span>
+        }
+<span class="nc" id="L301">    }</span>
+
+    @Override
+    public Collection&lt;AggregateListener&gt; getAggregateListeners() {
+<span class="nc bnc" id="L305" title="All 2 branches missed.">        if (_aggListeners == null)</span>
+<span class="nc" id="L306">            return Collections.emptyList();</span>
+        else
+<span class="nc" id="L308">            return _aggListeners.values();</span>
+    }
+
+    @Override
+    public AggregateListener getAggregateListener(String tag) {
+        // first check listeners for this query
+<span class="nc bnc" id="L314" title="All 2 branches missed.">        if (_aggListeners != null) {</span>
+<span class="nc" id="L315">            AggregateListener listen = _aggListeners.</span>
+<span class="nc" id="L316">                get(tag);</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">            if (listen != null)</span>
+<span class="nc" id="L318">                return listen;</span>
+        }
+
+        // check user-defined listeners from configuration
+<span class="nc" id="L322">        AggregateListener[] confListeners = _broker.getConfiguration().</span>
+<span class="nc" id="L323">            getAggregateListenerInstances();</span>
+<span class="nc bnc" id="L324" title="All 2 branches missed.">        for (int i = 0; i &lt; confListeners.length; i++)</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">            if (confListeners[i].getTag().equals(tag))</span>
+<span class="nc" id="L326">                return confListeners[i];</span>
+
+        // check store listeners
+<span class="nc" id="L329">        return _storeQuery.getAggregateListener(tag);</span>
+    }
+
+    @Override
+    public Extent getCandidateExtent() {
+        // if just the class is set, fetch the corresponding extent; if the
+        // extent is already set but its ignore cache setting is wrong,
+        // get a new extent with the correct setting (don't modify orig extent
+        // in case the user has a reference to it and might use it)
+<span class="nc" id="L338">        lock();</span>
+        try {
+<span class="nc" id="L340">            Class&lt;?&gt; cls = getCandidateType();</span>
+<span class="nc bnc" id="L341" title="All 8 branches missed.">            if (_extent == null &amp;&amp; _collection == null &amp;&amp; _broker != null</span>
+                &amp;&amp; cls != null) {
+<span class="nc" id="L343">                _extent = _broker.newExtent(cls, _subclasses);</span>
+<span class="nc" id="L344">                _extent.setIgnoreChanges(_ignoreChanges);</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">            } else if (_extent != null</span>
+<span class="nc bnc" id="L346" title="All 4 branches missed.">                &amp;&amp; _extent.getIgnoreChanges() != _ignoreChanges &amp;&amp; cls != null){</span>
+<span class="nc" id="L347">                _extent = _broker.newExtent(cls, _extent.hasSubclasses());</span>
+<span class="nc" id="L348">                _extent.setIgnoreChanges(_ignoreChanges);</span>
+            }
+<span class="nc" id="L350">            return _extent;</span>
+        } finally {
+<span class="nc" id="L352">            unlock();</span>
+        }
+    }
+
+    @Override
+    public void setCandidateExtent(Extent candidateExtent) {
+<span class="nc" id="L358">        lock();</span>
+        try {
+<span class="nc" id="L360">            assertOpen();</span>
+<span class="nc" id="L361">            assertNotReadOnly();</span>
+
+<span class="nc bnc" id="L363" title="All 2 branches missed.">            if (candidateExtent == _extent)</span>
+<span class="nc" id="L364">                return;</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">            if (candidateExtent == null) {</span>
+<span class="nc" id="L366">                _extent = null;</span>
+<span class="nc" id="L367">                return;</span>
+            }
+
+            // if extent then not collection
+<span class="nc" id="L371">            _extent = candidateExtent;</span>
+<span class="nc" id="L372">            _collection = null;</span>
+
+<span class="nc" id="L374">            boolean invalidate = false;</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">            if (_extent.getElementType() != _class) {</span>
+<span class="nc" id="L376">                _class = _extent.getElementType();</span>
+<span class="nc" id="L377">                _loader = null;</span>
+<span class="nc" id="L378">                invalidate = true;</span>
+            }
+<span class="nc bnc" id="L380" title="All 2 branches missed.">            if (_extent.hasSubclasses() != _subclasses) {</span>
+<span class="nc" id="L381">                _subclasses = _extent.hasSubclasses();</span>
+<span class="nc" id="L382">                invalidate = true;</span>
+            }
+<span class="nc bnc" id="L384" title="All 2 branches missed.">            if (invalidate)</span>
+<span class="nc" id="L385">                invalidateCompilation();</span>
+        } finally {
+<span class="nc" id="L387">            unlock();</span>
+        }
+<span class="nc" id="L389">    }</span>
+
+    @Override
+    public Collection&lt;?&gt; getCandidateCollection() {
+<span class="nc" id="L393">        assertOpen();</span>
+<span class="nc" id="L394">        return _collection;</span>
+    }
+
+    @Override
+    public void setCandidateCollection(Collection&lt;?&gt; candidateCollection) {
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        if (!_storeQuery.supportsInMemoryExecution())</span>
+<span class="nc" id="L400">            throw new UnsupportedException(_loc.get(&quot;query-nosupport&quot;,</span>
+                _language));
+
+<span class="nc" id="L403">        lock();</span>
+        try {
+<span class="nc" id="L405">            assertOpen();</span>
+
+            // if collection then not extent
+<span class="nc" id="L408">            _collection = candidateCollection;</span>
+<span class="nc bnc" id="L409" title="All 2 branches missed.">            if (_collection != null)</span>
+<span class="nc" id="L410">                _extent = null;</span>
+        } finally {
+<span class="nc" id="L412">            unlock();</span>
+        }
+<span class="nc" id="L414">    }</span>
+
+    @Override
+    public Class getCandidateType() {
+<span class="nc" id="L418">        lock();</span>
+        try {
+<span class="nc" id="L420">            assertOpen();</span>
+<span class="nc bnc" id="L421" title="All 8 branches missed.">            if (_class != null || _compiled != null || _query == null</span>
+                || _broker == null)
+<span class="nc" id="L423">                return _class;</span>
+
+            // check again after compilation; maybe encoded in string
+<span class="nc" id="L426">            compileForCompilation();</span>
+<span class="nc" id="L427">            return _class;</span>
+        } finally {
+<span class="nc" id="L429">            unlock();</span>
+        }
+    }
+
+    @Override
+    public void setCandidateType(Class candidateClass, boolean subs) {
+<span class="nc" id="L435">        lock();</span>
+        try {
+<span class="nc" id="L437">            assertOpen();</span>
+<span class="nc" id="L438">            assertNotReadOnly();</span>
+<span class="nc" id="L439">            _class = candidateClass;</span>
+<span class="nc" id="L440">            _subclasses = subs;</span>
+<span class="nc" id="L441">            _loader = null;</span>
+<span class="nc" id="L442">            invalidateCompilation();</span>
+        } finally {
+<span class="nc" id="L444">            unlock();</span>
+        }
+<span class="nc" id="L446">    }</span>
+
+    @Override
+    public boolean hasSubclasses() {
+<span class="nc" id="L450">        return _subclasses;</span>
+    }
+
+    @Override
+    public String getResultMappingName() {
+<span class="nc" id="L455">        assertOpen();</span>
+<span class="nc" id="L456">        return _resultMappingName;</span>
+    }
+
+    @Override
+    public Class getResultMappingScope() {
+<span class="nc" id="L461">        assertOpen();</span>
+<span class="nc" id="L462">        return _resultMappingScope;</span>
+    }
+
+    @Override
+    public void setResultMapping(Class&lt;?&gt; scope, String name) {
+<span class="nc" id="L467">        lock();</span>
+        try {
+<span class="nc" id="L469">            assertOpen();</span>
+<span class="nc" id="L470">            _resultMappingScope = scope;</span>
+<span class="nc" id="L471">            _resultMappingName = name;</span>
+<span class="nc" id="L472">            _packer = null;</span>
+        } finally {
+<span class="nc" id="L474">            unlock();</span>
+        }
+<span class="nc" id="L476">    }</span>
+
+    @Override
+    public boolean isUnique() {
+<span class="nc" id="L480">        lock();</span>
+        try {
+<span class="nc" id="L482">            assertOpen();</span>
+<span class="nc bnc" id="L483" title="All 2 branches missed.">            if (_unique != null)</span>
+<span class="nc" id="L484">                return _unique.booleanValue();</span>
+<span class="nc bnc" id="L485" title="All 8 branches missed.">            if ((_query == null &amp;&amp; _language.endsWith(&quot;JPQL&quot;)) || _compiling || _broker == null)</span>
+<span class="nc" id="L486">                return false;</span>
+
+            // check again after compilation; maybe encoded in string
+<span class="nc bnc" id="L489" title="All 2 branches missed.">            if (_compiled == null) {</span>
+<span class="nc" id="L490">                compileForCompilation();</span>
+<span class="nc bnc" id="L491" title="All 2 branches missed.">                if (_unique != null)</span>
+<span class="nc" id="L492">                    return _unique.booleanValue();</span>
+            }
+
+            // no explicit setting; default
+<span class="nc" id="L496">            StoreQuery.Executor ex = compileForExecutor();</span>
+<span class="nc bnc" id="L497" title="All 2 branches missed.">            if (!ex.isAggregate(_storeQuery))</span>
+<span class="nc" id="L498">                return false;</span>
+<span class="nc bnc" id="L499" title="All 2 branches missed.">            return !ex.hasGrouping(_storeQuery);</span>
+        } finally {
+<span class="nc" id="L501">            unlock();</span>
+        }
+    }
+
+    /**
+     * Affirms if this query has originated by parsing a string-based query.
+     */
+    public boolean isParsedQuery() {
+<span class="nc bnc" id="L509" title="All 2 branches missed.">        return getQueryString() != null;</span>
+    }
+
+    @Override
+    public void setUnique(boolean unique) {
+<span class="nc" id="L514">        lock();</span>
+        try {
+<span class="nc" id="L516">            assertOpen();</span>
+<span class="nc" id="L517">            assertNotReadOnly();</span>
+<span class="nc bnc" id="L518" title="All 2 branches missed.">            _unique = (unique) ? Boolean.TRUE : Boolean.FALSE;</span>
+        } finally {
+<span class="nc" id="L520">            unlock();</span>
+        }
+<span class="nc" id="L522">    }</span>
+
+    @Override
+    public Class getResultType() {
+<span class="nc" id="L526">        lock();</span>
+        try {
+<span class="nc" id="L528">            assertOpen();</span>
+<span class="nc bnc" id="L529" title="All 8 branches missed.">            if (_resultClass != null || _compiled != null || _query == null</span>
+                || _broker == null)
+<span class="nc" id="L531">                return _resultClass;</span>
+
+            // check again after compilation; maybe encoded in string
+<span class="nc" id="L534">            compileForCompilation();</span>
+<span class="nc" id="L535">            return _resultClass;</span>
+        } finally {
+<span class="nc" id="L537">            unlock();</span>
+        }
+    }
+
+    @Override
+    public void setResultType(Class cls) {
+<span class="nc" id="L543">        lock();</span>
+        try {
+<span class="nc" id="L545">            assertOpen();</span>
+            // allowed modification: no read-only check
+<span class="nc" id="L547">            _resultClass = cls;</span>
+<span class="nc" id="L548">            _packer = null;</span>
+        } finally {
+<span class="nc" id="L550">            unlock();</span>
+        }
+<span class="nc" id="L552">    }</span>
+
+    @Override
+    public long getStartRange() {
+<span class="nc" id="L556">        assertOpen();</span>
+<span class="nc" id="L557">        return _startIdx;</span>
+    }
+
+    @Override
+    public long getEndRange() {
+<span class="nc" id="L562">        assertOpen();</span>
+<span class="nc" id="L563">        return _endIdx;</span>
+    }
+
+    @Override
+    public void setRange(long start, long end) {
+<span class="nc bnc" id="L568" title="All 4 branches missed.">        if (start &lt; 0 || end &lt; 0)</span>
+<span class="nc" id="L569">            throw new UserException(_loc.get(&quot;invalid-range&quot;,</span>
+<span class="nc" id="L570">                String.valueOf(start), String.valueOf(end)));</span>
+
+<span class="nc bnc" id="L572" title="All 4 branches missed.">        if (end - start &gt; Integer.MAX_VALUE &amp;&amp; end != Long.MAX_VALUE)</span>
+<span class="nc" id="L573">            throw new UserException(_loc.get(&quot;range-too-big&quot;,</span>
+<span class="nc" id="L574">                String.valueOf(start), String.valueOf(end)));</span>
+
+<span class="nc" id="L576">        lock();</span>
+        try {
+<span class="nc" id="L578">            assertOpen();</span>
+            // allowed modification: no read-only check
+<span class="nc" id="L580">            _startIdx = start;</span>
+<span class="nc" id="L581">            _endIdx = end;</span>
+<span class="nc" id="L582">            _rangeSet = true;</span>
+        } finally {
+<span class="nc" id="L584">            unlock();</span>
+        }
+<span class="nc" id="L586">    }</span>
+
+    @Override
+    public String getParameterDeclaration() {
+<span class="nc" id="L590">        lock();</span>
+        try {
+<span class="nc" id="L592">            assertOpen();</span>
+<span class="nc bnc" id="L593" title="All 8 branches missed.">            if (_params != null || _compiled != null || _compiling</span>
+                || _broker == null)
+<span class="nc" id="L595">                return _params;</span>
+
+            // check again after compilation; maybe encoded in string
+<span class="nc" id="L598">            compileForCompilation();</span>
+<span class="nc" id="L599">            return _params;</span>
+        } finally {
+<span class="nc" id="L601">            unlock();</span>
+        }
+    }
+
+    @Override
+    public void declareParameters(String params) {
+<span class="nc bnc" id="L607" title="All 2 branches missed.">        if (!_storeQuery.supportsParameterDeclarations())</span>
+<span class="nc" id="L608">            throw new UnsupportedException(_loc.get(&quot;query-nosupport&quot;,</span>
+                _language));
+
+<span class="nc" id="L611">        lock();</span>
+        try {
+<span class="nc" id="L613">            assertOpen();</span>
+<span class="nc" id="L614">            assertNotReadOnly();</span>
+<span class="nc" id="L615">            _params = StringUtil.trimToNull(params);</span>
+<span class="nc" id="L616">            invalidateCompilation();</span>
+        } finally {
+<span class="nc" id="L618">            unlock();</span>
+        }
+<span class="nc" id="L620">    }</span>
+
+    @Override
+    public void compile() {
+<span class="nc" id="L624">        lock();</span>
+        try {
+<span class="nc" id="L626">            assertOpen();</span>
+<span class="nc" id="L627">            StoreQuery.Executor ex = compileForExecutor();</span>
+<span class="nc" id="L628">            getResultPacker(_storeQuery, ex);</span>
+<span class="nc" id="L629">            ex.validate(_storeQuery);</span>
+        } finally {
+<span class="nc" id="L631">            unlock();</span>
+        }
+<span class="nc" id="L633">    }</span>
+
+    @Override
+    public Object getCompilation() {
+<span class="nc" id="L637">        lock();</span>
+        try {
+<span class="nc" id="L639">            return compileForCompilation().storeData;</span>
+        } finally {
+<span class="nc" id="L641">            unlock();</span>
+        }
+    }
+
+    /**
+     * Compile query properties.
+     */
+    private Compilation compileForCompilation() {
+<span class="nc bnc" id="L649" title="All 4 branches missed.">        if (_compiled != null || _compiling)</span>
+<span class="nc" id="L650">            return _compiled;</span>
+
+<span class="nc" id="L652">        assertNotSerialized();</span>
+<span class="nc" id="L653">        assertOpen();</span>
+
+<span class="nc" id="L655">        boolean readOnly = _readOnly;</span>
+<span class="nc" id="L656">        _readOnly = false;</span>
+<span class="nc" id="L657">        _compiling = true;</span>
+        try {
+<span class="nc" id="L659">            _compiled = compilationFromCache();</span>
+<span class="nc" id="L660">            return _compiled;</span>
+<span class="nc" id="L661">        } catch (OpenJPAException ke) {</span>
+<span class="nc" id="L662">            throw ke;</span>
+<span class="nc" id="L663">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L664">            throw new GeneralException(re);</span>
+        } finally {
+<span class="nc" id="L666">            _compiling = false;</span>
+<span class="nc" id="L667">            _readOnly = readOnly;</span>
+        }
+    }
+
+    /**
+     * Find the cached compilation for the current query, creating one if it
+     * does not exist.
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    protected Compilation compilationFromCache() {
+<span class="nc" id="L677">        Map compCache = _broker.getConfiguration().getQueryCompilationCacheInstance();</span>
+<span class="nc bnc" id="L678" title="All 4 branches missed.">        if (compCache == null || !isParsedQuery()) {</span>
+<span class="nc" id="L679">            return newCompilation();</span>
+        } else {
+<span class="nc" id="L681">            CompilationKey key = new CompilationKey();</span>
+<span class="nc" id="L682">            key.queryType = _storeQuery.getClass();</span>
+<span class="nc" id="L683">            key.candidateType = getCandidateType();</span>
+<span class="nc" id="L684">            key.subclasses = hasSubclasses();</span>
+<span class="nc" id="L685">            key.query = getQueryString();</span>
+<span class="nc" id="L686">            key.language = getLanguage();</span>
+<span class="nc" id="L687">            key.storeKey = _storeQuery.newCompilationKey();</span>
+<span class="nc" id="L688">            Compilation comp = (Compilation) compCache.get(key);</span>
+
+            // parse declarations if needed
+<span class="nc bnc" id="L691" title="All 2 branches missed.">            if (comp == null) {</span>
+<span class="nc" id="L692">                comp = newCompilation();</span>
+                // only cache those queries that can be compiled
+<span class="nc bnc" id="L694" title="All 2 branches missed.">                if (comp.storeData != null) {</span>
+
+<span class="nc" id="L696">                    synchronized (compCache) {</span>
+<span class="nc" id="L697">                        Compilation existingComp = (Compilation) compCache.get(key);</span>
+<span class="nc bnc" id="L698" title="All 2 branches missed.">                        if (existingComp == null) {</span>
+<span class="nc" id="L699">                            compCache.put(key, comp);</span>
+                        } else {
+<span class="nc" id="L701">                            comp = existingComp;</span>
+                        }
+<span class="nc" id="L703">                    }</span>
+                }
+            } else {
+<span class="nc" id="L706">                _storeQuery.populateFromCompilation(comp.storeData);</span>
+            }
+
+<span class="nc" id="L709">            return comp;</span>
+        }
+    }
+
+    /**
+     * Create and populate a new compilation.
+     */
+    private Compilation newCompilation() {
+<span class="nc" id="L717">        Compilation comp = new Compilation();</span>
+<span class="nc" id="L718">        comp.storeData = _storeQuery.newCompilation();</span>
+<span class="nc" id="L719">        _storeQuery.populateFromCompilation(comp.storeData);</span>
+<span class="nc" id="L720">        return comp;</span>
+    }
+
+    /**
+     * Compile for execution, choosing between datastore and in-mem
+     * compilation based on what we support and our settings.
+     */
+    private StoreQuery.Executor compileForExecutor() {
+<span class="nc" id="L728">        Compilation comp = compileForCompilation();</span>
+<span class="nc bnc" id="L729" title="All 2 branches missed.">        if (_collection == null) {</span>
+<span class="nc bnc" id="L730" title="All 2 branches missed.">            if (comp.datastore != null)</span>
+<span class="nc" id="L731">                return comp.datastore;</span>
+<span class="nc bnc" id="L732" title="All 2 branches missed.">            if (comp.memory != null)</span>
+<span class="nc" id="L733">                return comp.memory;</span>
+<span class="nc bnc" id="L734" title="All 2 branches missed.">            if (_storeQuery.supportsDataStoreExecution())</span>
+<span class="nc" id="L735">                return compileForDataStore(comp);</span>
+<span class="nc" id="L736">            return compileForInMemory(comp);</span>
+        }
+
+<span class="nc bnc" id="L739" title="All 2 branches missed.">        if (comp.memory != null)</span>
+<span class="nc" id="L740">            return comp.memory;</span>
+<span class="nc bnc" id="L741" title="All 2 branches missed.">        if (comp.datastore != null)</span>
+<span class="nc" id="L742">            return comp.datastore;</span>
+<span class="nc bnc" id="L743" title="All 2 branches missed.">        if (_storeQuery.supportsInMemoryExecution())</span>
+<span class="nc" id="L744">            return compileForInMemory(comp);</span>
+<span class="nc" id="L745">        return compileForDataStore(comp);</span>
+    }
+
+    /**
+     * Create an expression tree for datastore execution.
+     */
+    private StoreQuery.Executor compileForDataStore(Compilation comp) {
+<span class="nc bnc" id="L752" title="All 2 branches missed.">        if (comp.datastore == null)</span>
+<span class="nc" id="L753">            comp.datastore = createExecutor(false);</span>
+<span class="nc" id="L754">        return comp.datastore;</span>
+    }
+
+    /**
+     * Create an expression tree for in-memory execution.
+     */
+    private StoreQuery.Executor compileForInMemory(Compilation comp) {
+<span class="nc bnc" id="L761" title="All 2 branches missed.">        if (comp.memory == null)</span>
+<span class="nc" id="L762">            comp.memory = createExecutor(true);</span>
+<span class="nc" id="L763">        return comp.memory;</span>
+    }
+
+    /**
+     * Return a query executor of the proper type.
+     */
+    private StoreQuery.Executor createExecutor(boolean inMem) {
+<span class="nc" id="L770">        assertCandidateType();</span>
+
+<span class="nc" id="L772">        MetaDataRepository repos = _broker.getConfiguration().</span>
+<span class="nc" id="L773">            getMetaDataRepositoryInstance();</span>
+<span class="nc" id="L774">        ClassMetaData meta = repos.getMetaData(_class,</span>
+<span class="nc" id="L775">            _broker.getClassLoader(), false);</span>
+
+        ClassMetaData[] metas;
+<span class="nc bnc" id="L778" title="All 4 branches missed.">        if (_class == null || _storeQuery.supportsAbstractExecutors())</span>
+<span class="nc" id="L779">            metas = new ClassMetaData[]{ meta };</span>
+<span class="nc bnc" id="L780" title="All 6 branches missed.">        else if (_subclasses &amp;&amp; (meta == null || meta.isManagedInterface()))</span>
+<span class="nc" id="L781">            metas = repos.getImplementorMetaDatas(_class,</span>
+<span class="nc" id="L782">                _broker.getClassLoader(), true);</span>
+<span class="nc bnc" id="L783" title="All 6 branches missed.">        else if (meta != null &amp;&amp; (_subclasses || meta.isMapped()))</span>
+<span class="nc" id="L784">            metas = new ClassMetaData[]{ meta };</span>
+        else
+<span class="nc" id="L786">            metas = StoreQuery.EMPTY_METAS;</span>
+
+<span class="nc bnc" id="L788" title="All 2 branches missed.">        if (metas.length == 0)</span>
+<span class="nc" id="L789">            throw new UserException(_loc.get(&quot;no-impls&quot;, _class));</span>
+        try {
+<span class="nc bnc" id="L791" title="All 2 branches missed.">            if (metas.length == 1) {</span>
+<span class="nc bnc" id="L792" title="All 2 branches missed.">                if (inMem)</span>
+<span class="nc" id="L793">                    return _storeQuery.newInMemoryExecutor(metas[0],</span>
+                        _subclasses);
+<span class="nc" id="L795">                return _storeQuery.newDataStoreExecutor(metas[0], _subclasses);</span>
+            }
+
+            // multiple implementors
+<span class="nc" id="L799">            StoreQuery.Executor[] es = new StoreQuery.Executor[metas.length];</span>
+<span class="nc bnc" id="L800" title="All 2 branches missed.">            for (int i = 0; i &lt; es.length; i++) {</span>
+<span class="nc bnc" id="L801" title="All 2 branches missed.">                if (inMem)</span>
+<span class="nc" id="L802">                    es[i] = _storeQuery.newInMemoryExecutor(metas[i], true);</span>
+                else
+<span class="nc" id="L804">                    es[i] = _storeQuery.newDataStoreExecutor(metas[i], true);</span>
+            }
+<span class="nc" id="L806">            return new MergedExecutor(es);</span>
+<span class="nc" id="L807">        } catch (OpenJPAException ke) {</span>
+<span class="nc" id="L808">            throw ke;</span>
+<span class="nc" id="L809">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L810">            throw new GeneralException(re);</span>
+        }
+    }
+
+    /**
+     * Clear any compilation, forcing this query to be recompiled
+     * next time it's executed. This should be invoked whenever any
+     * state changes that would cause the underlying query
+     * representation to change.
+     *
+     * @since 0.3.0
+     */
+    private boolean invalidateCompilation() {
+<span class="nc bnc" id="L823" title="All 2 branches missed.">        if (_compiling)</span>
+<span class="nc" id="L824">            return false;</span>
+<span class="nc" id="L825">        _storeQuery.invalidateCompilation();</span>
+<span class="nc" id="L826">        _compiled = null;</span>
+<span class="nc" id="L827">        _packer = null;</span>
+<span class="nc" id="L828">        return true;</span>
+    }
+
+    @Override
+    public Object execute() {
+<span class="nc" id="L833">        return execute((Object[]) null);</span>
+    }
+
+    @Override
+    public Object execute(Object[] params) {
+<span class="nc" id="L838">        return execute(OP_SELECT, params);</span>
+    }
+
+    @Override
+    public Object execute(Map params) {
+<span class="nc" id="L843">        return execute(OP_SELECT, params);</span>
+    }
+
+    private Object execute(int operation, Object[] params) {
+<span class="nc bnc" id="L847" title="All 2 branches missed.">        if (params == null)</span>
+<span class="nc" id="L848">            params = StoreQuery.EMPTY_OBJECTS;</span>
+
+<span class="nc" id="L850">        lock();</span>
+        try {
+<span class="nc" id="L852">            assertNotSerialized();</span>
+<span class="nc" id="L853">            _broker.beginOperation(true);</span>
+            try {
+<span class="nc" id="L855">                assertOpen();</span>
+<span class="nc" id="L856">                _broker.assertNontransactionalRead();</span>
+
+                // get executor
+<span class="nc" id="L859">                Compilation comp = compileForCompilation();</span>
+<span class="nc bnc" id="L860" title="All 2 branches missed.">                StoreQuery.Executor ex = (isInMemory(operation))</span>
+<span class="nc" id="L861">                    ? compileForInMemory(comp) : compileForDataStore(comp);</span>
+
+<span class="nc" id="L863">                assertParameters(_storeQuery, ex, params);</span>
+<span class="nc bnc" id="L864" title="All 2 branches missed.">                if (_log.isTraceEnabled())</span>
+<span class="nc" id="L865">                    logExecution(operation, ex.getOrderedParameterTypes(_storeQuery),</span>
+                        params);
+
+<span class="nc bnc" id="L868" title="All 2 branches missed.">                if (operation == OP_SELECT)</span>
+<span class="nc" id="L869">                    return execute(_storeQuery, ex, params);</span>
+<span class="nc bnc" id="L870" title="All 2 branches missed.">                if (operation == OP_DELETE)</span>
+<span class="nc" id="L871">                    return delete(_storeQuery, ex, params);</span>
+<span class="nc bnc" id="L872" title="All 2 branches missed.">                if (operation == OP_UPDATE)</span>
+<span class="nc" id="L873">                    return update(_storeQuery, ex, params);</span>
+<span class="nc" id="L874">                throw new UnsupportedException();</span>
+<span class="nc" id="L875">            } catch (OpenJPAException ke) {</span>
+<span class="nc" id="L876">                throw ke;</span>
+<span class="nc" id="L877">            } catch (Exception e) {</span>
+<span class="nc" id="L878">                throw new UserException(e);</span>
+            } finally {
+<span class="nc" id="L880">                _broker.endOperation();</span>
+            }
+        }
+        finally {
+<span class="nc" id="L884">            unlock();</span>
+        }
+    }
+
+    private Object execute(int operation, Map params) {
+<span class="nc bnc" id="L889" title="All 2 branches missed.">        if (params == null)</span>
+<span class="nc" id="L890">            params = Collections.EMPTY_MAP;</span>
+
+<span class="nc" id="L892">        lock();</span>
+        try {
+<span class="nc" id="L894">            _broker.beginOperation(true);</span>
+            try {
+<span class="nc" id="L896">                assertNotSerialized();</span>
+<span class="nc" id="L897">                assertOpen();</span>
+<span class="nc" id="L898">                _broker.assertNontransactionalRead();</span>
+
+                // get executor
+<span class="nc" id="L901">                Compilation comp = compileForCompilation();</span>
+<span class="nc bnc" id="L902" title="All 2 branches missed.">                StoreQuery.Executor ex = (isInMemory(operation))</span>
+<span class="nc" id="L903">                    ? compileForInMemory(comp) : compileForDataStore(comp);</span>
+
+<span class="nc" id="L905">                assertParameters(_storeQuery, ex, params);</span>
+<span class="nc bnc" id="L906" title="All 2 branches missed.">                Object[] arr = (params.isEmpty()) ? StoreQuery.EMPTY_OBJECTS :</span>
+<span class="nc" id="L907">                    ex.toParameterArray(_storeQuery, params);</span>
+<span class="nc bnc" id="L908" title="All 2 branches missed.">                if (_log.isTraceEnabled())</span>
+<span class="nc" id="L909">                    logExecution(operation, params);</span>
+
+<span class="nc bnc" id="L911" title="All 2 branches missed.">                if (operation == OP_SELECT)</span>
+<span class="nc" id="L912">                    return execute(_storeQuery, ex, arr);</span>
+<span class="nc bnc" id="L913" title="All 2 branches missed.">                if (operation == OP_DELETE)</span>
+<span class="nc" id="L914">                    return delete(_storeQuery, ex, arr);</span>
+<span class="nc bnc" id="L915" title="All 2 branches missed.">                if (operation == OP_UPDATE)</span>
+<span class="nc" id="L916">                    return update(_storeQuery, ex, arr);</span>
+<span class="nc" id="L917">                throw new UnsupportedException();</span>
+<span class="nc" id="L918">            } catch (OpenJPAException ke) {</span>
+<span class="nc" id="L919">                throw ke;</span>
+<span class="nc" id="L920">            } catch (Exception e) {</span>
+<span class="nc" id="L921">                throw new UserException(_loc.get(&quot;query-execution-error&quot;,</span>
+                        _query), e);
+            } finally {
+<span class="nc" id="L924">                _broker.endOperation();</span>
+            }
+        }
+        finally {
+<span class="nc" id="L928">            unlock();</span>
+        }
+    }
+
+    @Override
+    public long deleteAll() {
+<span class="nc" id="L934">        return deleteAll((Object[]) null);</span>
+    }
+
+    @Override
+    public long deleteAll(Object[] params) {
+<span class="nc" id="L939">        return ((Number) execute(OP_DELETE, params)).longValue();</span>
+    }
+
+    @Override
+    public long deleteAll(Map params) {
+<span class="nc" id="L944">        return ((Number) execute(OP_DELETE, params)).longValue();</span>
+    }
+
+    @Override
+    public long updateAll() {
+<span class="nc" id="L949">        return updateAll((Object[]) null);</span>
+    }
+
+    @Override
+    public long updateAll(Object[] params) {
+<span class="nc" id="L954">        return ((Number) execute(OP_UPDATE, params)).longValue();</span>
+    }
+
+    @Override
+    public long updateAll(Map params) {
+<span class="nc" id="L959">        return ((Number) execute(OP_UPDATE, params)).longValue();</span>
+    }
+
+    /**
+     * Converts the values of given &lt;code&gt;params&lt;/code&gt; Map into an array in
+     * consultation of the &lt;code&gt;paramTypes&lt;/code&gt; Map.
+     *
+     * The indexing of the resultant array is significant for following
+     * interrelated but tacit assumptions:
+     * The values in the returned Object[] is consumed by {@link Parameter}
+     * expressions. Query parsing creates these Parameters and sets their
+     * key and index. The index set on the Parameter by the parser is the
+     * same index used to access the Object[] elements returned by this method.
+     *
+     * {@link JPQLExpressionBuilder} creates and populates parameters as
+     * follows:
+     * The parameter key is not the token encountered by the parser, but
+     * converted to Integer or String based on the context in which the token
+     * appeared.
+     * The index for positional (Integer) parameter is the value of the key
+     * minus 1.
+     * The index for named (String) parameter is the order in which the
+     * token appeared to parser during scanning.
+     *
+     *
+     * The first LinkedMap argument to this method is the result of parsing.
+     * This LinkedMap contains the parameter key and their expected
+     * (if determinable) value types. That it is a LinkedMap points to the
+     * fact that an ordering is implicit. The ordering of the keys in this Map
+     * is the same as the order in which parser encountered the parameter
+     * tokens.
+     *
+     * For example, parsing result of the following two JPQL queries
+     *   a) UPDATE CompUser e SET e.name= ?1, e.age = ?2 WHERE e.userid = ?3
+     *   b) UPDATE CompUser e SET e.name= :name, e.age = :age WHERE e.userid =
+     *          :id
+     * The parameter keys will appear in the order (3,2,1) or (:id, :name, :age)
+     * in the given LinkedMap because WHERE clause is parsed before SET clause.
+     * The corresponding Parameter Expressions created by the parser will have
+     * following key and index:
+     *    a) 1:0, 2:1, 3:2
+     *    b) name:1, age:2, id:0
+     *
+     * The purpose of this method is to produce an Object[] with an indexing
+     * scheme that matches the indexing of the Parameter Expression.
+     * The user map (the second argument) should produce the following Object[]
+     * in two above-mentioned cases
+     *   a) {1:&quot;Shannon&quot;,2:29,3:5032} --&gt; [&quot;Shannon&quot;, 29, 5032]
+     *   b) {&quot;name&quot;:&quot;Shannon&quot;, &quot;age&quot;:29, &quot;id&quot;:5032} --&gt; [5032, &quot;Shannon&quot;, 29]
+     *
+     */
+
+    /**
+     * Return whether we should execute this query in memory.
+     */
+    private boolean isInMemory(int operation) {
+        // if there are any dirty instances in the current trans that are
+        // involved in this query, we have to execute in memory or flush
+<span class="nc bnc" id="L1017" title="All 4 branches missed.">        boolean inMem = !_storeQuery.supportsDataStoreExecution()</span>
+            || _collection != null;
+<span class="nc bnc" id="L1019" title="All 6 branches missed.">        if (!inMem &amp;&amp; (!_ignoreChanges || operation != OP_SELECT)</span>
+<span class="nc bnc" id="L1020" title="All 4 branches missed.">            &amp;&amp; _broker.isActive() &amp;&amp; isAccessPathDirty()) {</span>
+<span class="nc" id="L1021">            int flush = _fc.getFlushBeforeQueries();</span>
+<span class="nc bnc" id="L1022" title="All 4 branches missed.">            if ((flush == FLUSH_TRUE</span>
+<span class="nc bnc" id="L1023" title="All 4 branches missed.">                || (flush == FLUSH_WITH_CONNECTION &amp;&amp; _broker.hasConnection())</span>
+                || operation != OP_SELECT
+<span class="nc bnc" id="L1025" title="All 2 branches missed.">                || !_storeQuery.supportsInMemoryExecution())</span>
+<span class="nc" id="L1026">                &amp;&amp; _broker.getConfiguration().supportedOptions().</span>
+<span class="nc bnc" id="L1027" title="All 2 branches missed.">                contains(OpenJPAConfiguration.OPTION_INC_FLUSH)) {</span>
+<span class="nc" id="L1028">                _broker.flush();</span>
+            } else {
+<span class="nc bnc" id="L1030" title="All 2 branches missed.">                if (_log.isInfoEnabled())</span>
+<span class="nc" id="L1031">                    _log.info(_loc.get(&quot;force-in-mem&quot;, _class));</span>
+<span class="nc" id="L1032">                inMem = true;</span>
+            }
+        }
+
+<span class="nc bnc" id="L1036" title="All 4 branches missed.">        if (inMem &amp;&amp; !_storeQuery.supportsInMemoryExecution())</span>
+<span class="nc" id="L1037">            throw new InvalidStateException(_loc.get(&quot;cant-exec-inmem&quot;,</span>
+                _language));
+<span class="nc" id="L1039">        return inMem;</span>
+    }
+
+    /**
+     * Execute the query using the given compilation, executor, and parameter
+     * values. All other execute methods delegate to this one or to
+     * {@link #execute(int, Map)} after validation and locking.
+     */
+    private Object execute(StoreQuery q, StoreQuery.Executor ex,
+        Object[] params)
+        throws Exception {
+        // if this is an impossible result range, return null / empty list
+<span class="nc" id="L1051">        StoreQuery.Range range = new StoreQuery.Range(_startIdx, _endIdx);</span>
+<span class="nc bnc" id="L1052" title="All 2 branches missed.">        if (!_rangeSet)</span>
+<span class="nc" id="L1053">            ex.getRange(q, params, range);</span>
+<span class="nc bnc" id="L1054" title="All 2 branches missed.">        if (range.start &gt;= range.end)</span>
+<span class="nc" id="L1055">            return emptyResult(q, ex);</span>
+
+        // execute; if we have a result class or we have only one result
+        // and so need to remove it from its array, wrap in a packing rop
+<span class="nc" id="L1059">        range.lrs = isLRS(range.start, range.end);</span>
+<span class="nc" id="L1060">        ResultObjectProvider rop = ex.executeQuery(q, params, range);</span>
+        try {
+<span class="nc" id="L1062">            return toResult(q, ex, rop, range);</span>
+<span class="nc" id="L1063">        } catch (Exception e) {</span>
+<span class="nc bnc" id="L1064" title="All 2 branches missed.">            if (rop != null)</span>
+<span class="nc" id="L1065">                try { rop.close(); } catch (Exception e2) {}</span>
+<span class="nc" id="L1066">            throw e;</span>
+        }
+    }
+
+    /**
+     * Delete the query using the given executor, and parameter
+     * values. All other execute methods delegate to this one or to
+     * {@link #delete(StoreQuery, StoreQuery.Executor, Object[])} after validation and locking.
+     * The return value will be a Number indicating the number of
+     * instances deleted.
+     */
+    private Number delete(StoreQuery q, StoreQuery.Executor ex, Object[] params)
+        throws Exception {
+<span class="nc" id="L1079">        assertBulkModify(q, ex, params);</span>
+<span class="nc" id="L1080">        return ex.executeDelete(q, params);</span>
+    }
+
+    @Override
+    public Number deleteInMemory(StoreQuery q, StoreQuery.Executor executor,
+        Object[] params) {
+        try {
+<span class="nc" id="L1087">            Object o = execute(q, executor, params);</span>
+<span class="nc bnc" id="L1088" title="All 2 branches missed.">            if (!(o instanceof Collection))</span>
+<span class="nc" id="L1089">                o = Collections.singleton(o);</span>
+
+<span class="nc" id="L1091">            int size = 0;</span>
+<span class="nc bnc" id="L1092" title="All 2 branches missed.">            for (Iterator i = ((Collection) o).iterator(); i.hasNext(); size++)</span>
+<span class="nc" id="L1093">                _broker.delete(i.next(), null);</span>
+<span class="nc" id="L1094">            return size;</span>
+<span class="nc" id="L1095">        } catch (OpenJPAException ke) {</span>
+<span class="nc" id="L1096">            throw ke;</span>
+<span class="nc" id="L1097">        } catch (Exception e) {</span>
+<span class="nc" id="L1098">            throw new UserException(e);</span>
+        }
+    }
+
+    /**
+     * Update the query using the given compilation, executor, and parameter
+     * values. All other execute methods delegate to this one or to
+     * {@link #update(StoreQuery, StoreQuery.Executor, Object[])} after validation and locking.
+     * The return value will be a Number indicating the number of
+     * instances updated.
+     */
+    private Number update(StoreQuery q, StoreQuery.Executor ex, Object[] params)
+        throws Exception {
+<span class="nc" id="L1111">        assertBulkModify(q, ex, params);</span>
+<span class="nc" id="L1112">        return ex.executeUpdate(q, params);</span>
+    }
+
+    @Override
+    public Number updateInMemory(StoreQuery q, StoreQuery.Executor executor,
+        Object[] params) {
+        try {
+<span class="nc" id="L1119">            Object o = execute(q, executor, params);</span>
+<span class="nc bnc" id="L1120" title="All 2 branches missed.">            if (!(o instanceof Collection))</span>
+<span class="nc" id="L1121">                o = Collections.singleton(o);</span>
+
+<span class="nc" id="L1123">            int size = 0;</span>
+<span class="nc bnc" id="L1124" title="All 2 branches missed.">            for (Iterator i = ((Collection) o).iterator(); i.hasNext(); size++)</span>
+<span class="nc" id="L1125">                updateInMemory(i.next(), params, q);</span>
+<span class="nc" id="L1126">            return size;</span>
+<span class="nc" id="L1127">        } catch (OpenJPAException ke) {</span>
+<span class="nc" id="L1128">            throw ke;</span>
+<span class="nc" id="L1129">        } catch (Exception e) {</span>
+<span class="nc" id="L1130">            throw new UserException(e);</span>
+        }
+    }
+
+    /**
+     * Set the values for the updates in memory.
+     *
+     * @param ob the persistent instance to change
+     * @param params the parameters passed to the query
+     */
+    private void updateInMemory(Object ob, Object[] params, StoreQuery q) {
+<span class="nc" id="L1141">        for (Iterator it = getUpdates().entrySet().iterator();</span>
+<span class="nc bnc" id="L1142" title="All 2 branches missed.">            it.hasNext();) {</span>
+<span class="nc" id="L1143">            Map.Entry e = (Map.Entry) it.next();</span>
+<span class="nc" id="L1144">            Path path = (Path) e.getKey();</span>
+<span class="nc" id="L1145">            FieldMetaData fmd = path.last();</span>
+<span class="nc" id="L1146">            OpenJPAStateManager sm = _broker.getStateManager(ob);</span>
+
+            Object val;
+<span class="nc" id="L1149">            Object value = e.getValue();</span>
+<span class="nc bnc" id="L1150" title="All 2 branches missed.">            if (value instanceof Val) {</span>
+<span class="nc" id="L1151">                val = ((Val) value).</span>
+<span class="nc" id="L1152">                    evaluate(ob, null, getStoreContext(), params);</span>
+<span class="nc bnc" id="L1153" title="All 2 branches missed.">            } else if (value instanceof Literal) {</span>
+<span class="nc" id="L1154">                val = ((Literal) value).getValue();</span>
+<span class="nc bnc" id="L1155" title="All 2 branches missed.">            } else if (value instanceof Constant) {</span>
+<span class="nc" id="L1156">                val = ((Constant) value).getValue(params);</span>
+            } else {
+                try {
+<span class="nc" id="L1159">                    val = q.evaluate(value, ob, params, sm);</span>
+<span class="nc" id="L1160">                } catch (UnsupportedException e1) {</span>
+<span class="nc" id="L1161">                    throw new UserException(</span>
+<span class="nc" id="L1162">                            _loc.get(&quot;fail-to-get-update-value&quot;));</span>
+<span class="nc" id="L1163">                }</span>
+            }
+
+<span class="nc" id="L1166">            int i = fmd.getIndex();</span>
+<span class="nc" id="L1167">            PersistenceCapable into = ImplHelper.toPersistenceCapable(ob,</span>
+<span class="nc" id="L1168">                _broker.getConfiguration());</span>
+
+            // set the actual field in the instance
+<span class="nc" id="L1171">            int set = OpenJPAStateManager.SET_USER;</span>
+<span class="nc bnc" id="L1172" title="All 11 branches missed.">            switch (fmd.getDeclaredTypeCode()) {</span>
+                case JavaTypes.BOOLEAN:
+<span class="nc" id="L1174">                    sm.settingBooleanField(into, i, sm.fetchBooleanField(i),</span>
+<span class="nc bnc" id="L1175" title="All 2 branches missed.">                        val == null ? false : ((Boolean) val).booleanValue(),</span>
+                        set);
+<span class="nc" id="L1177">                    break;</span>
+                case JavaTypes.BYTE:
+<span class="nc" id="L1179">                    sm.settingByteField(into, i, sm.fetchByteField(i),</span>
+<span class="nc bnc" id="L1180" title="All 2 branches missed.">                        val == null ? 0 : ((Number) val).byteValue(), set);</span>
+<span class="nc" id="L1181">                    break;</span>
+                case JavaTypes.CHAR:
+<span class="nc" id="L1183">                    sm.settingCharField(into, i, sm.fetchCharField(i),</span>
+<span class="nc bnc" id="L1184" title="All 2 branches missed.">                        val == null ? 0 : val.toString().charAt(0), set);</span>
+<span class="nc" id="L1185">                    break;</span>
+                case JavaTypes.DOUBLE:
+<span class="nc" id="L1187">                    sm.settingDoubleField(into, i, sm.fetchDoubleField(i),</span>
+<span class="nc bnc" id="L1188" title="All 2 branches missed.">                        val == null ? 0 : ((Number) val).doubleValue(), set);</span>
+<span class="nc" id="L1189">                    break;</span>
+                case JavaTypes.FLOAT:
+<span class="nc" id="L1191">                    sm.settingFloatField(into, i, sm.fetchFloatField(i),</span>
+<span class="nc bnc" id="L1192" title="All 2 branches missed.">                        val == null ? 0 : ((Number) val).floatValue(), set);</span>
+<span class="nc" id="L1193">                    break;</span>
+                case JavaTypes.INT:
+<span class="nc" id="L1195">                    sm.settingIntField(into, i, sm.fetchIntField(i),</span>
+<span class="nc bnc" id="L1196" title="All 2 branches missed.">                        val == null ? 0 : ((Number) val).intValue(), set);</span>
+<span class="nc" id="L1197">                    break;</span>
+                case JavaTypes.LONG:
+<span class="nc" id="L1199">                    sm.settingLongField(into, i, sm.fetchLongField(i),</span>
+<span class="nc bnc" id="L1200" title="All 2 branches missed.">                        val == null ? 0 : ((Number) val).longValue(), set);</span>
+<span class="nc" id="L1201">                    break;</span>
+                case JavaTypes.SHORT:
+<span class="nc" id="L1203">                    sm.settingShortField(into, i, sm.fetchShortField(i),</span>
+<span class="nc bnc" id="L1204" title="All 2 branches missed.">                        val == null ? 0 : ((Number) val).shortValue(), set);</span>
+<span class="nc" id="L1205">                    break;</span>
+                case JavaTypes.STRING:
+<span class="nc" id="L1207">                    sm.settingStringField(into, i, sm.fetchStringField(i),</span>
+<span class="nc bnc" id="L1208" title="All 2 branches missed.">                        val == null ? null : val.toString(), set);</span>
+<span class="nc" id="L1209">                    break;</span>
+                case JavaTypes.DATE:
+                case JavaTypes.NUMBER:
+                case JavaTypes.BOOLEAN_OBJ:
+                case JavaTypes.BYTE_OBJ:
+                case JavaTypes.CHAR_OBJ:
+                case JavaTypes.DOUBLE_OBJ:
+                case JavaTypes.FLOAT_OBJ:
+                case JavaTypes.INT_OBJ:
+                case JavaTypes.LONG_OBJ:
+                case JavaTypes.SHORT_OBJ:
+                case JavaTypes.BIGDECIMAL:
+                case JavaTypes.BIGINTEGER:
+                case JavaTypes.LOCALE:
+                case JavaTypes.OBJECT:
+                case JavaTypes.OID:
+                case JavaTypes.ENUM:
+<span class="nc" id="L1226">                    sm.settingObjectField(into, i, sm.fetchObjectField(i), val,</span>
+                        set);
+<span class="nc" id="L1228">                    break;</span>
+                default:
+<span class="nc" id="L1230">                    throw new UserException(_loc.get(&quot;only-update-primitives&quot;));</span>
+            }
+<span class="nc" id="L1232">        }</span>
+<span class="nc" id="L1233">    }</span>
+
+    /**
+     * Trace log that the query is executing.
+     */
+    private void logExecution(int op, OrderedMap&lt;Object, Class&lt;?&gt;&gt; types, Object[] params) {
+<span class="nc" id="L1239">        OrderedMap&lt;Object, Object&gt; pmap = new OrderedMap&lt;&gt;();</span>
+<span class="nc bnc" id="L1240" title="All 2 branches missed.">        if (params.length &gt; 0) {</span>
+<span class="nc bnc" id="L1241" title="All 4 branches missed.">            if (types != null &amp;&amp; types.size() == params.length) {</span>
+<span class="nc" id="L1242">                int i = 0;</span>
+<span class="nc bnc" id="L1243" title="All 2 branches missed.">                for (Iterator&lt;Object&gt; itr = types.keySet().iterator(); itr.hasNext();)</span>
+<span class="nc" id="L1244">                    pmap.put(itr.next(), params[i++]);</span>
+<span class="nc" id="L1245">            } else {</span>
+<span class="nc bnc" id="L1246" title="All 2 branches missed.">                for (int i = 0; i &lt; params.length; i++)</span>
+<span class="nc" id="L1247">                    pmap.put(String.valueOf(i), params[i]);</span>
+            }
+        }
+<span class="nc" id="L1250">        logExecution(op, pmap);</span>
+<span class="nc" id="L1251">    }</span>
+
+    /**
+     * Trace log that the query is executing.
+     */
+    private void logExecution(int op, Map&lt;Object, Object&gt; params) {
+<span class="nc" id="L1257">        String s = _query;</span>
+<span class="nc bnc" id="L1258" title="All 2 branches missed.">        if (StringUtil.isEmpty(s))</span>
+<span class="nc" id="L1259">            s = toString();</span>
+
+<span class="nc" id="L1261">        String msg = &quot;executing-query&quot;;</span>
+<span class="nc bnc" id="L1262" title="All 2 branches missed.">        if (params.isEmpty() == false) {</span>
+<span class="nc" id="L1263">            msg = &quot;executing-query-with-params&quot;;</span>
+        }
+
+        // If we aren't supposed to print parameters, replace values with '?'
+<span class="nc bnc" id="L1267" title="All 2 branches missed.">        Object p = (_printParameters) ? params : &quot;?&quot;;</span>
+<span class="nc" id="L1268">        _log.trace(_loc.get(msg, s, p));</span>
+<span class="nc" id="L1269">    }</span>
+
+    /**
+     * Return whether this should be treated as a potential large result set.
+     */
+    private boolean isLRS(long start, long end) {
+<span class="nc" id="L1275">        long range = end - start;</span>
+<span class="nc bnc" id="L1276" title="All 2 branches missed.">        return _fc.getFetchBatchSize() &gt;= 0</span>
+<span class="nc bnc" id="L1277" title="All 2 branches missed.">            &amp;&amp; !(range &lt;= _fc.getFetchBatchSize()</span>
+<span class="nc bnc" id="L1278" title="All 4 branches missed.">            || (_fc.getFetchBatchSize() == 0 &amp;&amp; range &lt;= 50));</span>
+    }
+
+    /**
+     * Return the query result for the given result object provider.
+     */
+    protected Object toResult(StoreQuery q, StoreQuery.Executor ex,
+        ResultObjectProvider rop, StoreQuery.Range range)
+        throws Exception {
+<span class="nc bnc" id="L1287" title="All 2 branches missed.">        if (rop instanceof BatchedResultObjectProvider) {</span>
+<span class="nc" id="L1288">            return new QueryResultCallback(this, q, ex, (BatchedResultObjectProvider) rop, range);</span>
+        }
+        // pack projections if necessary
+<span class="nc" id="L1291">        String[] aliases = ex.getProjectionAliases(q);</span>
+<span class="nc bnc" id="L1292" title="All 2 branches missed.">        if (!ex.isPacking(q)) {</span>
+<span class="nc" id="L1293">            ResultPacker packer = getResultPacker(q, ex);</span>
+<span class="nc bnc" id="L1294" title="All 4 branches missed.">            if (packer != null || aliases.length == 1)</span>
+<span class="nc" id="L1295">                rop = new PackingResultObjectProvider(rop, packer,</span>
+                    aliases.length);
+        }
+
+        // if single result, extract it
+<span class="nc bnc" id="L1300" title="All 4 branches missed.">        if (_unique == Boolean.TRUE || (aliases.length &gt; 0</span>
+<span class="nc bnc" id="L1301" title="All 4 branches missed.">            &amp;&amp; !ex.hasGrouping(q) &amp;&amp; ex.isAggregate(q)))</span>
+<span class="nc" id="L1302">            return singleResult(rop, range);</span>
+
+        // now that we've executed the query, we can call isAggregate and
+        // hasGrouping efficiently
+<span class="nc bnc" id="L1306" title="All 2 branches missed.">        boolean detach = (_broker.getAutoDetach() &amp;</span>
+<span class="nc bnc" id="L1307" title="All 2 branches missed.">            AutoDetach.DETACH_NONTXREAD) &gt; 0 &amp;&amp; !_broker.isActive();</span>
+<span class="nc bnc" id="L1308" title="All 6 branches missed.">        boolean lrs = range.lrs &amp;&amp; !ex.isAggregate(q) &amp;&amp; !ex.hasGrouping(q);</span>
+        ResultList&lt;?&gt; res;
+        try {
+<span class="nc bnc" id="L1311" title="All 4 branches missed.">            res = (!detach &amp;&amp; lrs) ? _fc.newResultList(rop) : new EagerResultList(rop);</span>
+<span class="nc" id="L1312">            res.setUserObject(new Object[]{rop,ex});</span>
+<span class="nc" id="L1313">            _resultLists.add(decorateResultList(res));</span>
+<span class="nc" id="L1314">        } catch (OpenJPAException e) {</span>
+<span class="nc bnc" id="L1315" title="All 2 branches missed.">            if (e.getFailedObject() == null) {</span>
+<span class="nc" id="L1316">                e.setFailedObject(getQueryString());</span>
+            }
+<span class="nc" id="L1318">            throw e;</span>
+<span class="nc" id="L1319">        }</span>
+<span class="nc" id="L1320">        return res;</span>
+    }
+
+    /**
+     * Optionally decorate the native result.
+     */
+    protected RemoveOnCloseResultList decorateResultList(ResultList&lt;?&gt; res) {
+<span class="nc" id="L1327">        return new RemoveOnCloseResultList(res);</span>
+    }
+
+    /**
+     * Return a result packer for this projection, or null.
+     */
+    private ResultPacker getResultPacker(StoreQuery q, StoreQuery.Executor ex) {
+<span class="nc bnc" id="L1334" title="All 2 branches missed.">        if (_packer != null)</span>
+<span class="nc" id="L1335">            return _packer;</span>
+
+<span class="nc bnc" id="L1337" title="All 2 branches missed.">        Class&lt;?&gt; resultClass = (_resultClass != null) ? _resultClass</span>
+<span class="nc" id="L1338">            : ex.getResultClass(q);</span>
+<span class="nc bnc" id="L1339" title="All 2 branches missed.">        if (resultClass == null)</span>
+<span class="nc" id="L1340">            return null;</span>
+
+<span class="nc" id="L1342">        String[] aliases = ex.getProjectionAliases(q);</span>
+<span class="nc" id="L1343">        ResultShape&lt;?&gt; shape = ex.getResultShape(q);</span>
+<span class="nc bnc" id="L1344" title="All 2 branches missed.">        if (shape != null) { // using JPA2.0 style result shape for packing</span>
+<span class="nc bnc" id="L1345" title="All 2 branches missed.">            if (aliases.length == 0) {</span>
+<span class="nc" id="L1346">                _packer = new ResultShapePacker(new Class[]{_class}, new String[]{&quot;&quot;}, resultClass, shape);</span>
+            } else {
+<span class="nc" id="L1348">                _packer = new ResultShapePacker(ex.getProjectionTypes(q), aliases, resultClass, shape);</span>
+            }
+        } else {
+<span class="nc bnc" id="L1351" title="All 2 branches missed.">            if (aliases.length == 0) {</span>
+                // result class but no result; means candidate is being set
+                // into some result class
+<span class="nc" id="L1354">                _packer = new ResultPacker(_class, getAlias(), resultClass);</span>
+<span class="nc bnc" id="L1355" title="All 2 branches missed.">            } else if (resultClass != null) { // projection</span>
+<span class="nc" id="L1356">                Class&lt;?&gt;[] types = ex.getProjectionTypes(q);</span>
+<span class="nc" id="L1357">                _packer = new ResultPacker(types, aliases, resultClass);</span>
+            }
+        }
+<span class="nc" id="L1360">        return _packer;</span>
+    }
+
+    /**
+     * Create an empty result for this query.
+     */
+    private Object emptyResult(StoreQuery q, StoreQuery.Executor ex) {
+<span class="nc bnc" id="L1367" title="All 4 branches missed.">        if (_unique == Boolean.TRUE || (_unique == null</span>
+<span class="nc bnc" id="L1368" title="All 4 branches missed.">            &amp;&amp; !ex.hasGrouping(q) &amp;&amp; ex.isAggregate(q)))</span>
+<span class="nc" id="L1369">            return null;</span>
+<span class="nc" id="L1370">        return Collections.EMPTY_LIST;</span>
+    }
+
+    /**
+     * Extract an expected single result from the given provider. Used when
+     * the result is an ungrouped aggregate or the unique flag is set to true.
+     */
+    private Object singleResult(ResultObjectProvider rop,
+        StoreQuery.Range range)
+        throws Exception {
+<span class="nc" id="L1380">        rop.open();</span>
+        try {
+            // move to expected result
+<span class="nc" id="L1383">            boolean next = rop.next();</span>
+
+            // extract single result; throw an exception if multiple results
+            // match and not constrainted by range, or if a unique query with
+            // no results
+<span class="nc" id="L1388">            Object single = null;</span>
+<span class="nc bnc" id="L1389" title="All 2 branches missed.">            if (next) {</span>
+<span class="nc" id="L1390">                single = rop.getResultObject();</span>
+<span class="nc bnc" id="L1391" title="All 4 branches missed.">                if (range.end != range.start + 1 &amp;&amp; rop.next())</span>
+<span class="nc" id="L1392">                    throw new NonUniqueResultException(_loc.get(&quot;not-unique&quot;,</span>
+                        _class, _query));
+<span class="nc bnc" id="L1394" title="All 2 branches missed.">            } else if (_unique == Boolean.TRUE)</span>
+<span class="nc" id="L1395">                throw new NoResultException(_loc.get(&quot;no-result&quot;,</span>
+                    _class, _query));
+
+            // if unique set to false, use collection
+<span class="nc bnc" id="L1399" title="All 2 branches missed.">            if (_unique == Boolean.FALSE) {</span>
+<span class="nc bnc" id="L1400" title="All 2 branches missed.">                if (!next)</span>
+<span class="nc" id="L1401">                    return Collections.EMPTY_LIST;</span>
+                // Collections.singletonList is JDK 1.3, so...
+<span class="nc" id="L1403">                return Arrays.asList(new Object[]{ single });</span>
+            }
+
+            // return single result
+<span class="nc" id="L1407">            return single;</span>
+        } finally {
+<span class="nc" id="L1409">            rop.close();</span>
+        }
+    }
+
+    /**
+     * Calculates whether the access path of this query intersects with
+     * any dirty objects in the transaction.
+     */
+    private boolean isAccessPathDirty() {
+<span class="nc" id="L1418">        return isAccessPathDirty(_broker, getAccessPathMetaDatas());</span>
+    }
+
+    public static boolean isAccessPathDirty(Broker broker,
+        ClassMetaData[] accessMetas) {
+<span class="nc" id="L1423">        Collection&lt;Class&lt;?&gt;&gt; persisted = broker.getPersistedTypes();</span>
+<span class="nc" id="L1424">        Collection&lt;Class&lt;?&gt;&gt; updated = broker.getUpdatedTypes();</span>
+<span class="nc" id="L1425">        Collection&lt;Class&lt;?&gt;&gt; deleted = broker.getDeletedTypes();</span>
+<span class="nc bnc" id="L1426" title="All 6 branches missed.">        if (persisted.isEmpty() &amp;&amp; updated.isEmpty() &amp;&amp; deleted.isEmpty())</span>
+<span class="nc" id="L1427">            return false;</span>
+
+        // if no access metas, assume every dirty object affects path just
+        // to be safe
+<span class="nc bnc" id="L1431" title="All 2 branches missed.">        if (accessMetas.length == 0)</span>
+<span class="nc" id="L1432">            return true;</span>
+
+        // compare dirty classes to the access path classes
+        Class&lt;?&gt; accClass;
+<span class="nc bnc" id="L1436" title="All 2 branches missed.">        for (int i = 0; i &lt; accessMetas.length; i++) {</span>
+<span class="nc bnc" id="L1437" title="All 2 branches missed.">            if (accessMetas[i] == null)</span>
+<span class="nc" id="L1438">                continue;</span>
+            // shortcut if actual class is dirty
+<span class="nc" id="L1440">            accClass = accessMetas[i].getDescribedType();</span>
+<span class="nc bnc" id="L1441" title="All 4 branches missed.">            if (persisted.contains(accClass) || updated.contains(accClass)</span>
+<span class="nc bnc" id="L1442" title="All 2 branches missed.">                || deleted.contains(accClass))</span>
+<span class="nc" id="L1443">                return true;</span>
+
+            // check for dirty subclass
+<span class="nc bnc" id="L1446" title="All 2 branches missed.">            for (Iterator&lt;Class&lt;?&gt;&gt; dirty = persisted.iterator(); dirty.hasNext();)</span>
+<span class="nc bnc" id="L1447" title="All 2 branches missed.">                if (accClass.isAssignableFrom(dirty.next()))</span>
+<span class="nc" id="L1448">                    return true;</span>
+<span class="nc bnc" id="L1449" title="All 2 branches missed.">            for (Iterator&lt;Class&lt;?&gt;&gt; dirty = updated.iterator(); dirty.hasNext();)</span>
+<span class="nc bnc" id="L1450" title="All 2 branches missed.">                if (accClass.isAssignableFrom(dirty.next()))</span>
+<span class="nc" id="L1451">                    return true;</span>
+<span class="nc bnc" id="L1452" title="All 2 branches missed.">            for (Iterator&lt;Class&lt;?&gt;&gt; dirty = deleted.iterator(); dirty.hasNext();)</span>
+<span class="nc bnc" id="L1453" title="All 2 branches missed.">                if (accClass.isAssignableFrom(dirty.next()))</span>
+<span class="nc" id="L1454">                    return true;</span>
+        }
+
+        // no intersection
+<span class="nc" id="L1458">        return false;</span>
+    }
+
+    @Override
+    public void closeAll() {
+<span class="nc" id="L1463">        closeResults(true);</span>
+<span class="nc" id="L1464">    }</span>
+
+    @Override
+    public void closeResources() {
+<span class="nc" id="L1468">        closeResults(false);</span>
+<span class="nc" id="L1469">    }</span>
+
+    /**
+     * Close open results.
+     */
+    private void closeResults(boolean force) {
+<span class="nc" id="L1475">        lock();</span>
+        try {
+<span class="nc" id="L1477">            assertOpen();</span>
+
+            RemoveOnCloseResultList res;
+<span class="nc bnc" id="L1480" title="All 2 branches missed.">            for (Iterator&lt;RemoveOnCloseResultList&gt; itr = _resultLists.iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L1481">                res = itr.next();</span>
+<span class="nc bnc" id="L1482" title="All 4 branches missed.">                if (force || res.isProviderOpen())</span>
+<span class="nc" id="L1483">                    res.close(false);</span>
+            }
+<span class="nc" id="L1485">            _resultLists.clear();</span>
+        } finally {
+<span class="nc" id="L1487">            unlock();</span>
+        }
+<span class="nc" id="L1489">    }</span>
+
+    @Override
+    public String[] getDataStoreActions(Map params) {
+<span class="nc bnc" id="L1493" title="All 2 branches missed.">        if (params == null)</span>
+<span class="nc" id="L1494">            params = Collections.EMPTY_MAP;</span>
+
+<span class="nc" id="L1496">        lock();</span>
+        try {
+<span class="nc" id="L1498">            assertNotSerialized();</span>
+<span class="nc" id="L1499">            assertOpen();</span>
+
+<span class="nc" id="L1501">            StoreQuery.Executor ex = compileForExecutor();</span>
+<span class="nc" id="L1502">            assertParameters(_storeQuery, ex, params);</span>
+<span class="nc" id="L1503">            Object[] arr = ex.toParameterArray(_storeQuery, params);</span>
+<span class="nc" id="L1504">            StoreQuery.Range range = new StoreQuery.Range(_startIdx, _endIdx);</span>
+<span class="nc bnc" id="L1505" title="All 2 branches missed.">            if (!_rangeSet)</span>
+<span class="nc" id="L1506">                ex.getRange(_storeQuery, arr, range);</span>
+<span class="nc" id="L1507">            return ex.getDataStoreActions(_storeQuery, arr, range);</span>
+<span class="nc" id="L1508">        } catch (OpenJPAException ke) {</span>
+<span class="nc" id="L1509">            throw ke;</span>
+<span class="nc" id="L1510">        } catch (Exception e) {</span>
+<span class="nc" id="L1511">            throw new UserException(e);</span>
+        } finally {
+<span class="nc" id="L1513">            unlock();</span>
+        }
+    }
+
+    @Override
+    public boolean setQuery(Object query) {
+<span class="nc" id="L1519">        lock();</span>
+        try {
+<span class="nc" id="L1521">            assertOpen();</span>
+<span class="nc" id="L1522">            assertNotReadOnly();</span>
+
+<span class="nc bnc" id="L1524" title="All 4 branches missed.">            if (query == null || query instanceof String) {</span>
+<span class="nc" id="L1525">                invalidateCompilation();</span>
+<span class="nc" id="L1526">                _query = (String) query;</span>
+<span class="nc bnc" id="L1527" title="All 2 branches missed.">                if (_query != null)</span>
+<span class="nc" id="L1528">                    _query = _query.trim();</span>
+<span class="nc" id="L1529">                return true;</span>
+            }
+<span class="nc bnc" id="L1531" title="All 2 branches missed.">            if (!(query instanceof QueryImpl))</span>
+<span class="nc" id="L1532">                return _storeQuery.setQuery(query);</span>
+
+            // copy all non-transient state from the given query
+<span class="nc" id="L1535">            invalidateCompilation();</span>
+<span class="nc" id="L1536">            QueryImpl q = (QueryImpl) query;</span>
+<span class="nc" id="L1537">            _class = q._class;</span>
+<span class="nc" id="L1538">            _subclasses = q._subclasses;</span>
+<span class="nc" id="L1539">            _query = q._query;</span>
+<span class="nc" id="L1540">            _ignoreChanges = q._ignoreChanges;</span>
+<span class="nc" id="L1541">            _unique = q._unique;</span>
+<span class="nc" id="L1542">            _resultClass = q._resultClass;</span>
+<span class="nc" id="L1543">            _params = q._params;</span>
+<span class="nc" id="L1544">            _resultMappingScope = q._resultMappingScope;</span>
+<span class="nc" id="L1545">            _resultMappingName = q._resultMappingName;</span>
+<span class="nc" id="L1546">            _readOnly = q._readOnly;</span>
+
+            // don't share mutable objects
+<span class="nc" id="L1549">            _fc.copy(q._fc);</span>
+<span class="nc bnc" id="L1550" title="All 2 branches missed.">            if (q._filtListeners != null)</span>
+<span class="nc" id="L1551">                _filtListeners = new HashMap&lt;&gt;(q._filtListeners);</span>
+<span class="nc bnc" id="L1552" title="All 2 branches missed.">            if (q._aggListeners != null)</span>
+<span class="nc" id="L1553">                _aggListeners = new HashMap&lt;&gt;(q._aggListeners);</span>
+<span class="nc" id="L1554">            return true;</span>
+        } finally {
+<span class="nc" id="L1556">            unlock();</span>
+        }
+    }
+
+    @Override
+    public String getAlias() {
+<span class="nc" id="L1562">        lock();</span>
+        try {
+<span class="nc" id="L1564">            String alias = compileForExecutor().getAlias(_storeQuery);</span>
+<span class="nc bnc" id="L1565" title="All 2 branches missed.">            if (alias == null)</span>
+<span class="nc" id="L1566">                alias = ClassUtil.getClassName(_class);</span>
+<span class="nc" id="L1567">            return alias;</span>
+        } finally {
+<span class="nc" id="L1569">            unlock();</span>
+        }
+    }
+
+    @Override
+    public String[] getProjectionAliases() {
+<span class="nc" id="L1575">        lock();</span>
+        try {
+<span class="nc" id="L1577">            return compileForExecutor().getProjectionAliases(_storeQuery);</span>
+        } finally {
+<span class="nc" id="L1579">            unlock();</span>
+        }
+    }
+
+    @Override
+    public Class&lt;?&gt;[] getProjectionTypes() {
+<span class="nc" id="L1585">        lock();</span>
+        try {
+<span class="nc" id="L1587">            return compileForExecutor().getProjectionTypes(_storeQuery);</span>
+        } finally {
+<span class="nc" id="L1589">            unlock();</span>
+        }
+    }
+
+    @Override
+    public int getOperation() {
+<span class="nc" id="L1595">        lock();</span>
+        try {
+<span class="nc" id="L1597">            return compileForExecutor().getOperation(_storeQuery);</span>
+        } finally {
+<span class="nc" id="L1599">            unlock();</span>
+        }
+    }
+
+    @Override
+    public boolean isAggregate() {
+<span class="nc" id="L1605">        lock();</span>
+        try {
+<span class="nc" id="L1607">            return compileForExecutor().isAggregate(_storeQuery);</span>
+        } finally {
+<span class="nc" id="L1609">            unlock();</span>
+        }
+    }
+
+    @Override
+    public boolean isDistinct() {
+<span class="nc" id="L1615">        lock();</span>
+        try {
+<span class="nc" id="L1617">            return compileForExecutor().isDistinct(_storeQuery);</span>
+        } finally {
+<span class="nc" id="L1619">            unlock();</span>
+        }
+    }
+
+
+    @Override
+    public boolean hasGrouping() {
+<span class="nc" id="L1626">        lock();</span>
+        try {
+<span class="nc" id="L1628">            return compileForExecutor().hasGrouping(_storeQuery);</span>
+        } finally {
+<span class="nc" id="L1630">            unlock();</span>
+        }
+    }
+
+    @Override
+    public ClassMetaData[] getAccessPathMetaDatas() {
+<span class="nc" id="L1636">        lock();</span>
+        try {
+<span class="nc" id="L1638">            ClassMetaData[] metas = compileForExecutor().</span>
+<span class="nc" id="L1639">                getAccessPathMetaDatas(_storeQuery);</span>
+<span class="nc bnc" id="L1640" title="All 2 branches missed.">            return (metas == null) ? StoreQuery.EMPTY_METAS : metas;</span>
+        } finally {
+<span class="nc" id="L1642">            unlock();</span>
+        }
+    }
+
+    @Override
+    public OrderedMap&lt;Object,Class&lt;?&gt;&gt; getOrderedParameterTypes() {
+<span class="nc" id="L1648">        lock();</span>
+        try {
+<span class="nc" id="L1650">            return compileForExecutor().getOrderedParameterTypes(_storeQuery);</span>
+        } finally {
+<span class="nc" id="L1652">            unlock();</span>
+        }
+    }
+
+    @Override
+    public LinkedMap getParameterTypes() {
+<span class="nc" id="L1658">        lock();</span>
+        try {
+<span class="nc" id="L1660">            LinkedMap wrap = new LinkedMap();</span>
+<span class="nc" id="L1661">            wrap.putAll(compileForExecutor().getOrderedParameterTypes(_storeQuery));</span>
+<span class="nc" id="L1662">            return wrap;</span>
+        } finally {
+<span class="nc" id="L1664">            unlock();</span>
+        }
+    }
+
+
+    @Override
+    public Map getUpdates() {
+<span class="nc" id="L1671">        lock();</span>
+        try {
+<span class="nc" id="L1673">            return compileForExecutor().getUpdates(_storeQuery);</span>
+        } finally {
+<span class="nc" id="L1675">            unlock();</span>
+        }
+    }
+
+    @Override
+    public void lock() {
+<span class="nc bnc" id="L1681" title="All 2 branches missed.">        if (_lock != null)</span>
+<span class="nc" id="L1682">            _lock.lock();</span>
+<span class="nc" id="L1683">    }</span>
+
+    @Override
+    public void unlock() {
+<span class="nc bnc" id="L1687" title="All 2 branches missed.">        if (_lock != null)</span>
+<span class="nc" id="L1688">            _lock.unlock();</span>
+<span class="nc" id="L1689">    }</span>
+
+    public synchronized void startLocking() {
+<span class="nc bnc" id="L1692" title="All 2 branches missed.">    	if (_lock == null) {</span>
+<span class="nc" id="L1693">    		_lock = new ReentrantLock();</span>
+    	}
+<span class="nc" id="L1695">    }</span>
+
+    public synchronized void stopLocking() {
+<span class="nc bnc" id="L1698" title="All 4 branches missed.">    	if (_lock != null &amp;&amp; !_broker.getMultithreaded())</span>
+<span class="nc" id="L1699">    		_lock = null;</span>
+<span class="nc" id="L1700">    }</span>
+
+
+
+    /////////
+    // Utils
+    /////////
+
+    @Override
+    public Class classForName(String name, String[] imports) {
+        // full class name or primitive type?
+<span class="nc" id="L1711">        Class type = toClass(name);</span>
+<span class="nc bnc" id="L1712" title="All 2 branches missed.">        if (type != null)</span>
+<span class="nc" id="L1713">            return type;</span>
+
+        // first check the aliases map in the MetaDataRepository
+<span class="nc bnc" id="L1716" title="All 2 branches missed.">        ClassLoader loader = (_class == null) ? _loader</span>
+<span class="nc" id="L1717">            : AccessController.doPrivileged(</span>
+<span class="nc" id="L1718">                J2DoPrivHelper.getClassLoaderAction(_class));</span>
+<span class="nc" id="L1719">        ClassMetaData meta = _broker.getConfiguration().</span>
+<span class="nc" id="L1720">            getMetaDataRepositoryInstance().getMetaData(name, loader, false);</span>
+<span class="nc bnc" id="L1721" title="All 2 branches missed.">        if (meta != null)</span>
+<span class="nc" id="L1722">            return meta.getDescribedType();</span>
+
+        // try the name in the package of the candidate class
+<span class="nc bnc" id="L1725" title="All 2 branches missed.">        if (_class != null) {</span>
+<span class="nc" id="L1726">            String fullName = _class.getName().substring</span>
+<span class="nc" id="L1727">                (0, _class.getName().lastIndexOf('.') + 1) + name;</span>
+<span class="nc" id="L1728">            type = toClass(fullName);</span>
+<span class="nc bnc" id="L1729" title="All 2 branches missed.">            if (type != null)</span>
+<span class="nc" id="L1730">                return type;</span>
+        }
+
+        // try java.lang
+<span class="nc" id="L1734">        type = toClass(&quot;java.lang.&quot; + name);</span>
+<span class="nc bnc" id="L1735" title="All 2 branches missed.">        if (type != null)</span>
+<span class="nc" id="L1736">            return type;</span>
+
+        // try each import
+<span class="nc bnc" id="L1739" title="All 4 branches missed.">        if (imports != null &amp;&amp; imports.length &gt; 0) {</span>
+<span class="nc" id="L1740">            String dotName = &quot;.&quot; + name;</span>
+            String importName;
+<span class="nc bnc" id="L1742" title="All 2 branches missed.">            for (int i = 0; i &lt; imports.length; i++) {</span>
+<span class="nc" id="L1743">                importName = imports[i];</span>
+
+                // full class name import
+<span class="nc bnc" id="L1746" title="All 2 branches missed.">                if (importName.endsWith(dotName))</span>
+<span class="nc" id="L1747">                    type = toClass(importName);</span>
+                    // wildcard; strip to package
+<span class="nc bnc" id="L1749" title="All 2 branches missed.">                else if (importName.endsWith(&quot;.*&quot;)) {</span>
+<span class="nc" id="L1750">                    importName = importName.substring</span>
+<span class="nc" id="L1751">                        (0, importName.length() - 1);</span>
+<span class="nc" id="L1752">                    type = toClass(importName + name);</span>
+                }
+<span class="nc bnc" id="L1754" title="All 2 branches missed.">                if (type != null)</span>
+<span class="nc" id="L1755">                    return type;</span>
+            }
+        }
+<span class="nc" id="L1758">        return null;</span>
+    }
+
+    /**
+     * Return the {@link Class} for the given name, or null if name not valid.
+     */
+    private Class toClass(String name) {
+<span class="nc bnc" id="L1765" title="All 2 branches missed.">        if (_loader == null)</span>
+<span class="nc" id="L1766">            _loader = _broker.getConfiguration().getClassResolverInstance().</span>
+<span class="nc" id="L1767">                getClassLoader(_class, _broker.getClassLoader());</span>
+        try {
+<span class="nc" id="L1769">            return ClassUtil.toClass(name, _loader);</span>
+<span class="nc" id="L1770">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1771">        } catch (NoClassDefFoundError ncdfe) {</span>
+<span class="nc" id="L1772">        }</span>
+<span class="nc" id="L1773">        return null;</span>
+    }
+
+    @Override
+    public void assertOpen() {
+<span class="nc bnc" id="L1778" title="All 2 branches missed.">        if (_broker != null)</span>
+<span class="nc" id="L1779">            _broker.assertOpen();</span>
+<span class="nc" id="L1780">    }</span>
+
+    @Override
+    public void assertNotReadOnly() {
+<span class="nc bnc" id="L1784" title="All 2 branches missed.">        if (_readOnly)</span>
+<span class="nc" id="L1785">            throw new InvalidStateException(_loc.get(&quot;read-only&quot;));</span>
+<span class="nc" id="L1786">    }</span>
+
+    @Override
+    public void assertNotSerialized() {
+<span class="nc bnc" id="L1790" title="All 2 branches missed.">        if (_broker == null)</span>
+<span class="nc" id="L1791">            throw new InvalidStateException(_loc.get(&quot;serialized&quot;));</span>
+<span class="nc" id="L1792">    }</span>
+
+    /**
+     * Check that a candidate class has been set for the query.
+     */
+    private void assertCandidateType() {
+<span class="nc bnc" id="L1798" title="All 4 branches missed.">        if (_class == null &amp;&amp; _storeQuery.requiresCandidateType())</span>
+<span class="nc" id="L1799">            throw new InvalidStateException(_loc.get(&quot;no-class&quot;));</span>
+<span class="nc" id="L1800">    }</span>
+
+    /**
+     * Check that we are in a state to be able to perform a bulk operation;
+     * also flush the current modfications if any elements are currently dirty.
+     */
+    private void assertBulkModify(StoreQuery q, StoreQuery.Executor ex,
+        Object[] params) {
+<span class="nc" id="L1808">        _broker.assertActiveTransaction();</span>
+<span class="nc bnc" id="L1809" title="All 4 branches missed.">        if (_startIdx != 0 || _endIdx != Long.MAX_VALUE)</span>
+<span class="nc" id="L1810">            throw new UserException(_loc.get(&quot;no-modify-range&quot;));</span>
+<span class="nc bnc" id="L1811" title="All 2 branches missed.">        if (_resultClass != null)</span>
+<span class="nc" id="L1812">            throw new UserException(_loc.get(&quot;no-modify-resultclass&quot;));</span>
+<span class="nc" id="L1813">        StoreQuery.Range range = new StoreQuery.Range();</span>
+<span class="nc" id="L1814">        ex.getRange(q, params, range);</span>
+<span class="nc bnc" id="L1815" title="All 4 branches missed.">        if (range.start != 0 || range.end != Long.MAX_VALUE)</span>
+<span class="nc" id="L1816">            throw new UserException(_loc.get(&quot;no-modify-range&quot;));</span>
+<span class="nc" id="L1817">    }</span>
+
+    /**
+     * Checks that the passed parameters match the declarations.
+     */
+    protected void assertParameters(StoreQuery q, StoreQuery.Executor ex,
+        Object[] params) {
+<span class="nc bnc" id="L1824" title="All 4 branches missed.">        if (!q.requiresParameterDeclarations() || !isParsedQuery())</span>
+<span class="nc" id="L1825">            return;</span>
+
+<span class="nc" id="L1827">        OrderedMap&lt;Object,Class&lt;?&gt;&gt; paramTypes = ex.getOrderedParameterTypes(q);</span>
+<span class="nc" id="L1828">        int typeCount = paramTypes.size();</span>
+<span class="nc bnc" id="L1829" title="All 2 branches missed.">        if (typeCount &gt; params.length)</span>
+<span class="nc" id="L1830">            throw new UserException(_loc.get(&quot;unbound-params&quot;,</span>
+<span class="nc" id="L1831">                paramTypes.keySet()));</span>
+
+<span class="nc" id="L1833">        Iterator&lt;Map.Entry&lt;Object,Class&lt;?&gt;&gt;&gt; itr = paramTypes.entrySet().iterator();</span>
+        Map.Entry&lt;Object,Class&lt;?&gt;&gt; entry;
+<span class="nc bnc" id="L1835" title="All 2 branches missed.">        for (int i = 0; itr.hasNext(); i++) {</span>
+<span class="nc" id="L1836">            entry = itr.next();</span>
+<span class="nc bnc" id="L1837" title="All 4 branches missed.">            if (entry.getValue().isPrimitive() &amp;&amp; params[i] == null)</span>
+<span class="nc" id="L1838">                throw new UserException(_loc.get(&quot;null-primitive-param&quot;, entry.getKey()));</span>
+        }
+<span class="nc" id="L1840">    }</span>
+
+    protected void assertParameters(StoreQuery q, StoreQuery.Executor ex, Map params) {
+<span class="nc bnc" id="L1843" title="All 2 branches missed.">        if (!q.requiresParameterDeclarations())</span>
+<span class="nc" id="L1844">            return;</span>
+
+<span class="nc" id="L1846">        OrderedMap&lt;Object,Class&lt;?&gt;&gt; paramTypes = ex.getOrderedParameterTypes(q);</span>
+<span class="nc bnc" id="L1847" title="All 2 branches missed.">        for (Object actual : params.keySet()) {</span>
+<span class="nc bnc" id="L1848" title="All 2 branches missed.">            if (!paramTypes.containsKey(actual))</span>
+<span class="nc" id="L1849">            throw new UserException(_loc.get(&quot;unbound-params&quot;,</span>
+<span class="nc" id="L1850">                actual, paramTypes.keySet()));</span>
+<span class="nc" id="L1851">        }</span>
+<span class="nc bnc" id="L1852" title="All 2 branches missed.">        for (Object expected : paramTypes.keySet()) {</span>
+<span class="nc bnc" id="L1853" title="All 2 branches missed.">            if (!params.containsKey(expected))</span>
+<span class="nc" id="L1854">            throw new UserException(_loc.get(&quot;unbound-params&quot;,</span>
+<span class="nc" id="L1855">                expected, paramTypes.keySet()));</span>
+<span class="nc" id="L1856">        }</span>
+
+<span class="nc bnc" id="L1858" title="All 2 branches missed.">        for (Entry&lt;Object, Class&lt;?&gt;&gt; entry : paramTypes.entrySet()) {</span>
+<span class="nc bnc" id="L1859" title="All 2 branches missed.">            if (entry.getValue().isPrimitive()</span>
+<span class="nc bnc" id="L1860" title="All 2 branches missed.">                &amp;&amp; params.get(entry.getKey()) == null)</span>
+<span class="nc" id="L1861">                throw new UserException(_loc.get(&quot;null-primitive-param&quot;, entry.getKey()));</span>
+<span class="nc" id="L1862">        }</span>
+<span class="nc" id="L1863">    }</span>
+
+
+    @Override
+    public String toString() {
+<span class="nc" id="L1868">        StringBuilder buf = new StringBuilder(255);</span>
+<span class="nc" id="L1869">        buf.append(&quot;Query: &quot;).append(super.toString());</span>
+<span class="nc" id="L1870">        buf.append(&quot;; candidate class: &quot;).append(_class);</span>
+<span class="nc" id="L1871">        buf.append(&quot;; query: &quot;).append(_query);</span>
+<span class="nc" id="L1872">        return buf.toString();</span>
+    }
+
+    /**
+     * Struct of compiled query properties.
+     */
+<span class="nc" id="L1878">    protected static class Compilation</span>
+        implements Serializable {
+
+        
+        private static final long serialVersionUID = 1L;
+<span class="nc" id="L1883">        public StoreQuery.Executor memory = null;</span>
+<span class="nc" id="L1884">        public StoreQuery.Executor datastore = null;</span>
+<span class="nc" id="L1885">        public Object storeData = null;</span>
+    }
+
+    /**
+     * Struct to hold the unparsed properties associated with a query.
+     */
+<span class="nc" id="L1891">    private static class CompilationKey</span>
+        implements Serializable {
+
+        
+        private static final long serialVersionUID = 1L;
+<span class="nc" id="L1896">        public Class queryType = null;</span>
+<span class="nc" id="L1897">        public Class candidateType = null;</span>
+<span class="nc" id="L1898">        public boolean subclasses = true;</span>
+<span class="nc" id="L1899">        public String query = null;</span>
+<span class="nc" id="L1900">        public String language = null;</span>
+<span class="nc" id="L1901">        public Object storeKey = null;</span>
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L1905">            int rs = 17;</span>
+<span class="nc bnc" id="L1906" title="All 2 branches missed.">            rs = 37 * rs + ((queryType == null) ? 0 : queryType.hashCode());</span>
+<span class="nc bnc" id="L1907" title="All 2 branches missed.">            rs = 37 * rs + ((query == null) ? 0 : query.hashCode());</span>
+<span class="nc bnc" id="L1908" title="All 2 branches missed.">            rs = 37 * rs + ((language == null) ? 0 : language.hashCode());</span>
+<span class="nc bnc" id="L1909" title="All 2 branches missed.">            rs = 37 * rs + ((storeKey == null) ? 0 : storeKey.hashCode());</span>
+<span class="nc bnc" id="L1910" title="All 2 branches missed.">            if (subclasses)</span>
+<span class="nc" id="L1911">              rs++;</span>
+<span class="nc" id="L1912">            return rs;</span>
+        }
+
+        @Override
+        public boolean equals(Object other) {
+<span class="nc bnc" id="L1917" title="All 2 branches missed.">            if (other == this)</span>
+<span class="nc" id="L1918">                return true;</span>
+<span class="nc bnc" id="L1919" title="All 4 branches missed.">            if (other == null || other.getClass() != getClass())</span>
+<span class="nc" id="L1920">                return false;</span>
+
+<span class="nc" id="L1922">            CompilationKey key = (CompilationKey) other;</span>
+<span class="nc bnc" id="L1923" title="All 2 branches missed.">            if (key.queryType != queryType</span>
+<span class="nc bnc" id="L1924" title="All 2 branches missed.">                || !Objects.equals(key.query, query)</span>
+<span class="nc bnc" id="L1925" title="All 2 branches missed.">                || !Objects.equals(key.language, language))</span>
+<span class="nc" id="L1926">                return false;</span>
+<span class="nc bnc" id="L1927" title="All 2 branches missed.">            if (key.subclasses != subclasses)</span>
+<span class="nc" id="L1928">                return false;</span>
+<span class="nc bnc" id="L1929" title="All 2 branches missed.">            if (!Objects.equals(key.storeKey, storeKey))</span>
+<span class="nc" id="L1930">                return false;</span>
+
+            // allow either candidate type to be null because it might be
+            // encoded in the query string, but if both are set then they
+            // must be equal
+<span class="nc bnc" id="L1935" title="All 6 branches missed.">            return key.candidateType == null || candidateType == null</span>
+                || key.candidateType == candidateType;
+        }
+    }
+
+    /**
+     * A merged executor executes multiple Queries and returns
+     * a merged result list with the appropriate ordering (if more than
+     * one query needs to be executed). This executor has the following
+     * limitations:
+     * &lt;ul&gt;
+     * &lt;li&gt;It cannot combine aggregates.
+     * &lt;li&gt;It cannot collate the result lists if ordering is specified and
+     * a result string is given, but does not include the ordering
+     * criteria.&lt;/li&gt;
+     * &lt;li&gt;It cannot filter duplicate results from different result lists if
+     * the result is marked distinct. This would require tracking all
+     * previous results, which would interfere with large result set
+     * handling.&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @author Marc Prud'hommeaux
+         */
+    private static class MergedExecutor
+        implements StoreQuery.Executor {
+
+        private final StoreQuery.Executor[] _executors;
+
+<span class="nc" id="L1963">        public MergedExecutor(StoreQuery.Executor[] executors) {</span>
+<span class="nc" id="L1964">            _executors = executors;</span>
+<span class="nc" id="L1965">        }</span>
+
+        @Override
+        public QueryExpressions[] getQueryExpressions() {
+<span class="nc" id="L1969">            return _executors[0].getQueryExpressions();</span>
+        }
+
+        @Override
+        public ResultObjectProvider executeQuery(StoreQuery q,
+            Object[] params, StoreQuery.Range range) {
+<span class="nc bnc" id="L1975" title="All 2 branches missed.">            if (_executors.length == 1)</span>
+<span class="nc" id="L1976">                return _executors[0].executeQuery(q, params, range);</span>
+
+            // use lrs settings if we couldn't take advantage of the start index
+            // so that hopefully the skip to the start will be efficient
+<span class="nc" id="L1980">            StoreQuery.Range ropRange = new StoreQuery.Range(0, range.end);</span>
+<span class="nc bnc" id="L1981" title="All 4 branches missed.">            ropRange.lrs = range.lrs || (range.start &gt; 0 &amp;&amp; q.getContext().</span>
+<span class="nc bnc" id="L1982" title="All 2 branches missed.">                getFetchConfiguration().getFetchBatchSize() &gt;= 0);</span>
+
+            // execute the query; we cannot use the lower bound of the result
+            // range, but we can take advantage of the upper bound
+<span class="nc" id="L1986">            ResultObjectProvider[] rops =</span>
+                new ResultObjectProvider[_executors.length];
+<span class="nc bnc" id="L1988" title="All 2 branches missed.">            for (int i = 0; i &lt; _executors.length; i++)</span>
+<span class="nc" id="L1989">                rops[i] = _executors[i].executeQuery(q, params, ropRange);</span>
+
+<span class="nc" id="L1991">            boolean[] asc = _executors[0].getAscending(q);</span>
+            ResultObjectProvider rop;
+<span class="nc bnc" id="L1993" title="All 2 branches missed.">            if (asc.length == 0)</span>
+<span class="nc" id="L1994">                rop = new MergedResultObjectProvider(rops);</span>
+            else
+<span class="nc" id="L1996">                rop = new OrderingMergedResultObjectProvider(rops, asc,</span>
+                    _executors, q, params);
+
+            // if there is a lower bound, wrap in range rop
+<span class="nc bnc" id="L2000" title="All 2 branches missed.">            if (range.start != 0)</span>
+<span class="nc" id="L2001">                rop = new RangeResultObjectProvider(rop, range.start,</span>
+                    range.end);
+<span class="nc" id="L2003">            return rop;</span>
+        }
+
+        @Override
+        public Number executeDelete(StoreQuery q, Object[] params) {
+<span class="nc" id="L2008">            long num = 0;</span>
+<span class="nc bnc" id="L2009" title="All 2 branches missed.">            for (int i = 0; i &lt; _executors.length; i++)</span>
+<span class="nc" id="L2010">                num += _executors[i].executeDelete(q, params).longValue();</span>
+<span class="nc" id="L2011">            return num;</span>
+        }
+
+        @Override
+        public Number executeUpdate(StoreQuery q, Object[] params) {
+<span class="nc" id="L2016">            long num = 0;</span>
+<span class="nc bnc" id="L2017" title="All 2 branches missed.">            for (int i = 0; i &lt; _executors.length; i++)</span>
+<span class="nc" id="L2018">                num += _executors[i].executeUpdate(q, params).longValue();</span>
+<span class="nc" id="L2019">            return num;</span>
+        }
+
+        @Override
+        public String[] getDataStoreActions(StoreQuery q, Object[] params,
+            StoreQuery.Range range) {
+<span class="nc bnc" id="L2025" title="All 2 branches missed.">            if (_executors.length == 1)</span>
+<span class="nc" id="L2026">                return _executors[0].getDataStoreActions(q, params, range);</span>
+
+<span class="nc" id="L2028">            List results = new ArrayList(_executors.length);</span>
+<span class="nc" id="L2029">            StoreQuery.Range ropRange = new StoreQuery.Range(0L, range.end);</span>
+            String[] actions;
+<span class="nc bnc" id="L2031" title="All 2 branches missed.">            for (int i = 0; i &lt; _executors.length; i++) {</span>
+<span class="nc" id="L2032">                actions = _executors[i].getDataStoreActions(q, params,ropRange);</span>
+<span class="nc bnc" id="L2033" title="All 4 branches missed.">                if (actions != null &amp;&amp; actions.length &gt; 0)</span>
+<span class="nc" id="L2034">                    results.addAll(Arrays.asList(actions));</span>
+            }
+<span class="nc" id="L2036">            return (String[]) results.toArray(new String[results.size()]);</span>
+        }
+
+        @Override
+        public void validate(StoreQuery q) {
+<span class="nc" id="L2041">            _executors[0].validate(q);</span>
+<span class="nc" id="L2042">        }</span>
+
+        @Override
+        public void getRange(StoreQuery q, Object[] params,
+            StoreQuery.Range range) {
+<span class="nc" id="L2047">            _executors[0].getRange(q, params, range);</span>
+<span class="nc" id="L2048">        }</span>
+
+        @Override
+        public Object getOrderingValue(StoreQuery q, Object[] params,
+            Object resultObject, int idx) {
+            // unfortunately, at this point (must be a merged rop containing
+            // other merged rops) we have no idea which executor to extract
+            // the value from
+<span class="nc" id="L2056">            return _executors[0].getOrderingValue(q, params, resultObject, idx);</span>
+        }
+
+        @Override
+        public boolean[] getAscending(StoreQuery q) {
+<span class="nc" id="L2061">            return _executors[0].getAscending(q);</span>
+        }
+
+        @Override
+        public String getAlias(StoreQuery q) {
+<span class="nc" id="L2066">            return _executors[0].getAlias(q);</span>
+        }
+
+        @Override
+        public String[] getProjectionAliases(StoreQuery q) {
+<span class="nc" id="L2071">            return _executors[0].getProjectionAliases(q);</span>
+        }
+
+        @Override
+        public Class getResultClass(StoreQuery q) {
+<span class="nc" id="L2076">            return _executors[0].getResultClass(q);</span>
+        }
+
+        @Override
+        public ResultShape&lt;?&gt; getResultShape(StoreQuery q) {
+<span class="nc" id="L2081">            return _executors[0].getResultShape(q);</span>
+        }
+
+        @Override
+        public Class[] getProjectionTypes(StoreQuery q) {
+<span class="nc" id="L2086">            return _executors[0].getProjectionTypes(q);</span>
+        }
+
+        @Override
+        public boolean isPacking(StoreQuery q) {
+<span class="nc" id="L2091">            return _executors[0].isPacking(q);</span>
+        }
+
+        @Override
+        public ClassMetaData[] getAccessPathMetaDatas(StoreQuery q) {
+<span class="nc bnc" id="L2096" title="All 2 branches missed.">            if (_executors.length == 1)</span>
+<span class="nc" id="L2097">                return _executors[0].getAccessPathMetaDatas(q);</span>
+
+            // create set of base class metadatas in access path
+<span class="nc" id="L2100">            List metas = null;</span>
+<span class="nc bnc" id="L2101" title="All 2 branches missed.">            for (int i = 0; i &lt; _executors.length; i++)</span>
+<span class="nc" id="L2102">                metas = Filters.addAccessPathMetaDatas(metas, _executors[i].</span>
+<span class="nc" id="L2103">                    getAccessPathMetaDatas(q));</span>
+<span class="nc bnc" id="L2104" title="All 2 branches missed.">            if (metas == null)</span>
+<span class="nc" id="L2105">                return StoreQuery.EMPTY_METAS;</span>
+<span class="nc" id="L2106">            return (ClassMetaData[]) metas.toArray</span>
+<span class="nc" id="L2107">                (new ClassMetaData[metas.size()]);</span>
+        }
+
+        @Override
+        public boolean isAggregate(StoreQuery q) {
+<span class="nc bnc" id="L2112" title="All 2 branches missed.">            if (!_executors[0].isAggregate(q))</span>
+<span class="nc" id="L2113">                return false;</span>
+
+            // we can't merge aggregates
+<span class="nc" id="L2116">            throw new UnsupportedException(_loc.get(&quot;merged-aggregate&quot;,</span>
+<span class="nc" id="L2117">                q.getContext().getCandidateType(),</span>
+<span class="nc" id="L2118">                q.getContext().getQueryString()));</span>
+        }
+
+        @Override
+        public boolean isDistinct(StoreQuery q) {
+<span class="nc" id="L2123">            return _executors[0].isDistinct(q);</span>
+        }
+
+        @Override
+        public int getOperation(StoreQuery q) {
+<span class="nc" id="L2128">            return _executors[0].getOperation(q);</span>
+        }
+
+        @Override
+        public boolean hasGrouping(StoreQuery q) {
+<span class="nc" id="L2133">            return _executors[0].hasGrouping(q);</span>
+        }
+
+        @Override
+        public OrderedMap&lt;Object,Class&lt;?&gt;&gt; getOrderedParameterTypes(StoreQuery q) {
+<span class="nc" id="L2138">            return _executors[0].getOrderedParameterTypes(q);</span>
+        }
+
+        @Override
+        public LinkedMap getParameterTypes(StoreQuery q) {
+<span class="nc" id="L2143">            return _executors[0].getParameterTypes(q);</span>
+        }
+
+        @Override
+        public Object[] toParameterArray(StoreQuery q, Map userParams) {
+<span class="nc" id="L2148">            return _executors[0].toParameterArray(q, userParams);</span>
+        }
+
+
+        @Override
+        public Map getUpdates(StoreQuery q) {
+<span class="nc" id="L2154">            return _executors[0].getUpdates(q);</span>
+        }
+    }
+
+    /**
+     * Result object provider that packs results before returning them.
+     */
+    public static class PackingResultObjectProvider
+        implements ResultObjectProvider {
+
+        private final ResultObjectProvider _delegate;
+        private final ResultPacker _packer;
+        private final int _len;
+
+        public PackingResultObjectProvider(ResultObjectProvider delegate,
+<span class="nc" id="L2169">            ResultPacker packer, int resultLength) {</span>
+<span class="nc" id="L2170">            _delegate = delegate;</span>
+<span class="nc" id="L2171">            _packer = packer;</span>
+<span class="nc" id="L2172">            _len = resultLength;</span>
+<span class="nc" id="L2173">        }</span>
+
+        @Override
+        public boolean supportsRandomAccess() {
+<span class="nc" id="L2177">            return _delegate.supportsRandomAccess();</span>
+        }
+
+        @Override
+        public void open()
+            throws Exception {
+<span class="nc" id="L2183">            _delegate.open();</span>
+<span class="nc" id="L2184">        }</span>
+
+        @Override
+        public Object getResultObject()
+            throws Exception {
+<span class="nc" id="L2189">            Object ob = _delegate.getResultObject();</span>
+<span class="nc bnc" id="L2190" title="All 4 branches missed.">            if (_packer == null &amp;&amp; _len == 1)</span>
+<span class="nc" id="L2191">                return ((Object[]) ob)[0];</span>
+<span class="nc bnc" id="L2192" title="All 2 branches missed.">            if (_packer == null)</span>
+<span class="nc" id="L2193">                return ob;</span>
+<span class="nc bnc" id="L2194" title="All 2 branches missed.">            if (_len == 0)</span>
+<span class="nc" id="L2195">                return _packer.pack(ob);</span>
+<span class="nc" id="L2196">            return _packer.pack((Object[]) ob);</span>
+        }
+
+        @Override
+        public boolean next()
+            throws Exception {
+<span class="nc" id="L2202">            return _delegate.next();</span>
+        }
+
+        @Override
+        public boolean absolute(int pos)
+            throws Exception {
+<span class="nc" id="L2208">            return _delegate.absolute(pos);</span>
+        }
+
+        @Override
+        public int size()
+            throws Exception {
+<span class="nc" id="L2214">            return _delegate.size();</span>
+        }
+
+        @Override
+        public void reset()
+            throws Exception {
+<span class="nc" id="L2220">            _delegate.reset();</span>
+<span class="nc" id="L2221">        }</span>
+
+        @Override
+        public void close()
+            throws Exception {
+<span class="nc" id="L2226">            _delegate.close();</span>
+<span class="nc" id="L2227">        }</span>
+
+        @Override
+        public void handleCheckedException(Exception e) {
+<span class="nc" id="L2231">            _delegate.handleCheckedException(e);</span>
+<span class="nc" id="L2232">        }</span>
+
+        public ResultObjectProvider getDelegate() {
+<span class="nc" id="L2235">            return _delegate;</span>
+        }
+    }
+
+    /**
+     * Result list that removes itself from the query's open result list
+     * when it is closed. Public for testing.
+     */
+    public class RemoveOnCloseResultList
+        implements ResultList {
+
+        
+        private static final long serialVersionUID = 1L;
+        private final ResultList _res;
+
+<span class="nc" id="L2250">        public RemoveOnCloseResultList(ResultList res) {</span>
+<span class="nc" id="L2251">            _res = res;</span>
+<span class="nc" id="L2252">        }</span>
+
+        public ResultList getDelegate() {
+<span class="nc" id="L2255">            return _res;</span>
+        }
+
+        @Override
+        public boolean isProviderOpen() {
+<span class="nc" id="L2260">            return _res.isProviderOpen();</span>
+        }
+
+        @Override
+        public Object getUserObject() {
+<span class="nc" id="L2265">            return _res.getUserObject();</span>
+        }
+
+        @Override
+        public void setUserObject(Object opaque) {
+<span class="nc" id="L2270">            _res.setUserObject(opaque);</span>
+<span class="nc" id="L2271">        }</span>
+
+        @Override
+        public boolean isClosed() {
+<span class="nc" id="L2275">            return _res.isClosed();</span>
+        }
+
+        @Override
+        public void close() {
+<span class="nc" id="L2280">            close(true);</span>
+<span class="nc" id="L2281">        }</span>
+
+        public void close(boolean remove) {
+<span class="nc bnc" id="L2284" title="All 2 branches missed.">            if (isClosed())</span>
+<span class="nc" id="L2285">                return;</span>
+
+<span class="nc" id="L2287">            _res.close();</span>
+<span class="nc bnc" id="L2288" title="All 2 branches missed.">            if (!remove)</span>
+<span class="nc" id="L2289">                return;</span>
+
+<span class="nc" id="L2291">            lock();</span>
+            try {
+                // don't use standard _resultLists.remove method b/c relies on
+                // collection equality, which relies on element equality, which
+                // means we end up traversing entire result lists!
+<span class="nc bnc" id="L2296" title="All 2 branches missed.">                for (Iterator itr = _resultLists.iterator(); itr.hasNext();) {</span>
+<span class="nc bnc" id="L2297" title="All 2 branches missed.">                    if (itr.next() == this) {</span>
+<span class="nc" id="L2298">                        itr.remove();</span>
+<span class="nc" id="L2299">                        break;</span>
+                    }
+                }
+            } finally {
+<span class="nc" id="L2303">                unlock();</span>
+            }
+<span class="nc" id="L2305">        }</span>
+
+        @Override
+        public int size() {
+<span class="nc" id="L2309">            return _res.size();</span>
+        }
+
+        @Override
+        public boolean isEmpty() {
+<span class="nc" id="L2314">            return _res.isEmpty();</span>
+        }
+
+        @Override
+        public boolean contains(Object o) {
+<span class="nc" id="L2319">            return _res.contains(o);</span>
+        }
+
+        @Override
+        public Iterator iterator() {
+<span class="nc" id="L2324">            return _res.iterator();</span>
+        }
+
+        @Override
+        public Object[] toArray() {
+<span class="nc" id="L2329">            return _res.toArray();</span>
+        }
+
+        @Override
+        public Object[] toArray(Object[] a) {
+<span class="nc" id="L2334">            return _res.toArray(a);</span>
+        }
+
+        @Override
+        public boolean add(Object o) {
+<span class="nc" id="L2339">            return _res.add(o);</span>
+        }
+
+        @Override
+        public boolean remove(Object o) {
+<span class="nc" id="L2344">            return _res.remove(o);</span>
+        }
+
+        @Override
+        public boolean containsAll(Collection c) {
+<span class="nc" id="L2349">            return _res.containsAll(c);</span>
+        }
+
+        @Override
+        public boolean addAll(Collection c) {
+<span class="nc" id="L2354">            return _res.addAll(c);</span>
+        }
+
+        @Override
+        public boolean addAll(int idx, Collection c) {
+<span class="nc" id="L2359">            return _res.addAll(idx, c);</span>
+        }
+
+        @Override
+        public boolean removeAll(Collection c) {
+<span class="nc" id="L2364">            return _res.removeAll(c);</span>
+        }
+
+        @Override
+        public boolean retainAll(Collection c) {
+<span class="nc" id="L2369">            return _res.retainAll(c);</span>
+        }
+
+        @Override
+        public void clear() {
+<span class="nc" id="L2374">            _res.clear();</span>
+<span class="nc" id="L2375">        }</span>
+
+        @Override
+        public Object get(int idx) {
+<span class="nc" id="L2379">            return _res.get(idx);</span>
+        }
+
+        @Override
+        public Object set(int idx, Object o) {
+<span class="nc" id="L2384">            return _res.set(idx, o);</span>
+        }
+
+        @Override
+        public void add(int idx, Object o) {
+<span class="nc" id="L2389">            _res.add(idx, o);</span>
+<span class="nc" id="L2390">        }</span>
+
+        @Override
+        public Object remove(int idx) {
+<span class="nc" id="L2394">            return _res.remove(idx);</span>
+        }
+
+        @Override
+        public int indexOf(Object o) {
+<span class="nc" id="L2399">            return _res.indexOf(o);</span>
+        }
+
+        @Override
+        public int lastIndexOf(Object o) {
+<span class="nc" id="L2404">            return _res.lastIndexOf(o);</span>
+        }
+
+        @Override
+        public ListIterator listIterator() {
+<span class="nc" id="L2409">            return _res.listIterator();</span>
+        }
+
+        @Override
+        public ListIterator listIterator(int idx) {
+<span class="nc" id="L2414">            return _res.listIterator(idx);</span>
+        }
+
+        @Override
+        public List subList(int start, int end) {
+<span class="nc" id="L2419">            return _res.subList(start, end);</span>
+        }
+
+        @Override
+        public boolean equals(Object o) {
+<span class="nc" id="L2424">            return _res.equals(o);</span>
+        }
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L2429">            return _res.hashCode();</span>
+        }
+
+        @Override
+        public String toString ()
+		{
+<span class="nc" id="L2435">			return _res.toString ();</span>
+		}
+
+		public Object writeReplace ()
+		{
+<span class="nc" id="L2440">			return _res;</span>
+		}
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

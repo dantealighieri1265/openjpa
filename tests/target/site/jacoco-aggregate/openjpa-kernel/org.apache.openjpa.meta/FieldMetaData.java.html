@@ -1,0 +1,2529 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FieldMetaData.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.meta</a> &gt; <span class="el_source">FieldMetaData.java</span></div><h1>FieldMetaData.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.meta;
+
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+import java.io.Serializable;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Member;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+import java.util.TimeZone;
+
+import org.apache.commons.collections4.comparators.ComparatorChain;
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.kernel.OpenJPAStateManager;
+import org.apache.openjpa.kernel.StoreContext;
+import org.apache.openjpa.lib.conf.Configurations;
+import org.apache.openjpa.lib.log.Log;
+import org.apache.openjpa.lib.util.ClassUtil;
+import org.apache.openjpa.lib.util.J2DoPrivHelper;
+import org.apache.openjpa.lib.util.JavaVersions;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.Options;
+import org.apache.openjpa.lib.util.StringUtil;
+import org.apache.openjpa.lib.xml.Commentable;
+import org.apache.openjpa.util.Exceptions;
+import org.apache.openjpa.util.ImplHelper;
+import org.apache.openjpa.util.InternalException;
+import org.apache.openjpa.util.MetaDataException;
+import org.apache.openjpa.util.OpenJPAException;
+import org.apache.openjpa.util.ProxyManager;
+import org.apache.openjpa.util.UnsupportedException;
+import org.apache.openjpa.util.UserException;
+
+
+/**
+ * Metadata for a managed class field.
+ *
+ * @author Abe White
+ */
+public class FieldMetaData
+    extends Extensions
+    implements ValueMetaData, MetaDataContext, MetaDataModes, Commentable {
+
+    private static final long serialVersionUID = -566180883009883198L;
+
+    /**
+     * Constant specifying that no null-value was given.
+     */
+    public static final int NULL_UNSET = -1;
+
+    /**
+     * Constant specifying to use a datastore null to persist null values
+     * in object fields.
+     */
+    public static final int NULL_NONE = 0;
+
+    /**
+     * Constant specifying to use a datastore default value to persist null
+     * values in object fields.
+     */
+    public static final int NULL_DEFAULT = 1;
+
+    /**
+     * Constant specifying to throw an exception when attempting to persist
+     * null values in object fields.
+     */
+    public static final int NULL_EXCEPTION = 2;
+
+    /**
+     * Constant specifying the management level of a field.
+     */
+    public static final int MANAGE_PERSISTENT = 3;
+
+    /**
+     * Constant specifying the management level of a field.
+     */
+    public static final int MANAGE_TRANSACTIONAL = 1;
+
+    /**
+     * Constant specifying the management level of a field.
+     */
+    public static final int MANAGE_NONE = 0;
+
+    public static final int ONE_TO_ONE = 1;
+    public static final int ONE_TO_MANY = 2;
+    public static final int MANY_TO_ONE = 3;
+    public static final int MANY_TO_MANY = 4;
+
+<span class="nc" id="L125">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L126">        (FieldMetaData.class);</span>
+
+    private static final int DFG_FALSE = 1;
+    private static final int DFG_TRUE = 2;
+    private static final int DFG_EXPLICIT = 4;
+
+    private static final Method DEFAULT_METHOD;
+    static {
+        try {
+<span class="nc" id="L135">            DEFAULT_METHOD = Object.class.getMethod(&quot;wait&quot;, (Class[]) null);</span>
+<span class="nc" id="L136">        } catch (Exception e) {</span>
+            // shouldn't ever happen
+<span class="nc" id="L138">            throw new InternalException(e);</span>
+<span class="nc" id="L139">        }</span>
+<span class="nc" id="L140">    }</span>
+
+    // name and type
+    private final ValueMetaData _val;
+    private final ValueMetaData _key;
+    private final ValueMetaData _elem;
+    private final ClassMetaData _owner;
+    private final String _name;
+<span class="nc" id="L148">    private Class&lt;?&gt; _dec = null;</span>
+<span class="nc" id="L149">    private ClassMetaData _decMeta = null;</span>
+<span class="nc" id="L150">    private String _fullName = null;</span>
+<span class="nc" id="L151">    private String _embedFullName = null;</span>
+<span class="nc" id="L152">    private int _resMode = MODE_NONE;</span>
+<span class="nc" id="L153">    private String _mappedByIdValue = null;</span>
+<span class="nc" id="L154">    private int _access = AccessCode.UNKNOWN;</span>
+
+    // load/store info
+<span class="nc" id="L157">    private String[] _comments = null;</span>
+<span class="nc" id="L158">    private int _listIndex = -1;</span>
+
+    ////////////////////////////////////////////////////////////////////
+    // Note: if you add additional state, make sure to add it to copy()
+    ////////////////////////////////////////////////////////////////////
+
+    // misc info
+<span class="nc" id="L165">    private Class&lt;?&gt; _proxyClass = null;</span>
+<span class="nc" id="L166">    private Object _initializer = null;</span>
+<span class="nc" id="L167">    private boolean _transient = false;</span>
+<span class="nc" id="L168">    private boolean _primKey = false;</span>
+<span class="nc" id="L169">    private Boolean _version = null;</span>
+<span class="nc" id="L170">    private int _nullValue = NULL_UNSET;</span>
+<span class="nc" id="L171">    private int _manage = MANAGE_PERSISTENT;</span>
+<span class="nc" id="L172">    private int _index = -1;</span>
+<span class="nc" id="L173">    private int _decIndex = -1;</span>
+<span class="nc" id="L174">    private int _pkIndex = -1;</span>
+<span class="nc" id="L175">    private boolean _explicit = false;</span>
+<span class="nc" id="L176">    private int _dfg = 0;</span>
+<span class="nc" id="L177">    private Set&lt;String&gt; _fgSet = null;</span>
+<span class="nc" id="L178">    private String[] _fgs = null;</span>
+<span class="nc" id="L179">    private String   _lfg = null;</span>
+<span class="nc" id="L180">    private Boolean _lrs = null;</span>
+<span class="nc" id="L181">    private Boolean _stream = null;</span>
+<span class="nc" id="L182">    private String _extName = null;</span>
+<span class="nc" id="L183">    private String _factName = null;</span>
+<span class="nc" id="L184">    private String _extString = null;</span>
+<span class="nc" id="L185">    private Map _extValues = Collections.EMPTY_MAP;</span>
+<span class="nc" id="L186">    private Map _fieldValues = Collections.EMPTY_MAP;</span>
+<span class="nc" id="L187">    private Boolean _enumField = null;</span>
+<span class="nc" id="L188">    private Boolean _lobField = null;</span>
+<span class="nc" id="L189">    private Boolean _serializableField = null;</span>
+<span class="nc" id="L190">    private boolean _generated = false;</span>
+<span class="nc" id="L191">    private boolean _useSchemaElement = true;</span>
+
+    // Members aren't serializable. Use a proxy that can provide a Member
+    // to avoid writing the full Externalizable implementation.
+<span class="nc" id="L195">    private MemberProvider _backingMember = null;</span>
+
+    // Members aren't serializable. Initializing _extMethod and _factMethod to
+    // DEFAULT_METHOD is sufficient to trigger lazy population of these fields.
+<span class="nc" id="L199">    private transient Method _extMethod = DEFAULT_METHOD;</span>
+<span class="nc" id="L200">    private transient Member _factMethod = DEFAULT_METHOD;</span>
+
+    // intermediate and impl data
+<span class="nc" id="L203">    private boolean _intermediate = true;</span>
+<span class="nc" id="L204">    private Boolean _implData = Boolean.TRUE;</span>
+
+    // value generation
+<span class="nc" id="L207">    private int _valStrategy = -1;</span>
+<span class="nc" id="L208">    private int _upStrategy = -1;</span>
+<span class="nc" id="L209">    private String _seqName = ClassMetaData.DEFAULT_STRING;</span>
+<span class="nc" id="L210">    private SequenceMetaData _seqMeta = null;</span>
+
+    // inverses
+<span class="nc" id="L213">    private String _mappedBy = null;</span>
+<span class="nc" id="L214">    private FieldMetaData _mappedByMeta = null;</span>
+<span class="nc" id="L215">    private FieldMetaData[] _inverses = null;</span>
+<span class="nc" id="L216">    private String _inverse = ClassMetaData.DEFAULT_STRING;</span>
+
+    // ordering on load
+<span class="nc" id="L219">    private Order[] _orders = null;</span>
+<span class="nc" id="L220">    private String _orderDec = null;</span>
+    // indicate if this field is used by other field as &quot;order by&quot; value
+<span class="nc" id="L222">    private boolean _usedInOrderBy = false;</span>
+<span class="nc" id="L223">    private boolean _isElementCollection = false;</span>
+    private int _associationType;
+
+<span class="nc" id="L226">    private boolean _persistentCollection = false;</span>
+
+<span class="nc" id="L228">    private Boolean _delayCapable = null;</span>
+    /**
+     * Constructor.
+     *
+     * @param name the field name
+     * @param type the field type
+     * @param owner the owning class metadata
+     */
+<span class="nc" id="L236">    protected FieldMetaData(String name, Class&lt;?&gt; type, ClassMetaData owner) {</span>
+<span class="nc" id="L237">        _name = name;</span>
+<span class="nc" id="L238">        _owner = owner;</span>
+<span class="nc" id="L239">        _dec = null;</span>
+<span class="nc" id="L240">        _decMeta = null;</span>
+<span class="nc" id="L241">        _val = owner.getRepository().newValueMetaData(this);</span>
+<span class="nc" id="L242">        _key = owner.getRepository().newValueMetaData(this);</span>
+<span class="nc" id="L243">        _elem = owner.getRepository().newValueMetaData(this);</span>
+
+<span class="nc" id="L245">        setDeclaredType(type);</span>
+<span class="nc" id="L246">    }</span>
+
+    /**
+     * Supply the backing member object; this allows us to utilize
+     * parameterized type information if available.
+     * Sets the access style of this receiver based on whether the given
+     * member represents a field or getter method.
+     */
+    public void backingMember(Member member) {
+<span class="nc bnc" id="L255" title="All 2 branches missed.">        if (member == null)</span>
+<span class="nc" id="L256">            return;</span>
+<span class="nc bnc" id="L257" title="All 2 branches missed.">        if (Modifier.isTransient(member.getModifiers()))</span>
+<span class="nc" id="L258">            _transient = true;</span>
+
+<span class="nc" id="L260">        _backingMember = new MemberProvider(member);</span>
+
+        Class&lt;?&gt; type;
+        Class&lt;?&gt;[] types;
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        if (member instanceof Field) {</span>
+<span class="nc" id="L265">            Field f = (Field) member;</span>
+<span class="nc" id="L266">            type = f.getType();</span>
+<span class="nc" id="L267">            types = JavaVersions.getParameterizedTypes(f);</span>
+<span class="nc" id="L268">            setAccessType(AccessCode.FIELD);</span>
+<span class="nc" id="L269">        } else {</span>
+<span class="nc" id="L270">            Method meth = (Method) member;</span>
+<span class="nc" id="L271">            type = meth.getReturnType();</span>
+<span class="nc" id="L272">            types = JavaVersions.getParameterizedTypes(meth);</span>
+<span class="nc" id="L273">            setAccessType(AccessCode.PROPERTY);</span>
+        }
+
+<span class="nc" id="L276">        setDeclaredType(type);</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        if (Collection.class.isAssignableFrom(type)</span>
+<span class="nc bnc" id="L278" title="All 4 branches missed.">            &amp;&amp; _elem.getDeclaredType() == Object.class</span>
+            &amp;&amp; types.length == 1) {
+<span class="nc" id="L280">            _elem.setDeclaredType(types[0]);</span>
+<span class="nc bnc" id="L281" title="All 4 branches missed.">        } else if (Map.class.isAssignableFrom(type)</span>
+            &amp;&amp; types.length == 2) {
+<span class="nc bnc" id="L283" title="All 2 branches missed.">            if (_key.getDeclaredType() == Object.class)</span>
+<span class="nc" id="L284">                _key.setDeclaredType(types[0]);</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">            if (_elem.getDeclaredType() == Object.class)</span>
+<span class="nc" id="L286">                _elem.setDeclaredType(types[1]);</span>
+        }
+<span class="nc" id="L288">    }</span>
+
+    /**
+     * Return the backing member supplied in {@link #backingMember}.
+     */
+    public Member getBackingMember() {
+<span class="nc bnc" id="L294" title="All 2 branches missed.">        return (_backingMember == null) ? null : _backingMember.getMember();</span>
+    }
+
+    /**
+     * The metadata repository.
+     */
+    @Override
+    public MetaDataRepository getRepository() {
+<span class="nc" id="L302">        return _owner.getRepository();</span>
+    }
+
+    /**
+     * The class that defines the metadata for this field.
+     */
+    public ClassMetaData getDefiningMetaData() {
+<span class="nc" id="L309">        return _owner;</span>
+    }
+
+    /**
+     * The declaring class.
+     */
+    public Class&lt;?&gt; getDeclaringType() {
+<span class="nc bnc" id="L316" title="All 2 branches missed.">        return (_dec == null) ? _owner.getDescribedType() : _dec;</span>
+    }
+
+    /**
+     * The declaring class.
+     */
+    public void setDeclaringType(Class&lt;?&gt; cls) {
+<span class="nc" id="L323">        _dec = cls;</span>
+<span class="nc" id="L324">        _decMeta = null;</span>
+<span class="nc" id="L325">        _fullName = null;</span>
+<span class="nc" id="L326">        _embedFullName = null;</span>
+<span class="nc" id="L327">    }</span>
+
+    /**
+     * The declaring class.
+     */
+    public ClassMetaData getDeclaringMetaData() {
+<span class="nc bnc" id="L333" title="All 2 branches missed.">        if (_dec == null)</span>
+<span class="nc" id="L334">            return _owner;</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">        if (_decMeta == null)</span>
+<span class="nc" id="L336">            _decMeta = getRepository().getMetaData(_dec,</span>
+<span class="nc" id="L337">                _owner.getEnvClassLoader(), true);</span>
+<span class="nc" id="L338">        return _decMeta;</span>
+    }
+
+    /**
+     * The field name.
+     */
+    public String getName() {
+<span class="nc" id="L345">        return _name;</span>
+    }
+
+    /**
+     * The field name, qualified by the owning class.
+     * @deprecated Use getFullName(boolean) instead.
+     */
+    @Deprecated
+    public String getFullName() {
+<span class="nc" id="L354">        return getFullName(false);</span>
+    }
+
+    /**
+     * The field name, qualified by the owning class and optionally the
+     * embedding owner's name (if any).
+     */
+    public String getFullName(boolean embedOwner) {
+<span class="nc bnc" id="L362" title="All 2 branches missed.">        if (_fullName == null)</span>
+<span class="nc" id="L363">            _fullName = getDeclaringType().getName() + &quot;.&quot; + _name;</span>
+<span class="nc bnc" id="L364" title="All 4 branches missed.">        if (embedOwner &amp;&amp; _embedFullName == null) {</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">            if (_owner.getEmbeddingMetaData() == null)</span>
+<span class="nc" id="L366">                _embedFullName = _fullName;</span>
+            else
+<span class="nc" id="L368">                _embedFullName = _owner.getEmbeddingMetaData().</span>
+<span class="nc" id="L369">                    getFieldMetaData().getFullName(true) + &quot;.&quot; + _fullName;</span>
+        }
+<span class="nc bnc" id="L371" title="All 2 branches missed.">        return (embedOwner) ? _embedFullName : _fullName;</span>
+    }
+
+    /**
+     * The field name, qualified by the defining class.
+     */
+    public String getRealName() {
+    	// Added to support OPENJPA-704
+<span class="nc" id="L379">        return getDefiningMetaData().getDescribedType().getName() + &quot;.&quot; + _name;</span>
+    }
+
+    /**
+     * MetaData about the field value.
+     */
+    public ValueMetaData getValue() {
+<span class="nc" id="L386">        return _val;</span>
+    }
+
+    /**
+     * Metadata about the key value.
+     */
+    public ValueMetaData getKey() {
+<span class="nc" id="L393">        return _key;</span>
+    }
+
+    /**
+     * Metadata about the element value.
+     */
+    public ValueMetaData getElement() {
+<span class="nc" id="L400">        return _elem;</span>
+    }
+
+    /**
+     * Return whether this field is mapped to the datastore. By default,
+     * returns true for all persistent fields whose defining class is mapped.
+     */
+    public boolean isMapped() {
+<span class="nc bnc" id="L408" title="All 4 branches missed.">        return _manage == MANAGE_PERSISTENT &amp;&amp; _owner.isMapped();</span>
+    }
+
+    /**
+     * The type this field was initialized with, and therefore the
+     * type to use for proxies when loading data into this field.
+     */
+    public Class&lt;?&gt; getProxyType() {
+<span class="nc bnc" id="L416" title="All 2 branches missed.">        return (_proxyClass == null) ? getDeclaredType() : _proxyClass;</span>
+    }
+
+    /**
+     * The type this field was initialized with, and therefore the
+     * type to use for proxies when loading data into this field.
+     */
+    public void setProxyType(Class&lt;?&gt; type) {
+<span class="nc" id="L424">        _proxyClass = type;</span>
+<span class="nc" id="L425">    }</span>
+
+    /**
+     * The initializer used by the field, or null if none. This
+     * is additional information for initializing the field, such as
+     * a custom {@link Comparator} used by a {@link Set} or
+     * a {@link TimeZone} used by a {@link Calendar}.
+     */
+    public Object getInitializer() {
+<span class="nc" id="L434">        return _initializer;</span>
+    }
+
+    /**
+     * The initializer used by the field, or null if none. This
+     * is additional information for initializing the field, such as
+     * a custom {@link Comparator} used by a {@link Set} or
+     * a {@link TimeZone} used by a {@link Calendar}.
+     */
+    public void setInitializer(Object initializer) {
+<span class="nc" id="L444">        _initializer = initializer;</span>
+<span class="nc" id="L445">    }</span>
+
+    /**
+     * Return whether this is a transient field.
+     */
+    public boolean isTransient() {
+<span class="nc" id="L451">        return _transient;</span>
+    }
+
+    /**
+     * Return whether this is a transient field.
+     */
+    public void setTransient(boolean trans) {
+<span class="nc" id="L458">        _transient = trans;</span>
+<span class="nc" id="L459">    }</span>
+
+    /**
+     * The absolute index of this persistent/transactional field.
+     */
+    public int getIndex() {
+<span class="nc" id="L465">        return _index;</span>
+    }
+
+    /**
+     * The absolute index of this persistent/transactional field.
+     */
+    public void setIndex(int index) {
+<span class="nc" id="L472">        _index = index;</span>
+<span class="nc" id="L473">    }</span>
+
+    /**
+     * The relative index of this persistent/transactional field.
+     */
+    public int getDeclaredIndex() {
+<span class="nc" id="L479">        return _decIndex;</span>
+    }
+
+    /**
+     * The relative index of this persistent/transactional field.
+     */
+    public void setDeclaredIndex(int index) {
+<span class="nc" id="L486">        _decIndex = index;</span>
+<span class="nc" id="L487">    }</span>
+
+    /**
+     * The index in which this field was listed in the metadata. Defaults to
+     * &lt;code&gt;-1&lt;/code&gt; if this field was not listed in the metadata.
+     */
+    public int getListingIndex() {
+<span class="nc" id="L494">        return _listIndex;</span>
+    }
+
+    /**
+     * The index in which this field was listed in the metadata. Defaults to
+     * &lt;code&gt;-1&lt;/code&gt; if this field was not listed in the metadata.
+     */
+    public void setListingIndex(int index) {
+<span class="nc" id="L502">        _listIndex = index;</span>
+<span class="nc" id="L503">    }</span>
+
+    /**
+     * The absolute primary key index for this field, or -1 if not a primary
+     * key. The first primary key field has index 0, the second index 1, etc.
+     */
+    public int getPrimaryKeyIndex() {
+<span class="nc" id="L510">        return _pkIndex;</span>
+    }
+
+    /**
+     * The absolute primary key index for this field, or -1 if not a primary
+     * key. The first primary key field has index 0, the second index 1, etc.
+     */
+    public void setPrimaryKeyIndex(int index) {
+<span class="nc" id="L518">        _pkIndex = index;</span>
+<span class="nc" id="L519">    }</span>
+
+    /**
+     * Return the management level for the field. Will be one of:
+     * &lt;ul&gt;
+     * &lt;li&gt;{@link #MANAGE_PERSISTENT}: the field is persistent&lt;/li&gt;
+     * &lt;li&gt;{@link #MANAGE_TRANSACTIONAL}: the field is transactional but not
+     * persistent&lt;/li&gt;
+     * &lt;li&gt;{@link #MANAGE_NONE}: the field is not managed&lt;/li&gt;
+     * &lt;/ul&gt; Defaults to {@link #MANAGE_PERSISTENT}.
+     */
+    public int getManagement() {
+<span class="nc" id="L531">        return _manage;</span>
+    }
+
+    /**
+     * Return the management level for the field. Will be one of:
+     * &lt;ul&gt;
+     * &lt;li&gt;{@link #MANAGE_PERSISTENT}: the field is persistent&lt;/li&gt;
+     * &lt;li&gt;{@link #MANAGE_TRANSACTIONAL}: the field is transactional but not
+     * persistent&lt;/li&gt;
+     * &lt;li&gt;{@link #MANAGE_NONE}: the field is not managed&lt;/li&gt;
+     * &lt;/ul&gt;
+     * Defaults to {@link #MANAGE_PERSISTENT}.
+     */
+    public void setManagement(int manage) {
+<span class="nc bnc" id="L545" title="All 6 branches missed.">        if ((_manage == MANAGE_NONE) != (manage == MANAGE_NONE))</span>
+<span class="nc" id="L546">            _owner.clearFieldCache();</span>
+<span class="nc" id="L547">        _manage = manage;</span>
+<span class="nc" id="L548">    }</span>
+
+    /**
+     * Whether this is a primary key field.
+     */
+    public boolean isPrimaryKey() {
+<span class="nc" id="L554">        return _primKey;</span>
+    }
+
+    /**
+     * Whether this is a primary key field.
+     */
+    public void setPrimaryKey(boolean primKey) {
+<span class="nc" id="L561">        _primKey = primKey;</span>
+<span class="nc" id="L562">    }</span>
+
+    /**
+     * For a primary key field, return the type of the corresponding object id
+     * class field.
+     */
+    public int getObjectIdFieldTypeCode() {
+<span class="nc" id="L569">        ClassMetaData relmeta = getDeclaredTypeMetaData();</span>
+<span class="nc bnc" id="L570" title="All 2 branches missed.">        if (relmeta == null)</span>
+<span class="nc" id="L571">            return getDeclaredTypeCode();</span>
+<span class="nc bnc" id="L572" title="All 2 branches missed.">        if (relmeta.getIdentityType() == ClassMetaData.ID_DATASTORE) {</span>
+<span class="nc" id="L573">            boolean unwrap = getRepository().getMetaDataFactory().getDefaults().</span>
+<span class="nc" id="L574">                isDataStoreObjectIdFieldUnwrapped();</span>
+<span class="nc bnc" id="L575" title="All 2 branches missed.">            return (unwrap) ? JavaTypes.LONG : JavaTypes.OBJECT;</span>
+        }
+<span class="nc bnc" id="L577" title="All 2 branches missed.">        if (relmeta.isOpenJPAIdentity())</span>
+<span class="nc" id="L578">            return relmeta.getPrimaryKeyFields()[0].getObjectIdFieldTypeCode();</span>
+<span class="nc" id="L579">        return JavaTypes.OBJECT;</span>
+    }
+
+    /**
+     * For a primary key field, return the type of the corresponding object id
+     * class field.
+     */
+    public Class&lt;?&gt; getObjectIdFieldType() {
+<span class="nc" id="L587">        ClassMetaData relmeta = getDeclaredTypeMetaData();</span>
+<span class="nc bnc" id="L588" title="All 4 branches missed.">        if (relmeta == null || getValue().isEmbedded())</span>
+<span class="nc" id="L589">            return getDeclaredType();</span>
+<span class="nc bnc" id="L590" title="All 3 branches missed.">        switch (relmeta.getIdentityType()) {</span>
+            case ClassMetaData.ID_DATASTORE:
+<span class="nc" id="L592">                boolean unwrap = getRepository().getMetaDataFactory().</span>
+<span class="nc" id="L593">                    getDefaults().isDataStoreObjectIdFieldUnwrapped();</span>
+<span class="nc bnc" id="L594" title="All 2 branches missed.">                return (unwrap) ? long.class : Object.class;</span>
+            case ClassMetaData.ID_APPLICATION:
+<span class="nc bnc" id="L596" title="All 2 branches missed.">                if (relmeta.isOpenJPAIdentity())</span>
+<span class="nc" id="L597">                    return relmeta.getPrimaryKeyFields()[0].</span>
+<span class="nc" id="L598">                        getObjectIdFieldType();</span>
+<span class="nc bnc" id="L599" title="All 2 branches missed.">                return (relmeta.getObjectIdType() == null) ? Object.class</span>
+<span class="nc" id="L600">                    : relmeta.getObjectIdType();</span>
+            default:
+<span class="nc" id="L602">                return Object.class;</span>
+        }
+    }
+
+    /**
+     * Whether this field holds optimistic version information.
+     */
+    public boolean isVersion() {
+<span class="nc bnc" id="L610" title="All 2 branches missed.">        return _version == Boolean.TRUE;</span>
+    }
+
+    /**
+     * Whether this field holds optimistic version information.
+     */
+    public void setVersion(boolean version) {
+<span class="nc bnc" id="L617" title="All 2 branches missed.">        _version = (version) ? Boolean.TRUE : Boolean.FALSE;</span>
+<span class="nc" id="L618">    }</span>
+
+    /**
+     * Whether this field is in the default fetch group.
+     */
+    public boolean isInDefaultFetchGroup() {
+<span class="nc bnc" id="L624" title="All 2 branches missed.">        if (_dfg == 0) {</span>
+<span class="nc bnc" id="L625" title="All 6 branches missed.">            if (_manage != MANAGE_PERSISTENT || isPrimaryKey() || isVersion())</span>
+<span class="nc" id="L626">                _dfg = DFG_FALSE;</span>
+            else {
+                // field left as default; dfg setting depends on type
+<span class="nc bnc" id="L629" title="All 4 branches missed.">                switch (getTypeCode()) {</span>
+                    case JavaTypes.OBJECT:
+<span class="nc bnc" id="L631" title="All 4 branches missed.">                        if (isSerializable() || isEnum())</span>
+<span class="nc" id="L632">                            _dfg = DFG_TRUE;</span>
+                        else
+<span class="nc" id="L634">                            _dfg = DFG_FALSE;</span>
+<span class="nc" id="L635">                        break;</span>
+                    case JavaTypes.ARRAY:
+<span class="nc bnc" id="L637" title="All 2 branches missed.">                        if (isLobArray())</span>
+<span class="nc" id="L638">                            _dfg = DFG_TRUE;</span>
+                        else
+<span class="nc" id="L640">                            _dfg = DFG_FALSE;</span>
+<span class="nc" id="L641">                        break;</span>
+                    case JavaTypes.COLLECTION:
+                    case JavaTypes.MAP:
+                    case JavaTypes.PC:
+                    case JavaTypes.PC_UNTYPED:
+<span class="nc" id="L646">                        _dfg = DFG_FALSE;</span>
+<span class="nc" id="L647">                        break;</span>
+                    default:
+<span class="nc" id="L649">                        _dfg = DFG_TRUE;</span>
+                }
+            }
+        }
+<span class="nc bnc" id="L653" title="All 2 branches missed.">        return (_dfg &amp; DFG_TRUE) &gt; 0;</span>
+    }
+
+    private boolean isEnum() {
+<span class="nc bnc" id="L657" title="All 2 branches missed.">        if (_enumField == null) {</span>
+<span class="nc" id="L658">            Class&lt;?&gt; decl = getDeclaredType();</span>
+<span class="nc bnc" id="L659" title="All 2 branches missed.">            _enumField =  Enum.class.isAssignableFrom(decl)</span>
+<span class="nc" id="L660">                ? Boolean.TRUE : Boolean.FALSE;</span>
+        }
+<span class="nc" id="L662">        return _enumField.booleanValue();</span>
+    }
+
+    private boolean isSerializable() {
+<span class="nc bnc" id="L666" title="All 2 branches missed.">        if (_serializableField == null) {</span>
+<span class="nc" id="L667">            Class&lt;?&gt; decl = getDeclaredType();</span>
+<span class="nc bnc" id="L668" title="All 2 branches missed.">            if (Serializable.class.isAssignableFrom(decl))</span>
+<span class="nc" id="L669">                _serializableField = Boolean.TRUE;</span>
+            else
+<span class="nc" id="L671">                _serializableField = Boolean.FALSE;</span>
+        }
+<span class="nc" id="L673">        return _serializableField.booleanValue();</span>
+    }
+
+    private boolean isLobArray() {
+        // check for byte[], Byte[], char[], Character[]
+<span class="nc bnc" id="L678" title="All 2 branches missed.">        if (_lobField == null) {</span>
+<span class="nc" id="L679">            Class&lt;?&gt; decl = getDeclaredType();</span>
+<span class="nc bnc" id="L680" title="All 8 branches missed.">            if (decl == byte[].class || decl == Byte[].class ||</span>
+                decl == char[].class || decl == Character[].class)
+<span class="nc" id="L682">                _lobField = Boolean.TRUE;</span>
+            else
+<span class="nc" id="L684">                _lobField = Boolean.FALSE;</span>
+        }
+<span class="nc" id="L686">        return _lobField.booleanValue();</span>
+    }
+
+    /**
+     * Whether this field is in the default fetch group.
+     */
+    public void setInDefaultFetchGroup(boolean dfg) {
+<span class="nc bnc" id="L693" title="All 2 branches missed.">        if (dfg)</span>
+<span class="nc" id="L694">            _dfg = DFG_TRUE;</span>
+        else
+<span class="nc" id="L696">            _dfg = DFG_FALSE;</span>
+<span class="nc" id="L697">        _dfg |= DFG_EXPLICIT;</span>
+<span class="nc" id="L698">    }</span>
+
+    /**
+     * Whether the default fetch group setting is explicit.
+     */
+    public boolean isDefaultFetchGroupExplicit() {
+<span class="nc bnc" id="L704" title="All 2 branches missed.">        return (_dfg &amp; DFG_EXPLICIT) &gt; 0;</span>
+    }
+
+    /**
+     * Whether the default fetch group setting is explicit. Allow setting
+     * for testing.
+     */
+    public void setDefaultFetchGroupExplicit(boolean explicit) {
+<span class="nc bnc" id="L712" title="All 2 branches missed.">        if (explicit)</span>
+<span class="nc" id="L713">            _dfg |= DFG_EXPLICIT;</span>
+        else
+<span class="nc" id="L715">            _dfg &amp;= ~DFG_EXPLICIT;</span>
+<span class="nc" id="L716">    }</span>
+
+    /**
+     * Gets the name of the custom fetch groups those are associated to this
+     * receiver.  This does not include the &quot;default&quot; and &quot;all&quot; fetch groups.
+     *
+     * @return the set of fetch group names, not including the default and
+     * all fetch groups.
+     */
+    public String[] getCustomFetchGroups() {
+<span class="nc bnc" id="L726" title="All 2 branches missed.">        if (_fgs == null) {</span>
+<span class="nc bnc" id="L727" title="All 4 branches missed.">            if (_fgSet == null || _manage != MANAGE_PERSISTENT</span>
+<span class="nc bnc" id="L728" title="All 4 branches missed.">                || isPrimaryKey() || isVersion())</span>
+<span class="nc" id="L729">                _fgs = new String[0];</span>
+            else
+<span class="nc" id="L731">                _fgs = _fgSet.toArray(new String[_fgSet.size()]);</span>
+        }
+<span class="nc" id="L733">        return _fgs;</span>
+    }
+
+    /**
+     * The fetch group that is to be loaded when this receiver is loaded, or
+     * null if none set.
+     */
+    public String getLoadFetchGroup () {
+<span class="nc" id="L741">    	return _lfg;</span>
+    }
+
+    /**
+     * The fetch group that is to be loaded when this receiver is loaded, or
+     * null if none set.
+     */
+    public void setLoadFetchGroup (String lfg) {
+<span class="nc bnc" id="L749" title="All 2 branches missed.">        if (&quot;&quot;.equals(lfg))</span>
+<span class="nc" id="L750">            lfg = null;</span>
+<span class="nc" id="L751">    	_lfg = lfg;</span>
+<span class="nc" id="L752">    }</span>
+
+    /**
+     * Whether this field is in the given fetch group.
+     */
+    public boolean isInFetchGroup(String fg) {
+<span class="nc bnc" id="L758" title="All 6 branches missed.">        if (_manage != MANAGE_PERSISTENT || isPrimaryKey() || isVersion())</span>
+<span class="nc" id="L759">            return false;</span>
+<span class="nc bnc" id="L760" title="All 2 branches missed.">        if (FetchGroup.NAME_ALL.equals(fg))</span>
+<span class="nc" id="L761">            return true;</span>
+<span class="nc bnc" id="L762" title="All 2 branches missed.">        if (FetchGroup.NAME_DEFAULT.equals(fg))</span>
+<span class="nc" id="L763">            return isInDefaultFetchGroup();</span>
+<span class="nc bnc" id="L764" title="All 4 branches missed.">        return _fgSet != null &amp;&amp; _fgSet.contains(fg);</span>
+    }
+
+    /**
+     * Set whether this field is in the given fetch group.
+     *
+     * @param fg is the name of a fetch group that must be present in the
+     * class that declared this field or any of its persistent superclasses.
+     */
+    public void setInFetchGroup(String fg, boolean in) {
+<span class="nc bnc" id="L774" title="All 2 branches missed.">        if (StringUtil.isEmpty(fg))</span>
+<span class="nc" id="L775">            throw new MetaDataException(_loc.get(&quot;empty-fg-name&quot;, this));</span>
+<span class="nc bnc" id="L776" title="All 2 branches missed.">        if (fg.equals(FetchGroup.NAME_ALL))</span>
+<span class="nc" id="L777">            return;</span>
+<span class="nc bnc" id="L778" title="All 2 branches missed.">        if (fg.equals(FetchGroup.NAME_DEFAULT)) {</span>
+<span class="nc" id="L779">            setInDefaultFetchGroup(in);</span>
+<span class="nc" id="L780">            return;</span>
+        }
+<span class="nc bnc" id="L782" title="All 2 branches missed.">        if (_owner.getFetchGroup(fg) == null)</span>
+<span class="nc" id="L783">            throw new MetaDataException(_loc.get(&quot;unknown-fg&quot;, fg, this));</span>
+<span class="nc bnc" id="L784" title="All 4 branches missed.">        if (in &amp;&amp; _fgSet == null)</span>
+<span class="nc" id="L785">            _fgSet = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L786" title="All 8 branches missed.">        if ((in &amp;&amp; _fgSet.add(fg))</span>
+<span class="nc bnc" id="L787" title="All 2 branches missed.">            || (!in &amp;&amp; _fgSet != null &amp;&amp; _fgSet.remove(fg)))</span>
+<span class="nc" id="L788">            _fgs = null;</span>
+<span class="nc" id="L789">    }</span>
+
+    /**
+     * How the data store should treat null values for this field:
+     * &lt;ul&gt;
+     * &lt;li&gt;{@link #NULL_UNSET}: no value supplied&lt;/li&gt;
+     * &lt;li&gt;{@link #NULL_NONE}: leave null values as null in the data store&lt;/li&gt;
+     * &lt;li&gt;{@link #NULL_EXCEPTION}: throw an exception if this field is null
+     * at commit&lt;/li&gt;
+     * &lt;li&gt;{@link #NULL_DEFAULT}: use the database default if this field is
+     * null at commit&lt;/li&gt;
+     * &lt;/ul&gt; Defaults to {@link #NULL_UNSET}.
+     */
+    public int getNullValue() {
+<span class="nc" id="L803">        return _nullValue;</span>
+    }
+
+    /**
+     * How the data store should treat null values for this field:
+     * &lt;ul&gt;
+     * &lt;li&gt;{@link #NULL_UNSET}: no value supplied&lt;/li&gt;
+     * &lt;li&gt;{@link #NULL_NONE}: leave null values as null in the data store&lt;/li&gt;
+     * &lt;li&gt;{@link #NULL_EXCEPTION}: throw an exception if this field is null
+     * at commit&lt;/li&gt;
+     * &lt;li&gt;{@link #NULL_DEFAULT}: use the database default if this field is
+     * null at commit&lt;/li&gt;
+     * &lt;/ul&gt; Defaults to {@link #NULL_UNSET}.
+     */
+    public void setNullValue(int nullValue) {
+<span class="nc" id="L818">        _nullValue = nullValue;</span>
+<span class="nc" id="L819">    }</span>
+
+    /**
+     * Whether this field is explicitly declared in the metadata.
+     */
+    public boolean isExplicit() {
+<span class="nc" id="L825">        return _explicit;</span>
+    }
+
+    /**
+     * Whether this field is explicitly declared in the metadata.
+     */
+    public void setExplicit(boolean explicit) {
+<span class="nc" id="L832">        _explicit = explicit;</span>
+<span class="nc" id="L833">    }</span>
+
+    /**
+     * The field that this field shares a mapping with.
+     */
+    public String getMappedBy() {
+<span class="nc" id="L839">        return _mappedBy;</span>
+    }
+
+    /**
+     * The field that this field shares a mapping with.
+     */
+    public void setMappedBy(String mapped) {
+<span class="nc" id="L846">        _mappedBy = mapped;</span>
+<span class="nc" id="L847">        _mappedByMeta = null;</span>
+<span class="nc" id="L848">    }</span>
+
+    /**
+     * The field that this field shares a mapping with.
+     */
+    public FieldMetaData getMappedByMetaData() {
+<span class="nc bnc" id="L854" title="All 4 branches missed.">        if (_mappedBy != null &amp;&amp; _mappedByMeta == null) {</span>
+<span class="nc" id="L855">            ClassMetaData meta = null;</span>
+<span class="nc bnc" id="L856" title="All 3 branches missed.">            switch (getTypeCode()) {</span>
+                case JavaTypes.PC:
+<span class="nc" id="L858">                    meta = getTypeMetaData();</span>
+<span class="nc" id="L859">                    break;</span>
+                case JavaTypes.ARRAY:
+                case JavaTypes.COLLECTION:
+                case JavaTypes.MAP:
+<span class="nc" id="L863">                    meta = _elem.getTypeMetaData();</span>
+                    break;
+            }
+
+<span class="nc bnc" id="L867" title="All 2 branches missed.">            FieldMetaData field = (meta == null) ? null</span>
+<span class="nc" id="L868">                : getMappedByField(meta, _mappedBy);</span>
+<span class="nc bnc" id="L869" title="All 2 branches missed.">            if (field == null)</span>
+<span class="nc" id="L870">                throw new MetaDataException(_loc.get(&quot;no-mapped-by&quot;, this,</span>
+                    _mappedBy));
+<span class="nc bnc" id="L872" title="All 2 branches missed.">            if (field.getMappedBy() != null)</span>
+<span class="nc" id="L873">                throw new MetaDataException(_loc.get(&quot;circ-mapped-by&quot;, this,</span>
+                    _mappedBy));
+<span class="nc" id="L875">            OpenJPAConfiguration conf = getRepository().getConfiguration();</span>
+<span class="nc" id="L876">            boolean isAbstractMappingUniDirectional = getRepository().getMetaDataFactory().</span>
+<span class="nc" id="L877">                    getDefaults().isAbstractMappingUniDirectional(conf);</span>
+<span class="nc bnc" id="L878" title="All 2 branches missed.">            if (isAbstractMappingUniDirectional) {</span>
+<span class="nc bnc" id="L879" title="All 2 branches missed.">                if (field.getDeclaringMetaData().isAbstract())</span>
+<span class="nc" id="L880">                    throw new MetaDataException(_loc.get(&quot;no-mapped-by-in-mapped-super&quot;, field,</span>
+<span class="nc" id="L881">                            field.getDeclaringMetaData()));</span>
+
+<span class="nc bnc" id="L883" title="All 2 branches missed.">                if (this.getDeclaringMetaData().isAbstract())</span>
+<span class="nc" id="L884">                    throw new MetaDataException(_loc.get(&quot;no-mapped-by-in-mapped-super&quot;, this,</span>
+<span class="nc" id="L885">                            this.getDeclaringMetaData()));</span>
+            }
+<span class="nc" id="L887">            _mappedByMeta = field;</span>
+        }
+<span class="nc" id="L889">        return _mappedByMeta;</span>
+    }
+
+    public FieldMetaData getMappedByField(ClassMetaData meta, String mappedBy) {
+<span class="nc" id="L893">        FieldMetaData field = meta.getField(mappedBy);</span>
+<span class="nc bnc" id="L894" title="All 2 branches missed.">        if (field != null)</span>
+<span class="nc" id="L895">            return field;</span>
+<span class="nc" id="L896">        int dotIdx = mappedBy.indexOf(&quot;.&quot;);</span>
+<span class="nc bnc" id="L897" title="All 2 branches missed.">        if ( dotIdx == -1)</span>
+<span class="nc" id="L898">            return null;</span>
+<span class="nc" id="L899">        String fieldName = mappedBy.substring(0, dotIdx);</span>
+<span class="nc" id="L900">        FieldMetaData field1 = meta.getField(fieldName);</span>
+<span class="nc bnc" id="L901" title="All 2 branches missed.">        if (field1 == null)</span>
+<span class="nc" id="L902">            return null;</span>
+<span class="nc" id="L903">        ClassMetaData meta1 = field1.getEmbeddedMetaData();</span>
+<span class="nc bnc" id="L904" title="All 2 branches missed.">        if (meta1 == null)</span>
+<span class="nc" id="L905">            return null;</span>
+<span class="nc" id="L906">        String mappedBy1 = mappedBy.substring(dotIdx + 1);</span>
+<span class="nc" id="L907">        return getMappedByField(meta1, mappedBy1);</span>
+    }
+
+
+    /**
+     * Logical inverse field.
+     */
+    public String getInverse() {
+<span class="nc bnc" id="L915" title="All 2 branches missed.">        if (ClassMetaData.DEFAULT_STRING.equals(_inverse))</span>
+<span class="nc" id="L916">            _inverse = null;</span>
+<span class="nc" id="L917">        return _inverse;</span>
+    }
+
+    /**
+     * Logical inverse field.
+     */
+    public void setInverse(String inverse) {
+<span class="nc" id="L924">        _inverses = null;</span>
+<span class="nc" id="L925">        _inverse = inverse;</span>
+<span class="nc" id="L926">    }</span>
+
+    /**
+     * Return all inverses of this field.
+     */
+    public FieldMetaData[] getInverseMetaDatas() {
+<span class="nc bnc" id="L932" title="All 2 branches missed.">        if (_inverses == null) {</span>
+            // can't declare both an inverse owner and a logical inverse
+<span class="nc" id="L934">            String inv = getInverse();</span>
+<span class="nc bnc" id="L935" title="All 6 branches missed.">            if (_mappedBy != null &amp;&amp; inv != null &amp;&amp; !_mappedBy.equals(inv))</span>
+<span class="nc" id="L936">                throw new MetaDataException(_loc.get(&quot;mapped-not-inverse&quot;,</span>
+                    this));
+
+            // get the metadata for the type on the other side of this relation
+<span class="nc" id="L940">            ClassMetaData meta = null;</span>
+<span class="nc bnc" id="L941" title="All 3 branches missed.">            switch (getTypeCode()) {</span>
+                case JavaTypes.PC:
+<span class="nc" id="L943">                    meta = getTypeMetaData();</span>
+<span class="nc" id="L944">                    break;</span>
+                case JavaTypes.ARRAY:
+                case JavaTypes.COLLECTION:
+                case JavaTypes.MAP:
+<span class="nc" id="L948">                    meta = _elem.getTypeMetaData();</span>
+                    break;
+            }
+
+<span class="nc" id="L952">            Collection&lt;FieldMetaData&gt; inverses = null;</span>
+<span class="nc bnc" id="L953" title="All 2 branches missed.">            if (meta != null) {</span>
+                // add mapped by and named inverse, if any
+<span class="nc" id="L955">                FieldMetaData field = getMappedByMetaData();</span>
+<span class="nc bnc" id="L956" title="All 2 branches missed.">                if (field != null) {</span>
+                    // mapped by field isn't necessarily a pc type, but all
+                    // inverses must be
+<span class="nc bnc" id="L959" title="All 2 branches missed.">                    if (field.getTypeCode() == JavaTypes.PC</span>
+<span class="nc bnc" id="L960" title="All 2 branches missed.">                        || field.getElement().getTypeCode() == JavaTypes.PC) {</span>
+<span class="nc" id="L961">                        inverses = new ArrayList&lt;&gt;(3);</span>
+<span class="nc" id="L962">                        inverses.add(field);</span>
+                    }
+<span class="nc bnc" id="L964" title="All 2 branches missed.">                } else if (inv != null) {</span>
+<span class="nc" id="L965">                    field = meta.getField(inv);</span>
+<span class="nc bnc" id="L966" title="All 2 branches missed.">                    if (field == null)</span>
+<span class="nc" id="L967">                        throw new MetaDataException(_loc.get(&quot;no-inverse&quot;,</span>
+                            this, inv));
+<span class="nc" id="L969">                    inverses = new ArrayList&lt;&gt;(3);</span>
+<span class="nc" id="L970">                    inverses.add(field);</span>
+                }
+
+                // scan rel type for fields that name this field as an inverse
+<span class="nc" id="L974">                FieldMetaData[] fields = meta.getFields();</span>
+<span class="nc" id="L975">                Class&lt;?&gt; type = getDeclaringMetaData().getDescribedType();</span>
+<span class="nc bnc" id="L976" title="All 2 branches missed.">                for (int i = 0; i &lt; fields.length; i++) {</span>
+                    // skip fields that aren't compatible with our owning class
+<span class="nc bnc" id="L978" title="All 3 branches missed.">                    switch (fields[i].getTypeCode()) {</span>
+                        case JavaTypes.PC:
+<span class="nc bnc" id="L980" title="All 2 branches missed.">                            if (!type.isAssignableFrom(fields[i].getType()))</span>
+<span class="nc" id="L981">                                continue;</span>
+                            break;
+                        case JavaTypes.COLLECTION:
+                        case JavaTypes.ARRAY:
+<span class="nc bnc" id="L985" title="All 2 branches missed.">                            if (!type.isAssignableFrom(fields[i].</span>
+<span class="nc" id="L986">                                getElement().getType()))</span>
+<span class="nc" id="L987">                                continue;</span>
+                            break;
+                        default:
+<span class="nc" id="L990">                            continue;</span>
+                    }
+
+                    // if the field declares us as its inverse and we haven't
+                    // already added it (we might have if we also declared it
+                    // as our inverse), add it now
+<span class="nc bnc" id="L996" title="All 2 branches missed.">                    if (_name.equals(fields[i].getMappedBy())</span>
+<span class="nc bnc" id="L997" title="All 2 branches missed.">                        || _name.equals(fields[i].getInverse())) {</span>
+<span class="nc bnc" id="L998" title="All 2 branches missed.">                        if (inverses == null)</span>
+<span class="nc" id="L999">                            inverses = new ArrayList&lt;&gt;(3);</span>
+<span class="nc bnc" id="L1000" title="All 2 branches missed.">                        if (!inverses.contains(fields[i]))</span>
+<span class="nc" id="L1001">                            inverses.add(fields[i]);</span>
+                    }
+                }
+            }
+
+<span class="nc" id="L1006">            MetaDataRepository repos = getRepository();</span>
+<span class="nc bnc" id="L1007" title="All 2 branches missed.">            if (inverses == null)</span>
+<span class="nc" id="L1008">                _inverses = repos.EMPTY_FIELDS;</span>
+            else
+<span class="nc" id="L1010">                _inverses = inverses.toArray</span>
+<span class="nc" id="L1011">                    (repos.newFieldMetaDataArray(inverses.size()));</span>
+        }
+<span class="nc" id="L1013">        return _inverses;</span>
+    }
+
+    /**
+     * The strategy to use for insert value generation.
+     * One of the constants from {@link ValueStrategies}.
+     */
+    public int getValueStrategy() {
+<span class="nc bnc" id="L1021" title="All 2 branches missed.">        if (_valStrategy == -1)</span>
+<span class="nc" id="L1022">            _valStrategy = ValueStrategies.NONE;</span>
+<span class="nc" id="L1023">        return _valStrategy;</span>
+    }
+
+    /**
+     * The strategy to use for insert value generation.
+     * One of the constants from {@link ValueStrategies}.
+     */
+    public void setValueStrategy(int strategy) {
+<span class="nc" id="L1031">        _valStrategy = strategy;</span>
+<span class="nc bnc" id="L1032" title="All 2 branches missed.">        if (strategy != ValueStrategies.SEQUENCE)</span>
+<span class="nc" id="L1033">            setValueSequenceName(null);</span>
+<span class="nc" id="L1034">    }</span>
+
+    /**
+     * The value sequence name, or null for none.
+     */
+    public String getValueSequenceName() {
+<span class="nc bnc" id="L1040" title="All 2 branches missed.">        if (ClassMetaData.DEFAULT_STRING.equals(_seqName))</span>
+<span class="nc" id="L1041">            _seqName = null;</span>
+<span class="nc" id="L1042">        return _seqName;</span>
+    }
+
+    /**
+     * The value sequence name, or null for none.
+     */
+    public void setValueSequenceName(String seqName) {
+<span class="nc" id="L1049">        _seqName = seqName;</span>
+<span class="nc" id="L1050">        _seqMeta = null;</span>
+<span class="nc bnc" id="L1051" title="All 2 branches missed.">        if (seqName != null)</span>
+<span class="nc" id="L1052">            setValueStrategy(ValueStrategies.SEQUENCE);</span>
+<span class="nc" id="L1053">    }</span>
+
+    /**
+     * Metadata for the value sequence.
+     */
+    public SequenceMetaData getValueSequenceMetaData() {
+<span class="nc bnc" id="L1059" title="All 4 branches missed.">        if (_seqMeta == null &amp;&amp; getValueSequenceName() != null)</span>
+<span class="nc" id="L1060">            _seqMeta = getRepository().getSequenceMetaData(_owner,</span>
+<span class="nc" id="L1061">                getValueSequenceName(), true);</span>
+<span class="nc" id="L1062">        return _seqMeta;</span>
+    }
+
+    /**
+     * The strategy to use when updating the field.
+     */
+    public int getUpdateStrategy() {
+<span class="nc bnc" id="L1069" title="All 2 branches missed.">        if (isVersion())</span>
+<span class="nc" id="L1070">            return UpdateStrategies.RESTRICT;</span>
+<span class="nc bnc" id="L1071" title="All 2 branches missed.">        if (_upStrategy == -1)</span>
+<span class="nc" id="L1072">            _upStrategy = UpdateStrategies.NONE;</span>
+<span class="nc" id="L1073">        return _upStrategy;</span>
+    }
+
+    /**
+     * Set the update strategy.
+     */
+    public void setUpdateStrategy(int strategy) {
+<span class="nc" id="L1080">        _upStrategy = strategy;</span>
+<span class="nc" id="L1081">    }</span>
+
+    /**
+     * Whether this field is backed by a large result set.
+     */
+    public boolean isLRS() {
+<span class="nc bnc" id="L1087" title="All 4 branches missed.">        return _lrs == Boolean.TRUE &amp;&amp; _manage == MANAGE_PERSISTENT;</span>
+    }
+
+    /**
+     * Whether this field is backed by a large result set.
+     */
+    public void setLRS(boolean lrs) {
+<span class="nc bnc" id="L1094" title="All 2 branches missed.">        _lrs = (lrs) ? Boolean.TRUE : Boolean.FALSE;</span>
+<span class="nc" id="L1095">    }</span>
+
+    /**
+     * Whether this field is backed by a stream.
+     *
+     * @since 1.1.0
+     */
+    public boolean isStream() {
+<span class="nc bnc" id="L1103" title="All 4 branches missed.">        return _stream == Boolean.TRUE &amp;&amp; _manage == MANAGE_PERSISTENT;</span>
+    }
+
+    /**
+     * Whether this field is backed by a stream.
+     *
+     * @since 1.1.0
+     */
+    public void setStream(boolean stream) {
+<span class="nc bnc" id="L1112" title="All 2 branches missed.">        _stream = (stream) ? Boolean.TRUE : Boolean.FALSE;</span>
+<span class="nc" id="L1113">    }</span>
+
+    /**
+     * Whether this field uses intermediate data when loading/storing
+     * information through a {@link OpenJPAStateManager}. Defaults to true.
+     *
+     * @see OpenJPAStateManager#setIntermediate(int,Object)
+     */
+    public boolean usesIntermediate() {
+<span class="nc" id="L1122">        return _intermediate;</span>
+    }
+
+    /**
+     * Whether this field uses intermediate data when loading/storing
+     * information through a {@link OpenJPAStateManager}. Defaults to true.
+     *
+     * @see OpenJPAStateManager#setIntermediate(int,Object)
+     */
+    public void setUsesIntermediate(boolean intermediate) {
+<span class="nc" id="L1132">        _intermediate = intermediate;</span>
+<span class="nc" id="L1133">        _owner.clearExtraFieldDataTable();</span>
+<span class="nc" id="L1134">    }</span>
+
+    /**
+     * Whether this field uses impl data in conjunction with standard
+     * field data when acting on a {@link OpenJPAStateManager}.
+     * Defaults to {@link Boolean#TRUE} (non-cachable impl data).
+     *
+     * @return {@link Boolean#FALSE} if this field does not use impl data,
+     * {@link Boolean#TRUE} if this field uses non-cachable impl
+     * data, or &lt;code&gt;null&lt;/code&gt; if this field uses impl data that
+     * should be cached across instances
+     * @see OpenJPAStateManager#setImplData(int,Object)
+     */
+    public Boolean usesImplData() {
+<span class="nc" id="L1148">        return _implData;</span>
+    }
+
+    /**
+     * Whether this field uses impl data in conjunction with standard
+     * field data when acting on a {@link OpenJPAStateManager}.
+     *
+     * @see OpenJPAStateManager#setImplData(int,Object)
+     * @see #usesImplData
+     */
+    public void setUsesImplData(Boolean implData) {
+<span class="nc" id="L1159">        _implData = implData;</span>
+<span class="nc" id="L1160">        _owner.clearExtraFieldDataTable();</span>
+<span class="nc" id="L1161">    }</span>
+
+    /**
+     * The orderings for this field to be applied on load, or empty array.
+     */
+    public Order[] getOrders() {
+<span class="nc bnc" id="L1167" title="All 2 branches missed.">        if (_orders == null) {</span>
+<span class="nc bnc" id="L1168" title="All 2 branches missed.">            if (_orderDec == null)</span>
+<span class="nc" id="L1169">                _orders = getRepository().EMPTY_ORDERS;</span>
+            else {
+<span class="nc" id="L1171">                String[] decs = StringUtil.split(_orderDec, &quot;,&quot;, 0);</span>
+<span class="nc" id="L1172">                Order[] orders = getRepository().newOrderArray(decs.length);</span>
+                int spc;
+                boolean asc;
+<span class="nc bnc" id="L1175" title="All 2 branches missed.">                for (int i = 0; i &lt; decs.length; i++) {</span>
+<span class="nc" id="L1176">                    decs[i] = decs[i].trim();</span>
+<span class="nc" id="L1177">                    spc = decs[i].indexOf(' ');</span>
+<span class="nc bnc" id="L1178" title="All 2 branches missed.">                    if (spc == -1)</span>
+<span class="nc" id="L1179">                        asc = true;</span>
+                    else {
+<span class="nc" id="L1181">                        asc = decs[i].substring(spc + 1).trim().</span>
+<span class="nc" id="L1182">                            toLowerCase().startsWith(&quot;asc&quot;);</span>
+<span class="nc" id="L1183">                        decs[i] = decs[i].substring(0, spc);</span>
+                    }
+<span class="nc" id="L1185">                    orders[i] = getRepository().newOrder(this, decs[i], asc);</span>
+                    //set &quot;isUsedInOrderBy&quot; to the field
+<span class="nc" id="L1187">                    ClassMetaData elemCls = getElement()</span>
+<span class="nc" id="L1188">                        .getDeclaredTypeMetaData();</span>
+<span class="nc bnc" id="L1189" title="All 2 branches missed.">                    if (elemCls != null) {</span>
+<span class="nc" id="L1190">                      FieldMetaData fmd = elemCls.getDeclaredField(decs[i]);</span>
+<span class="nc bnc" id="L1191" title="All 2 branches missed.">                      if (fmd != null)</span>
+<span class="nc" id="L1192">                        fmd.setUsedInOrderBy(true);</span>
+                    }
+                }
+<span class="nc" id="L1195">                _orders = orders;</span>
+            }
+        }
+<span class="nc" id="L1198">        return _orders;</span>
+    }
+
+    /**
+     * The orderings for this field to be applied on load.
+     */
+    public void setOrders(Order[] orders) {
+<span class="nc" id="L1205">        _orderDec = null;</span>
+<span class="nc" id="L1206">        _orders = orders;</span>
+<span class="nc" id="L1207">    }</span>
+
+    /**
+     * String declaring the orderings for this field to be applied on load,
+     * or null. The string is of the form:&lt;br /&gt;
+     * &lt;code&gt;orderable[ asc|desc][, ...]&lt;/code&gt;&lt;br /&gt;
+     * The orderable &lt;code&gt;#element&lt;/code&gt; is used to denote the value of
+     * the field's elements.
+     */
+    public String getOrderDeclaration() {
+<span class="nc bnc" id="L1217" title="All 4 branches missed.">        if (_orderDec == null &amp;&amp; _orders != null) {</span>
+<span class="nc" id="L1218">            StringBuilder buf = new StringBuilder();</span>
+<span class="nc bnc" id="L1219" title="All 2 branches missed.">            for (int i = 0; i &lt; _orders.length; i++) {</span>
+<span class="nc bnc" id="L1220" title="All 2 branches missed.">                if (i &gt; 0)</span>
+<span class="nc" id="L1221">                    buf.append(&quot;, &quot;);</span>
+<span class="nc" id="L1222">                buf.append(_orders[i].getName()).append(&quot; &quot;);</span>
+<span class="nc bnc" id="L1223" title="All 2 branches missed.">                buf.append((_orders[i].isAscending()) ? &quot;asc&quot; : &quot;desc&quot;);</span>
+            }
+<span class="nc" id="L1225">            _orderDec = buf.toString();</span>
+        }
+<span class="nc" id="L1227">        return _orderDec;</span>
+    }
+
+    /**
+     * String declaring the orderings for this field to be applied on load,
+     * or null. The string is of the form:&lt;br /&gt;
+     * &lt;code&gt;orderable[ asc|desc][, ...]&lt;/code&gt;&lt;br /&gt;
+     * The orderable &lt;code&gt;#element&lt;/code&gt; is used to denote the value of
+     * the field's elements.
+     */
+    public void setOrderDeclaration(String dec) {
+<span class="nc" id="L1238">        _orderDec = StringUtil.trimToNull(dec);</span>
+<span class="nc" id="L1239">        _orders = null;</span>
+<span class="nc" id="L1240">    }</span>
+
+    /**
+     * Order this field value when it is loaded.
+     */
+    public Object order(Object val) {
+<span class="nc bnc" id="L1246" title="All 2 branches missed.">        if (val == null)</span>
+<span class="nc" id="L1247">            return null;</span>
+
+<span class="nc" id="L1249">        Order[] orders = getOrders();</span>
+<span class="nc bnc" id="L1250" title="All 2 branches missed.">        if (orders.length == 0)</span>
+<span class="nc" id="L1251">            return val;</span>
+
+        // create a comparator for the elements of the value
+        Comparator&lt;?&gt; comp;
+<span class="nc bnc" id="L1255" title="All 2 branches missed.">        if (orders.length == 1)</span>
+<span class="nc" id="L1256">            comp = orders[0].getComparator();</span>
+        else {
+<span class="nc" id="L1258">            List&lt;Comparator&lt;?&gt;&gt; comps = null;</span>
+            Comparator&lt;?&gt; curComp;
+<span class="nc bnc" id="L1260" title="All 2 branches missed.">            for (int i = 0; i &lt; orders.length; i++) {</span>
+<span class="nc" id="L1261">                curComp = orders[i].getComparator();</span>
+<span class="nc bnc" id="L1262" title="All 2 branches missed.">                if (curComp != null) {</span>
+<span class="nc bnc" id="L1263" title="All 2 branches missed.">                    if (comps == null)</span>
+<span class="nc" id="L1264">                        comps = new ArrayList&lt;&gt;(orders.length);</span>
+<span class="nc bnc" id="L1265" title="All 2 branches missed.">                    if (i != comps.size())</span>
+<span class="nc" id="L1266">                        throw new MetaDataException(_loc.get</span>
+<span class="nc" id="L1267">                            (&quot;mixed-inmem-ordering&quot;, this));</span>
+<span class="nc" id="L1268">                    comps.add(curComp);</span>
+                }
+            }
+<span class="nc bnc" id="L1271" title="All 2 branches missed.">            if (comps == null)</span>
+<span class="nc" id="L1272">                comp = null;</span>
+            else
+<span class="nc" id="L1274">                comp = new ComparatorChain(comps);</span>
+        }
+
+<span class="nc bnc" id="L1277" title="All 2 branches missed.">        if (comp == null)</span>
+<span class="nc" id="L1278">            return val;</span>
+
+        // sort
+<span class="nc bnc" id="L1281" title="All 3 branches missed.">        switch (getTypeCode()) {</span>
+            case JavaTypes.ARRAY:
+<span class="nc" id="L1283">                List l = JavaTypes.toList(val, _elem.getType(), true);</span>
+<span class="nc" id="L1284">                Collections.sort(l, (Comparator&lt;? super Order&gt;) comp);</span>
+<span class="nc" id="L1285">                return JavaTypes.toArray(l, _elem.getType());</span>
+            case JavaTypes.COLLECTION:
+<span class="nc bnc" id="L1287" title="All 2 branches missed.">                if (val instanceof List)</span>
+<span class="nc" id="L1288">                    Collections.sort((List) val, (Comparator&lt;? super Order&gt;) comp);</span>
+<span class="nc" id="L1289">                return val;</span>
+            default:
+<span class="nc" id="L1291">                throw new MetaDataException(_loc.get(&quot;cant-order&quot;, this));</span>
+        }
+    }
+
+    /**
+     * Whether the field is externalized.
+     */
+    public boolean isExternalized() {
+<span class="nc bnc" id="L1299" title="All 2 branches missed.">        return getExternalizerMethod() != null</span>
+<span class="nc bnc" id="L1300" title="All 2 branches missed.">            || getExternalValueMap() != null;</span>
+    }
+
+    /**
+     * Convert the given field value to its external value through the
+     * provided externalizer, or return the value as-is if no externalizer.
+     */
+    public Object getExternalValue(Object val, StoreContext ctx) {
+<span class="nc" id="L1308">        Map extValues = getExternalValueMap();</span>
+<span class="nc bnc" id="L1309" title="All 2 branches missed.">        if (extValues != null) {</span>
+<span class="nc" id="L1310">            Object foundVal = extValues.get(val);</span>
+<span class="nc bnc" id="L1311" title="All 2 branches missed.">            if (foundVal == null) {</span>
+<span class="nc" id="L1312">                throw new UserException(_loc.get(&quot;bad-externalized-value&quot;,</span>
+<span class="nc" id="L1313">                        new Object[] { val, extValues.keySet(), this }))</span>
+<span class="nc" id="L1314">                        .setFatal(true).setFailedObject(val);</span>
+            } else {
+<span class="nc" id="L1316">                return foundVal;</span>
+            }
+        }
+
+<span class="nc" id="L1320">        Method externalizer = getExternalizerMethod();</span>
+<span class="nc bnc" id="L1321" title="All 2 branches missed.">        if (externalizer == null)</span>
+<span class="nc" id="L1322">            return val;</span>
+
+        // special case for queries: allow the given value to pass through
+        // as-is if it is already in externalized form
+<span class="nc bnc" id="L1326" title="All 4 branches missed.">        if (val != null &amp;&amp; getType().isInstance(val)</span>
+<span class="nc bnc" id="L1327" title="All 2 branches missed.">            &amp;&amp; (!getDeclaredType().isInstance(val)</span>
+<span class="nc bnc" id="L1328" title="All 2 branches missed.">            || getDeclaredType() == Object.class))</span>
+<span class="nc" id="L1329">            return val;</span>
+
+        try {
+            // either invoke the static toExternal(val[, ctx]) method, or the
+            // non-static val.toExternal([ctx]) method
+<span class="nc bnc" id="L1334" title="All 2 branches missed.">            if (Modifier.isStatic(externalizer.getModifiers())) {</span>
+<span class="nc bnc" id="L1335" title="All 2 branches missed.">                if (externalizer.getParameterTypes().length == 1)</span>
+<span class="nc" id="L1336">                    return externalizer.invoke(null, new Object[]{ val });</span>
+<span class="nc" id="L1337">                return externalizer.invoke(null, new Object[]{ val, ctx });</span>
+            }
+<span class="nc bnc" id="L1339" title="All 2 branches missed.">            if (val == null)</span>
+<span class="nc" id="L1340">                return null;</span>
+<span class="nc bnc" id="L1341" title="All 2 branches missed.">            if (externalizer.getParameterTypes().length == 0)</span>
+<span class="nc" id="L1342">                return externalizer.invoke(val, (Object[]) null);</span>
+<span class="nc" id="L1343">            return externalizer.invoke(val, new Object[]{ ctx });</span>
+<span class="nc" id="L1344">        } catch (OpenJPAException ke) {</span>
+<span class="nc" id="L1345">            throw ke;</span>
+<span class="nc" id="L1346">        } catch (Exception e) {</span>
+<span class="nc" id="L1347">            throw new MetaDataException(_loc.get(&quot;externalizer-err&quot;, this,</span>
+<span class="nc" id="L1348">                Exceptions.toString(val), e.toString())).setCause(e);</span>
+        }
+    }
+
+    /**
+     * Return the result of passing the given external value through the
+     * factory to get the field value. If no factory is present,
+     * the given value is returned as-is.
+     */
+    public Object getFieldValue(Object val, StoreContext ctx) {
+<span class="nc" id="L1358">        Map fieldValues = getFieldValueMap();</span>
+<span class="nc bnc" id="L1359" title="All 2 branches missed.">        if (fieldValues != null)</span>
+<span class="nc" id="L1360">            return fieldValues.get(val);</span>
+
+<span class="nc" id="L1362">        Member factory = getFactoryMethod();</span>
+<span class="nc bnc" id="L1363" title="All 2 branches missed.">        if (factory == null)</span>
+<span class="nc" id="L1364">            return val;</span>
+
+        try {
+<span class="nc bnc" id="L1367" title="All 4 branches missed.">            if (val == null &amp;&amp; getNullValue() == NULL_DEFAULT)</span>
+<span class="nc" id="L1368">                return AccessController.doPrivileged(</span>
+<span class="nc" id="L1369">                    J2DoPrivHelper.newInstanceAction(getDeclaredType()));</span>
+
+            // invoke either the constructor for the field type,
+            // or the static type.toField(val[, ctx]) method
+<span class="nc bnc" id="L1373" title="All 2 branches missed.">            if (factory instanceof Constructor) {</span>
+<span class="nc bnc" id="L1374" title="All 2 branches missed.">                if (val == null)</span>
+<span class="nc" id="L1375">                    return null;</span>
+<span class="nc" id="L1376">                return ((Constructor) factory).newInstance</span>
+<span class="nc" id="L1377">                    (new Object[]{ val });</span>
+            }
+
+<span class="nc" id="L1380">            Method meth = (Method) factory;</span>
+<span class="nc bnc" id="L1381" title="All 2 branches missed.">            if (meth.getParameterTypes().length == 1)</span>
+<span class="nc" id="L1382">                return meth.invoke(null, new Object[]{ val });</span>
+<span class="nc" id="L1383">            return meth.invoke(null, new Object[]{ val, ctx });</span>
+<span class="nc" id="L1384">        } catch (Exception e) {</span>
+            // unwrap cause
+<span class="nc bnc" id="L1386" title="All 2 branches missed.">            if (e instanceof InvocationTargetException) {</span>
+<span class="nc" id="L1387">                Throwable t = ((InvocationTargetException) e).</span>
+<span class="nc" id="L1388">                    getTargetException();</span>
+<span class="nc bnc" id="L1389" title="All 2 branches missed.">                if (t instanceof Error)</span>
+<span class="nc" id="L1390">                    throw (Error) t;</span>
+<span class="nc" id="L1391">                e = (Exception) t;</span>
+
+                // allow null values to cause NPEs and illegal arg exceptions
+                // without error
+<span class="nc bnc" id="L1395" title="All 6 branches missed.">                if (val == null &amp;&amp; (e instanceof NullPointerException</span>
+                    || e instanceof IllegalArgumentException))
+<span class="nc" id="L1397">                    return null;</span>
+            }
+
+<span class="nc bnc" id="L1400" title="All 2 branches missed.">            if (e instanceof OpenJPAException)</span>
+<span class="nc" id="L1401">                throw (OpenJPAException) e;</span>
+<span class="nc bnc" id="L1402" title="All 2 branches missed.">            if (e instanceof PrivilegedActionException)</span>
+<span class="nc" id="L1403">                e = ((PrivilegedActionException) e).getException();</span>
+<span class="nc" id="L1404">            throw new MetaDataException(_loc.get(&quot;factory-err&quot;, this,</span>
+<span class="nc" id="L1405">                Exceptions.toString(val), e.toString())).setCause(e);</span>
+        }
+    }
+
+    /**
+     * The name of this field's externalizer, or null if none.
+     */
+    public String getExternalizer() {
+<span class="nc" id="L1413">        return _extName;</span>
+    }
+
+    /**
+     * The name of this field's externalizer, or null if none.
+     */
+    public void setExternalizer(String externalizer) {
+<span class="nc" id="L1420">        _extName = externalizer;</span>
+<span class="nc" id="L1421">        _extMethod = DEFAULT_METHOD;</span>
+<span class="nc" id="L1422">    }</span>
+
+    /**
+     * The name of this field's factory, or null if none.
+     */
+    public String getFactory() {
+<span class="nc" id="L1428">        return _factName;</span>
+    }
+
+    /**
+     * The name of this field's factory, or null if none.
+     */
+    public void setFactory(String factory) {
+<span class="nc" id="L1435">        _factName = factory;</span>
+<span class="nc" id="L1436">        _factMethod = DEFAULT_METHOD;</span>
+<span class="nc" id="L1437">    }</span>
+
+    /**
+     * Properties string mapping field values to external values.
+     */
+    public String getExternalValues() {
+<span class="nc" id="L1443">        return _extString;</span>
+    }
+
+    /**
+     * Properties string mapping field values to external values.
+     */
+    public void setExternalValues(String values) {
+<span class="nc" id="L1450">        _extString = values;</span>
+<span class="nc" id="L1451">        _extValues = null;</span>
+<span class="nc" id="L1452">    }</span>
+
+    /**
+     * Return the mapping of field values to external values.
+     */
+    public Map getExternalValueMap() {
+<span class="nc" id="L1458">        parseExternalValues();</span>
+<span class="nc" id="L1459">        return _extValues;</span>
+    }
+
+    /**
+     * Return the mapping of external values to field values.
+     */
+    public Map getFieldValueMap() {
+<span class="nc" id="L1466">        parseExternalValues();</span>
+<span class="nc" id="L1467">        return _fieldValues;</span>
+    }
+
+    /**
+     * Parse external values into maps.
+     */
+    private void parseExternalValues() {
+<span class="nc bnc" id="L1474" title="All 4 branches missed.">        if (_extValues != Collections.EMPTY_MAP</span>
+            &amp;&amp; _fieldValues != Collections.EMPTY_MAP)
+<span class="nc" id="L1476">            return;</span>
+
+<span class="nc bnc" id="L1478" title="All 2 branches missed.">        if (_extString == null) {</span>
+<span class="nc" id="L1479">            _extValues = null;</span>
+<span class="nc" id="L1480">            _fieldValues = null;</span>
+<span class="nc" id="L1481">            return;</span>
+        }
+
+        // parse string into options; this takes care of proper trimming etc
+<span class="nc" id="L1485">        Options values = Configurations.parseProperties(_extString);</span>
+<span class="nc bnc" id="L1486" title="All 2 branches missed.">        if (values.isEmpty())</span>
+<span class="nc" id="L1487">            throw new MetaDataException(_loc.get(&quot;no-external-values&quot;, this,</span>
+                _extString));
+
+<span class="nc" id="L1490">        Map extValues = new HashMap((int) (values.size() * 1.33 + 1));</span>
+<span class="nc" id="L1491">        Map fieldValues = new HashMap((int) (values.size() * 1.33 + 1));</span>
+        Map.Entry entry;
+        Object extValue, fieldValue;
+<span class="nc bnc" id="L1494" title="All 2 branches missed.">        for (Iterator itr = values.entrySet().iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L1495">            entry = (Map.Entry) itr.next();</span>
+<span class="nc" id="L1496">            fieldValue = transform((String) entry.getKey(),</span>
+<span class="nc" id="L1497">                getDeclaredTypeCode());</span>
+<span class="nc" id="L1498">            extValue = transform((String) entry.getValue(), getTypeCode());</span>
+
+<span class="nc" id="L1500">            extValues.put(fieldValue, extValue);</span>
+<span class="nc" id="L1501">            fieldValues.put(extValue, fieldValue);</span>
+        }
+
+<span class="nc" id="L1504">        _extValues = extValues;</span>
+<span class="nc" id="L1505">        _fieldValues = fieldValues;</span>
+<span class="nc" id="L1506">    }</span>
+
+    /**
+     * Return the string value converted to the given type code. The string
+     * must be non-null and trimmed.
+     */
+    private Object transform(String val, int typeCode) {
+<span class="nc bnc" id="L1513" title="All 2 branches missed.">        if (&quot;null&quot;.equals(val))</span>
+<span class="nc" id="L1514">            return null;</span>
+
+<span class="nc bnc" id="L1516" title="All 11 branches missed.">        switch (typeCode) {</span>
+            case JavaTypes.BOOLEAN:
+            case JavaTypes.BOOLEAN_OBJ:
+<span class="nc" id="L1519">                return Boolean.valueOf(val);</span>
+            case JavaTypes.BYTE:
+            case JavaTypes.BYTE_OBJ:
+<span class="nc" id="L1522">                return Byte.valueOf(val);</span>
+            case JavaTypes.INT:
+            case JavaTypes.INT_OBJ:
+<span class="nc" id="L1525">                return Integer.valueOf(val);</span>
+            case JavaTypes.LONG:
+            case JavaTypes.LONG_OBJ:
+<span class="nc" id="L1528">                return Long.valueOf(val);</span>
+            case JavaTypes.SHORT:
+            case JavaTypes.SHORT_OBJ:
+<span class="nc" id="L1531">                return Short.valueOf(val);</span>
+            case JavaTypes.DOUBLE:
+            case JavaTypes.DOUBLE_OBJ:
+<span class="nc" id="L1534">                return Double.valueOf(val);</span>
+            case JavaTypes.FLOAT:
+            case JavaTypes.FLOAT_OBJ:
+<span class="nc" id="L1537">                return Float.valueOf(val);</span>
+            case JavaTypes.CHAR:
+            case JavaTypes.CHAR_OBJ:
+<span class="nc" id="L1540">                return Character.valueOf(val.charAt(0));</span>
+            case JavaTypes.STRING:
+<span class="nc" id="L1542">                return val;</span>
+            case JavaTypes.ENUM:
+<span class="nc" id="L1544">                return Enum.valueOf((Class&lt;? extends Enum&gt;)getDeclaredType(), val);</span>
+        }
+<span class="nc" id="L1546">        throw new MetaDataException(_loc.get(&quot;bad-external-type&quot;, this));</span>
+    }
+
+    /**
+     * The externalizer method.
+     */
+    public Method getExternalizerMethod() {
+<span class="nc bnc" id="L1553" title="All 2 branches missed.">        if (_manage != MANAGE_PERSISTENT)</span>
+<span class="nc" id="L1554">            return null;</span>
+<span class="nc bnc" id="L1555" title="All 2 branches missed.">        if (_extMethod == DEFAULT_METHOD) {</span>
+<span class="nc bnc" id="L1556" title="All 2 branches missed.">            if (_extName != null) {</span>
+<span class="nc" id="L1557">                _extMethod = findMethod(_extName);</span>
+<span class="nc bnc" id="L1558" title="All 2 branches missed.">                if (_extMethod == null)</span>
+<span class="nc" id="L1559">                    throw new MetaDataException(_loc.get(&quot;bad-externalizer&quot;,</span>
+                        this, _extName));
+            } else
+<span class="nc" id="L1562">                _extMethod = null;</span>
+        }
+<span class="nc" id="L1564">        return _extMethod;</span>
+    }
+
+    /**
+     * The factory method or constructor.
+     */
+    public Member getFactoryMethod() {
+<span class="nc bnc" id="L1571" title="All 2 branches missed.">        if (_manage != MANAGE_PERSISTENT)</span>
+<span class="nc" id="L1572">            return null;</span>
+<span class="nc bnc" id="L1573" title="All 2 branches missed.">        if (_factMethod == DEFAULT_METHOD) {</span>
+<span class="nc bnc" id="L1574" title="All 2 branches missed.">            if (getExternalizerMethod() == null)</span>
+<span class="nc" id="L1575">                _factMethod = null;</span>
+            else {
+                try {
+<span class="nc bnc" id="L1578" title="All 2 branches missed.">                    if (_factName == null)</span>
+<span class="nc" id="L1579">                        _factMethod = getDeclaredType().getConstructor</span>
+<span class="nc" id="L1580">                            (new Class[]{ getType() });</span>
+                    else
+<span class="nc" id="L1582">                    	_factMethod = findMethodByNameAndType(_factName, getType());</span>
+<span class="nc" id="L1583">                } catch (OpenJPAException ke) {</span>
+<span class="nc" id="L1584">                    throw ke;</span>
+<span class="nc" id="L1585">                } catch (Exception e) {</span>
+<span class="nc" id="L1586">                }</span>
+
+<span class="nc bnc" id="L1588" title="All 4 branches missed.">                if (!(_factMethod instanceof Constructor)</span>
+                    &amp;&amp; !(_factMethod instanceof Method))
+<span class="nc" id="L1590">                    throw new MetaDataException(_loc.get(&quot;bad-factory&quot;, this));</span>
+            }
+        }
+<span class="nc" id="L1593">        return _factMethod;</span>
+    }
+
+    /**
+     * Find the method for the specified name. Possible forms are:
+     * &lt;ul&gt;
+     * &lt;li&gt;toExternalString&lt;/li&gt;
+     * &lt;li&gt;MyFactoryClass.toExternalString&lt;/li&gt;
+     * &lt;li&gt;com.company.MyFactoryClass.toExternalString&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param method the name of the method to locate
+     * @return the method for invocation
+     */
+    private Method findMethod(String method) {
+<span class="nc" id="L1608">    	return findMethodByNameAndType(method, null);</span>
+    }
+
+    /**
+     * Find the method for the specified name and type. Possible forms are:
+     * &lt;ul&gt;
+     * &lt;li&gt;toExternalString&lt;/li&gt;
+     * &lt;li&gt;MyFactoryClass.toExternalString&lt;/li&gt;
+     * &lt;li&gt;com.company.MyFactoryClass.toExternalString&lt;/li&gt;
+     * &lt;/ul&gt;
+     *
+     * @param method the name of the method to locate
+     * @param type The type of the parameter which will pass the object from the database.
+     * @return the method for invocation
+     */
+    private Method findMethodByNameAndType(String method, Class&lt;?&gt; type) {
+<span class="nc bnc" id="L1624" title="All 2 branches missed.">        if (StringUtil.isEmpty(method))</span>
+<span class="nc" id="L1625">            return null;</span>
+
+        // get class name and get package name divide on the last '.', so the
+        // names don't apply in this case, but the methods do what we want
+<span class="nc" id="L1629">        String methodName = ClassUtil.getClassName(method);</span>
+<span class="nc" id="L1630">        String clsName = ClassUtil.getPackageName(method);</span>
+
+<span class="nc" id="L1632">        Class&lt;?&gt; cls = null;</span>
+<span class="nc" id="L1633">        Class&lt;?&gt; owner = _owner.getDescribedType();</span>
+
+<span class="nc bnc" id="L1635" title="All 2 branches missed.">        if (clsName.length() == 0)</span>
+<span class="nc" id="L1636">            cls = getDeclaredType();</span>
+<span class="nc bnc" id="L1637" title="All 2 branches missed.">        else if (clsName.equals(owner.getName())</span>
+<span class="nc bnc" id="L1638" title="All 2 branches missed.">            || clsName.equals(ClassUtil.getClassName(owner)))</span>
+<span class="nc" id="L1639">            cls = owner;</span>
+        else
+<span class="nc" id="L1641">            cls = JavaTypes.classForName(clsName, this);</span>
+
+        // find the named method
+<span class="nc" id="L1644">        Method[] methods = cls.getMethods();</span>
+        Class&lt;?&gt;[] params;
+<span class="nc bnc" id="L1646" title="All 2 branches missed.">        for (int i = 0; i &lt; methods.length; i++) {</span>
+<span class="nc bnc" id="L1647" title="All 2 branches missed.">            if (methods[i].getName().equals(methodName)) {</span>
+<span class="nc" id="L1648">                params = methods[i].getParameterTypes();</span>
+
+                // static factory methods require one argument or one argument
+                // plus a context; non-static methods require zero arguments or
+                // just a context
+<span class="nc bnc" id="L1653" title="All 6 branches missed.">                if (Modifier.isStatic(methods[i].getModifiers())</span>
+                    &amp;&amp; (params.length == 1 || (params.length == 2
+<span class="nc bnc" id="L1655" title="All 2 branches missed.">                    &amp;&amp; isStoreContextParameter(params[1]))))</span>
+
+<span class="nc bnc" id="L1657" title="All 2 branches missed.">                	if (type == null) {</span>
+<span class="nc" id="L1658">                		return methods[i];</span>
+<span class="nc bnc" id="L1659" title="All 2 branches missed.">                	} else if (isConvertibleToByMethodInvocationConversion(type, params[0])) {</span>
+<span class="nc" id="L1660">                		return methods[i];</span>
+                	}
+<span class="nc bnc" id="L1662" title="All 6 branches missed.">                if (!Modifier.isStatic(methods[i].getModifiers())</span>
+                    &amp;&amp; (params.length == 0 || (params.length == 1
+<span class="nc bnc" id="L1664" title="All 2 branches missed.">                    &amp;&amp; isStoreContextParameter(params[0]))))</span>
+<span class="nc" id="L1665">                    return methods[i];</span>
+            }
+        }
+
+<span class="nc" id="L1669">        return null;</span>
+    }
+
+	/**
+	 * Test if the {@code sourceType} is convertible to the {@code destType}.
+	 * Convertible follows the rules in Java Language Specification, 3rd Ed, s5.3 and means that:
+	 * &lt;ul&gt;
+	 * &lt;li&gt;{@code sourceType} and {@code destType} are the same type (identity conversion)&lt;/li&gt;
+	 * &lt;li&gt;For primitive types: that {@code sourceType} can be widened into {@code destType}
+	 * or that {@code sourceType} can be boxed into a class assignable to {@code destType}.&lt;/li&gt;
+	 * &lt;li&gt;For non-primitive types: that the {@code sourceType} can be unboxed into a primitive
+	 *  that is the same as, or can be widened into,
+	 * {@code destType} or {@code sourceType} can be assigned to {@code destType}.&lt;/li&gt;
+	 *
+	 * @return True iff the conditions above are true.
+	 */
+	private boolean isConvertibleToByMethodInvocationConversion(Class&lt;?&gt; sourceType, Class&lt;?&gt; destType) {
+		// Note that class.isAssignableFrom is a widening reference conversion test
+<span class="nc bnc" id="L1687" title="All 2 branches missed.">		if (sourceType.isPrimitive()) {</span>
+<span class="nc bnc" id="L1688" title="All 2 branches missed.">			return isConvertibleToByIdentityPrimitiveConversion(sourceType, destType)</span>
+<span class="nc bnc" id="L1689" title="All 2 branches missed.">				|| isConvertibleToByWideningPrimitive(sourceType, destType)</span>
+<span class="nc bnc" id="L1690" title="All 2 branches missed.">				|| destType.isAssignableFrom(box(sourceType));</span>
+		} else {
+			// Note that unbox will return null if the sourceType is not a wrapper.
+			// The identity primitive conversion and widening primitive handle this.
+<span class="nc bnc" id="L1694" title="All 2 branches missed.">			return isConvertibleToByIdentityPrimitiveConversion(unbox(sourceType), destType)</span>
+<span class="nc bnc" id="L1695" title="All 2 branches missed.">			|| isConvertibleToByWideningPrimitive(unbox(sourceType), destType)</span>
+<span class="nc bnc" id="L1696" title="All 2 branches missed.">			|| destType.isAssignableFrom(sourceType);</span>
+		}
+	}
+
+	/**
+	 * @return The results of unboxing {@code sourceType} following Java Language Specification, 3rd Ed, s5.1.8
+	 */
+	private Class&lt;?&gt; unbox(Class&lt;?&gt; sourceType) {
+<span class="nc bnc" id="L1704" title="All 2 branches missed.">		if (sourceType == java.lang.Boolean.class) {</span>
+<span class="nc" id="L1705">			return java.lang.Boolean.TYPE;</span>
+<span class="nc bnc" id="L1706" title="All 2 branches missed.">		} else if (sourceType == java.lang.Byte.class) {</span>
+<span class="nc" id="L1707">			return java.lang.Byte.TYPE;</span>
+<span class="nc bnc" id="L1708" title="All 2 branches missed.">		} else if (sourceType == java.lang.Short.class) {</span>
+<span class="nc" id="L1709">			return java.lang.Short.TYPE;</span>
+<span class="nc bnc" id="L1710" title="All 2 branches missed.">		} else if (sourceType == java.lang.Character.class) {</span>
+<span class="nc" id="L1711">			return java.lang.Character.TYPE;</span>
+<span class="nc bnc" id="L1712" title="All 2 branches missed.">		} else if (sourceType == java.lang.Integer.class) {</span>
+<span class="nc" id="L1713">			return java.lang.Integer.TYPE;</span>
+<span class="nc bnc" id="L1714" title="All 2 branches missed.">		} else if (sourceType == java.lang.Long.class) {</span>
+<span class="nc" id="L1715">			return java.lang.Long.TYPE;</span>
+<span class="nc bnc" id="L1716" title="All 2 branches missed.">		} else if (sourceType == java.lang.Float.class) {</span>
+<span class="nc" id="L1717">			return java.lang.Float.TYPE;</span>
+<span class="nc bnc" id="L1718" title="All 2 branches missed.">		} else if (sourceType == java.lang.Double.class) {</span>
+<span class="nc" id="L1719">			return java.lang.Double.TYPE;</span>
+		} else {
+<span class="nc" id="L1721">			return null;</span>
+		}
+	}
+
+	/**
+	 * @return The results of unboxing {@code sourceType} following Java Language Specification, 3rd Ed, s5.1.7
+	 */
+	private Class&lt;?&gt; box(Class&lt;?&gt; sourceType) {
+<span class="nc bnc" id="L1729" title="All 2 branches missed.">		if (sourceType.isPrimitive()) {</span>
+<span class="nc bnc" id="L1730" title="All 2 branches missed.">			if (sourceType == java.lang.Boolean.TYPE) {</span>
+<span class="nc" id="L1731">				return java.lang.Boolean.class;</span>
+<span class="nc bnc" id="L1732" title="All 2 branches missed.">			} else if (sourceType == java.lang.Byte.TYPE) {</span>
+<span class="nc" id="L1733">				return java.lang.Byte.class;</span>
+<span class="nc bnc" id="L1734" title="All 2 branches missed.">			} else if (sourceType == java.lang.Short.TYPE) {</span>
+<span class="nc" id="L1735">				return java.lang.Short.class;</span>
+<span class="nc bnc" id="L1736" title="All 2 branches missed.">			} else if (sourceType == java.lang.Character.TYPE) {</span>
+<span class="nc" id="L1737">				return java.lang.Character.class;</span>
+<span class="nc bnc" id="L1738" title="All 2 branches missed.">			} else if (sourceType == java.lang.Integer.TYPE) {</span>
+<span class="nc" id="L1739">				return java.lang.Integer.class;</span>
+<span class="nc bnc" id="L1740" title="All 2 branches missed.">			} else if (sourceType == java.lang.Long.TYPE) {</span>
+<span class="nc" id="L1741">				return java.lang.Long.class;</span>
+<span class="nc bnc" id="L1742" title="All 2 branches missed.">			} else if (sourceType == java.lang.Float.TYPE) {</span>
+<span class="nc" id="L1743">				return java.lang.Float.class;</span>
+<span class="nc bnc" id="L1744" title="All 2 branches missed.">			} else if (sourceType == java.lang.Double.TYPE) {</span>
+<span class="nc" id="L1745">				return java.lang.Double.class;</span>
+			}
+<span class="nc" id="L1747">			return null;  // Should never be reached because all primitives are accounted for above.</span>
+		} else {
+<span class="nc" id="L1749">			throw new IllegalArgumentException(&quot;Cannot box a type that is not a primitive.&quot;);</span>
+		}
+	}
+
+	/**
+	 * @return true if {@code sourceType} can be converted by a widening primitive conversion
+	 *  following Java Language Specification, 3rd Ed, s5.1.2
+	 */
+	private boolean isConvertibleToByWideningPrimitive(Class&lt;?&gt; sourceType, Class&lt;?&gt; destType) {
+		// Widening conversion following Java Language Specification, s5.1.2.
+<span class="nc bnc" id="L1759" title="All 2 branches missed.">		if (sourceType == java.lang.Byte.TYPE) {</span>
+<span class="nc bnc" id="L1760" title="All 10 branches missed.">			return destType == java.lang.Short.TYPE ||</span>
+			    destType == java.lang.Integer.TYPE ||
+			    destType == java.lang.Long.TYPE ||
+			    destType == java.lang.Float.TYPE ||
+			    destType == java.lang.Double.TYPE;
+<span class="nc bnc" id="L1765" title="All 2 branches missed.">		} else if (sourceType == java.lang.Short.TYPE) {</span>
+<span class="nc bnc" id="L1766" title="All 8 branches missed.">			return destType == java.lang.Integer.TYPE ||</span>
+				destType == java.lang.Long.TYPE ||
+				destType == java.lang.Float.TYPE ||
+				destType == java.lang.Double.TYPE;
+<span class="nc bnc" id="L1770" title="All 2 branches missed.">		} else if (sourceType == java.lang.Character.TYPE) {</span>
+<span class="nc bnc" id="L1771" title="All 8 branches missed.">			return destType == java.lang.Integer.TYPE ||</span>
+			  	destType == java.lang.Long.TYPE ||
+			  	destType == java.lang.Float.TYPE ||
+			  	destType == java.lang.Double.TYPE;
+<span class="nc bnc" id="L1775" title="All 2 branches missed.">		} else if (sourceType == java.lang.Integer.TYPE) {</span>
+<span class="nc bnc" id="L1776" title="All 6 branches missed.">			return destType == java.lang.Long.TYPE ||</span>
+			  	destType == java.lang.Float.TYPE ||
+			  	destType == java.lang.Double.TYPE;
+<span class="nc bnc" id="L1779" title="All 2 branches missed.">		} else if (sourceType == java.lang.Long.TYPE) {</span>
+<span class="nc bnc" id="L1780" title="All 4 branches missed.">			return destType == java.lang.Float.TYPE ||</span>
+			  	destType == java.lang.Double.TYPE;
+<span class="nc bnc" id="L1782" title="All 2 branches missed.">		} else if (sourceType == java.lang.Float.TYPE) {</span>
+<span class="nc bnc" id="L1783" title="All 2 branches missed.">			return destType == java.lang.Double.TYPE;</span>
+		}
+<span class="nc" id="L1785">		return false;</span>
+	}
+
+	/**
+	 * Returns true iff the sourceType is a primitive that can be converted to
+	 * destType using an identity conversion - i.e. sourceType and destType are the same type.
+	 * following Java Language Specification, 3rd Ed, s5.1.1
+	 */
+	private boolean isConvertibleToByIdentityPrimitiveConversion(Class&lt;?&gt; sourceType, Class&lt;?&gt; destType) {
+<span class="nc bnc" id="L1794" title="All 6 branches missed.">		return sourceType != null &amp;&amp; sourceType.isPrimitive() &amp;&amp; sourceType == destType;</span>
+	}
+
+    /**
+     * Return true if the given type is a store context type; we can't
+     * use the standard &lt;code&gt;isAssignableFrom&lt;/code&gt; because of classloader
+     * oddness.
+     */
+    private static boolean isStoreContextParameter(Class&lt;?&gt; type) {
+<span class="nc" id="L1803">        return StoreContext.class.getName().equals(type.getName());</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L1808" title="All 2 branches missed.">        if (other == this)</span>
+<span class="nc" id="L1809">            return true;</span>
+<span class="nc bnc" id="L1810" title="All 2 branches missed.">        if (!(other instanceof FieldMetaData))</span>
+<span class="nc" id="L1811">            return false;</span>
+<span class="nc" id="L1812">        return getFullName(true).equals(((FieldMetaData) other).</span>
+<span class="nc" id="L1813">            getFullName(true));</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L1818">        return getFullName(true).hashCode();</span>
+    }
+
+    public int compareTo(Object other) {
+<span class="nc bnc" id="L1822" title="All 2 branches missed.">        if (other == null)</span>
+<span class="nc" id="L1823">            return 1;</span>
+<span class="nc" id="L1824">        return getFullName(true).compareTo(((FieldMetaData) other).</span>
+<span class="nc" id="L1825">            getFullName(true));</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L1830">        return getFullName(true);</span>
+    }
+
+    ////////////////////////
+    // Resolve and validate
+    ////////////////////////
+
+    /**
+     * Resolve mode for this field.
+     */
+    @Override
+    public int getResolve() {
+<span class="nc" id="L1842">        return _resMode;</span>
+    }
+
+    /**
+     * Resolve mode for this field.
+     */
+    @Override
+    public void setResolve(int mode) {
+<span class="nc" id="L1850">        _resMode = mode;</span>
+<span class="nc" id="L1851">    }</span>
+
+    /**
+     * Resolve mode for this field.
+     */
+    @Override
+    public void setResolve(int mode, boolean on) {
+<span class="nc bnc" id="L1858" title="All 2 branches missed.">        if (mode == MODE_NONE)</span>
+<span class="nc" id="L1859">            _resMode = mode;</span>
+<span class="nc bnc" id="L1860" title="All 2 branches missed.">        else if (on)</span>
+<span class="nc" id="L1861">            _resMode |= mode;</span>
+        else
+<span class="nc" id="L1863">            _resMode &amp;= ~mode;</span>
+<span class="nc" id="L1864">    }</span>
+
+    /**
+     * Resolve and validate metadata. Return true if already resolved.
+     */
+    @Override
+    public boolean resolve(int mode) {
+<span class="nc bnc" id="L1871" title="All 2 branches missed.">        if ((_resMode &amp; mode) == mode)</span>
+<span class="nc" id="L1872">            return true;</span>
+<span class="nc" id="L1873">        int cur = _resMode;</span>
+<span class="nc" id="L1874">        _resMode |= mode;</span>
+
+<span class="nc" id="L1876">        Log log = getRepository().getLog();</span>
+<span class="nc bnc" id="L1877" title="All 2 branches missed.">        if (log.isTraceEnabled())</span>
+<span class="nc" id="L1878">            log.trace(_loc.get(&quot;resolve-field&quot;, _owner + &quot;@&quot;</span>
+<span class="nc" id="L1879">                + System.identityHashCode(_owner) + &quot;.&quot; + _name));</span>
+
+        // we only perform actions for metadata mode
+<span class="nc bnc" id="L1882" title="All 4 branches missed.">        if ((mode &amp; MODE_META) == 0 || (cur &amp; MODE_META) != 0)</span>
+<span class="nc" id="L1883">            return false;</span>
+
+<span class="nc" id="L1885">        Method externalizer = getExternalizerMethod();</span>
+<span class="nc bnc" id="L1886" title="All 2 branches missed.">        if (externalizer != null)</span>
+<span class="nc" id="L1887">            setType(externalizer.getReturnType());</span>
+
+        // only pass on metadata resolve mode so that metadata is always
+        // resolved before any other resolve modes our subclasses pass along
+<span class="nc" id="L1891">        _val.resolve(MODE_META);</span>
+<span class="nc" id="L1892">        _key.resolve(MODE_META);</span>
+<span class="nc" id="L1893">        _elem.resolve(MODE_META);</span>
+
+<span class="nc" id="L1895">        MetaDataRepository repos = getRepository();</span>
+<span class="nc" id="L1896">        int validate = repos.getValidate();</span>
+<span class="nc bnc" id="L1897" title="All 2 branches missed.">        if ((validate &amp; MetaDataRepository.VALIDATE_META) != 0</span>
+<span class="nc bnc" id="L1898" title="All 4 branches missed.">            &amp;&amp; (!ImplHelper.isManagedType(repos.getConfiguration(),</span>
+<span class="nc" id="L1899">                _owner.getDescribedType())</span>
+            || (validate &amp; MetaDataRepository.VALIDATE_UNENHANCED) == 0)) {
+<span class="nc" id="L1901">            validateLRS();</span>
+<span class="nc bnc" id="L1902" title="All 2 branches missed.">            if ((validate &amp; MetaDataRepository.VALIDATE_RUNTIME) == 0)</span>
+<span class="nc" id="L1903">                validateSupportedType();</span>
+<span class="nc" id="L1904">            validateValue();</span>
+<span class="nc" id="L1905">            validateExtensionKeys();</span>
+        }
+<span class="nc" id="L1907">        return false;</span>
+    }
+
+    /**
+     * Validate that this field can be used for LRS.
+     */
+    private void validateLRS() {
+<span class="nc bnc" id="L1914" title="All 2 branches missed.">        if (!isLRS())</span>
+<span class="nc" id="L1915">            return;</span>
+
+        // can't use lrs for arrays
+<span class="nc bnc" id="L1918" title="All 2 branches missed.">        if (getTypeCode() == JavaTypes.ARRAY)</span>
+<span class="nc" id="L1919">            throw new MetaDataException(_loc.get(&quot;bad-lrs-array&quot;, this));</span>
+
+        // can't use lrs for externalized vals
+<span class="nc bnc" id="L1922" title="All 2 branches missed.">        if (getExternalizerMethod() != null)</span>
+<span class="nc" id="L1923">            throw new MetaDataException(_loc.get(&quot;bad-lrs-extern&quot;, this));</span>
+
+        // can't use lrs for concrete types
+<span class="nc bnc" id="L1926" title="All 4 branches missed.">        if (getType() != Collection.class &amp;&amp; getType() != Map.class</span>
+<span class="nc bnc" id="L1927" title="All 2 branches missed.">            &amp;&amp; getType() != Set.class)</span>
+<span class="nc" id="L1928">            throw new MetaDataException(_loc.get(&quot;bad-lrs-concrete&quot;, this));</span>
+<span class="nc" id="L1929">    }</span>
+
+    /**
+     * Validate that this field is supported by the runtime.
+     */
+    private void validateSupportedType() {
+        // log warnings about things we don't handle
+<span class="nc" id="L1936">        OpenJPAConfiguration conf = getRepository().getConfiguration();</span>
+<span class="nc" id="L1937">        Collection&lt;String&gt; opts = conf.supportedOptions();</span>
+<span class="nc" id="L1938">        Log log = conf.getLog(OpenJPAConfiguration.LOG_METADATA);</span>
+<span class="nc bnc" id="L1939" title="All 5 branches missed.">        switch (getTypeCode()) {</span>
+            case JavaTypes.PC:
+<span class="nc bnc" id="L1941" title="All 4 branches missed.">                if (isEmbedded() &amp;&amp; !opts.contains(</span>
+                	OpenJPAConfiguration.OPTION_EMBEDDED_RELATION)) {
+<span class="nc" id="L1943">                    setEmbedded(false);</span>
+<span class="nc bnc" id="L1944" title="All 2 branches missed.">                    if (log.isWarnEnabled())</span>
+<span class="nc" id="L1945">                        log.warn(_loc.get(&quot;cant-embed&quot;, this));</span>
+                } else
+<span class="nc bnc" id="L1947" title="All 4 branches missed.">                if (isEmbedded() &amp;&amp; getDeclaredTypeCode() != JavaTypes.PC) {</span>
+<span class="nc" id="L1948">                    setEmbedded(false);</span>
+<span class="nc bnc" id="L1949" title="All 2 branches missed.">                    if (log.isWarnEnabled())</span>
+<span class="nc" id="L1950">                        log.warn(_loc.get(&quot;cant-embed-extern&quot;, this));</span>
+                }
+                break;
+            case JavaTypes.COLLECTION:
+<span class="nc bnc" id="L1954" title="All 2 branches missed.">                if (!opts.contains(OpenJPAConfiguration.OPTION_TYPE_COLLECTION))</span>
+<span class="nc" id="L1955">                    throw new UnsupportedException(</span>
+<span class="nc" id="L1956">                        _loc.get(&quot;type-not-supported&quot;,</span>
+                            &quot;Collection&quot;, this));
+<span class="nc bnc" id="L1958" title="All 4 branches missed.">                if (_elem.isEmbeddedPC() &amp;&amp; !opts.contains(</span>
+                    OpenJPAConfiguration.OPTION_EMBEDDED_COLLECTION_RELATION)){
+<span class="nc" id="L1960">                    _elem.setEmbedded(false);</span>
+<span class="nc bnc" id="L1961" title="All 2 branches missed.">                    if (log.isWarnEnabled())</span>
+<span class="nc" id="L1962">                        log.warn(_loc.get(&quot;cant-embed-element&quot;, this));</span>
+                }
+                break;
+            case JavaTypes.ARRAY:
+<span class="nc bnc" id="L1966" title="All 2 branches missed.">                if (!opts.contains(OpenJPAConfiguration.OPTION_TYPE_ARRAY))</span>
+<span class="nc" id="L1967">                    throw new UnsupportedException(</span>
+<span class="nc" id="L1968">                        _loc.get(&quot;type-not-supported&quot;,</span>
+                            &quot;Array&quot;, this));
+<span class="nc bnc" id="L1970" title="All 4 branches missed.">                if (_elem.isEmbeddedPC() &amp;&amp; !opts.contains(</span>
+                    OpenJPAConfiguration.OPTION_EMBEDDED_COLLECTION_RELATION)) {
+<span class="nc" id="L1972">                    _elem.setEmbedded(false);</span>
+<span class="nc bnc" id="L1973" title="All 2 branches missed.">                    if (log.isWarnEnabled())</span>
+<span class="nc" id="L1974">                        log.warn(_loc.get(&quot;cant-embed-element&quot;, this));</span>
+                }
+                break;
+            case JavaTypes.MAP:
+<span class="nc bnc" id="L1978" title="All 2 branches missed.">                if (!opts.contains(OpenJPAConfiguration.OPTION_TYPE_MAP))</span>
+<span class="nc" id="L1979">                    throw new UnsupportedException(</span>
+<span class="nc" id="L1980">                        _loc.get(&quot;type-not-supported&quot;,</span>
+                            &quot;Map&quot;, this));
+<span class="nc bnc" id="L1982" title="All 4 branches missed.">                if (_elem.isEmbeddedPC() &amp;&amp; !opts.contains(</span>
+                	OpenJPAConfiguration.OPTION_EMBEDDED_MAP_RELATION)) {
+<span class="nc" id="L1984">                    _elem.setEmbedded(false);</span>
+<span class="nc bnc" id="L1985" title="All 2 branches missed.">                    if (log.isWarnEnabled())</span>
+<span class="nc" id="L1986">                        log.warn(_loc.get(&quot;cant-embed-element&quot;, this));</span>
+                }
+<span class="nc bnc" id="L1988" title="All 4 branches missed.">                if (_key.isEmbeddedPC() &amp;&amp; !opts.contains(</span>
+                	OpenJPAConfiguration.OPTION_EMBEDDED_MAP_RELATION)) {
+<span class="nc" id="L1990">                    _key.setEmbedded(false);</span>
+<span class="nc bnc" id="L1991" title="All 2 branches missed.">                    if (log.isWarnEnabled())</span>
+<span class="nc" id="L1992">                        log.warn(_loc.get(&quot;cant-embed-key&quot;, this));</span>
+                }
+                break;
+        }
+<span class="nc" id="L1996">    }</span>
+
+    /**
+     * Validate our value strategy.
+     */
+    private void validateValue() {
+<span class="nc bnc" id="L2002" title="All 4 branches missed.">        if (getExternalizerMethod() != null &amp;&amp; getExternalValueMap() != null)</span>
+<span class="nc" id="L2003">            throw new MetaDataException(_loc.get(&quot;extern-externvalues&quot;, this));</span>
+<span class="nc bnc" id="L2004" title="All 2 branches missed.">        if (getValueStrategy() == ValueStrategies.SEQUENCE</span>
+<span class="nc bnc" id="L2005" title="All 2 branches missed.">            &amp;&amp; getValueSequenceName() == null)</span>
+<span class="nc" id="L2006">            throw new MetaDataException(_loc.get(&quot;no-seq-name&quot;, this));</span>
+<span class="nc" id="L2007">        ValueStrategies.assertSupported(getValueStrategy(), this,</span>
+            &quot;value strategy&quot;);
+<span class="nc" id="L2009">    }</span>
+
+    /**
+     * Copy state from the given field to this one. Do not copy mapping
+     * information.
+     */
+    public void copy(FieldMetaData field) {
+<span class="nc" id="L2016">        super.copy(field);</span>
+
+<span class="nc" id="L2018">        _intermediate = field.usesIntermediate();</span>
+<span class="nc" id="L2019">        _implData = field.usesImplData();</span>
+
+        // copy field-level info; use get methods to force resolution of
+        // lazy data
+<span class="nc" id="L2023">        _proxyClass = field.getProxyType();</span>
+<span class="nc" id="L2024">        _initializer = field.getInitializer();</span>
+<span class="nc" id="L2025">        _transient = field.isTransient();</span>
+<span class="nc" id="L2026">        _nullValue = field.getNullValue();</span>
+<span class="nc" id="L2027">        _manage = field.getManagement();</span>
+<span class="nc" id="L2028">        _explicit = field.isExplicit();</span>
+<span class="nc" id="L2029">        _extName = field.getExternalizer();</span>
+<span class="nc" id="L2030">        _extMethod = DEFAULT_METHOD;</span>
+<span class="nc" id="L2031">        _factName = field.getFactory();</span>
+<span class="nc" id="L2032">        _factMethod = DEFAULT_METHOD;</span>
+<span class="nc" id="L2033">        _extString = field.getExternalValues();</span>
+<span class="nc" id="L2034">        _extValues = Collections.EMPTY_MAP;</span>
+<span class="nc" id="L2035">        _fieldValues = Collections.EMPTY_MAP;</span>
+<span class="nc" id="L2036">        _primKey = field.isPrimaryKey();</span>
+<span class="nc" id="L2037">        _backingMember = field._backingMember;</span>
+<span class="nc" id="L2038">        _enumField = field._enumField;</span>
+<span class="nc" id="L2039">        _lobField = field._lobField;</span>
+<span class="nc" id="L2040">        _serializableField = field._serializableField;</span>
+<span class="nc" id="L2041">        _generated = field._generated;</span>
+<span class="nc" id="L2042">        _mappedByIdValue = field._mappedByIdValue;</span>
+<span class="nc" id="L2043">        _isElementCollection = field._isElementCollection;</span>
+<span class="nc" id="L2044">        _access = field._access;</span>
+<span class="nc" id="L2045">        _orderDec = field._orderDec;</span>
+<span class="nc" id="L2046">        _useSchemaElement = field._useSchemaElement;</span>
+
+        // embedded fields can't be versions
+<span class="nc bnc" id="L2049" title="All 4 branches missed.">        if (_owner.getEmbeddingMetaData() == null &amp;&amp; _version == null)</span>
+<span class="nc bnc" id="L2050" title="All 2 branches missed.">            _version = (field.isVersion()) ? Boolean.TRUE : Boolean.FALSE;</span>
+
+        // only copy this data if not already set explicitly in this instance
+<span class="nc bnc" id="L2053" title="All 2 branches missed.">        if (_dfg == 0) {</span>
+<span class="nc bnc" id="L2054" title="All 2 branches missed.">            _dfg = (field.isInDefaultFetchGroup()) ? DFG_TRUE : DFG_FALSE;</span>
+<span class="nc bnc" id="L2055" title="All 2 branches missed.">            if (field.isDefaultFetchGroupExplicit())</span>
+<span class="nc" id="L2056">                _dfg |= DFG_EXPLICIT;</span>
+        }
+<span class="nc bnc" id="L2058" title="All 4 branches missed.">        if (_fgSet == null &amp;&amp; field._fgSet != null)</span>
+<span class="nc" id="L2059">            _fgSet = new HashSet(field._fgSet);</span>
+<span class="nc bnc" id="L2060" title="All 2 branches missed.">        if (_lfg == null)</span>
+<span class="nc" id="L2061">            _lfg = field.getLoadFetchGroup();</span>
+<span class="nc bnc" id="L2062" title="All 2 branches missed.">        if (_lrs == null)</span>
+<span class="nc bnc" id="L2063" title="All 2 branches missed.">            _lrs = (field.isLRS()) ? Boolean.TRUE : Boolean.FALSE;</span>
+<span class="nc bnc" id="L2064" title="All 2 branches missed.">        if (_valStrategy == -1)</span>
+<span class="nc" id="L2065">            _valStrategy = field.getValueStrategy();</span>
+<span class="nc bnc" id="L2066" title="All 2 branches missed.">        if (_upStrategy == -1)</span>
+<span class="nc" id="L2067">            _upStrategy = field.getUpdateStrategy();</span>
+<span class="nc bnc" id="L2068" title="All 2 branches missed.">        if (ClassMetaData.DEFAULT_STRING.equals(_seqName)) {</span>
+<span class="nc" id="L2069">            _seqName = field.getValueSequenceName();</span>
+<span class="nc" id="L2070">            _seqMeta = null;</span>
+        }
+<span class="nc bnc" id="L2072" title="All 2 branches missed.">        if (ClassMetaData.DEFAULT_STRING.equals(_inverse))</span>
+<span class="nc" id="L2073">            _inverse = field.getInverse();</span>
+
+        // copy value metadata
+<span class="nc" id="L2076">        _val.copy(field);</span>
+<span class="nc" id="L2077">        _key.copy(field.getKey());</span>
+<span class="nc" id="L2078">        _elem.copy(field.getElement());</span>
+<span class="nc" id="L2079">    }</span>
+
+    @Override
+    protected void addExtensionKeys(Collection exts) {
+<span class="nc" id="L2083">        getRepository().getMetaDataFactory().addFieldExtensionKeys(exts);</span>
+<span class="nc" id="L2084">    }</span>
+
+    ///////////////
+    // Commentable
+    ///////////////
+
+    @Override
+    public String[] getComments() {
+<span class="nc bnc" id="L2092" title="All 2 branches missed.">        return (_comments == null) ? EMPTY_COMMENTS : _comments;</span>
+    }
+
+    @Override
+    public void setComments(String[] comments) {
+<span class="nc" id="L2097">        _comments = comments;</span>
+<span class="nc" id="L2098">    }</span>
+
+    ////////////////////////////////
+    // ValueMetaData implementation
+    ////////////////////////////////
+
+    @Override
+    public FieldMetaData getFieldMetaData() {
+<span class="nc" id="L2106">        return this;</span>
+    }
+
+    @Override
+    public Class getType() {
+<span class="nc" id="L2111">        return _val.getType();</span>
+    }
+
+    @Override
+    public void setType(Class type) {
+<span class="nc" id="L2116">        _val.setType(type);</span>
+<span class="nc bnc" id="L2117" title="All 2 branches missed.">        if (type.isArray())</span>
+<span class="nc" id="L2118">            _elem.setType(type.getComponentType());</span>
+<span class="nc bnc" id="L2119" title="All 2 branches missed.">        else if (type == Properties.class) {</span>
+<span class="nc" id="L2120">            _key.setType(String.class);</span>
+<span class="nc" id="L2121">            _elem.setType(String.class);</span>
+        }
+<span class="nc" id="L2123">    }</span>
+
+    @Override
+    public int getTypeCode() {
+<span class="nc" id="L2127">        return _val.getTypeCode();</span>
+    }
+
+    @Override
+    public void setTypeCode(int code) {
+<span class="nc" id="L2132">        _val.setTypeCode(code);</span>
+<span class="nc" id="L2133">    }</span>
+
+    @Override
+    public boolean isTypePC() {
+<span class="nc" id="L2137">        return _val.isTypePC();</span>
+    }
+
+    @Override
+    public ClassMetaData getTypeMetaData() {
+<span class="nc" id="L2142">        return _val.getTypeMetaData();</span>
+    }
+
+    @Override
+    public Class getDeclaredType() {
+<span class="nc" id="L2147">        return _val.getDeclaredType();</span>
+    }
+
+    @Override
+    public void setDeclaredType(Class type) {
+<span class="nc" id="L2152">        _val.setDeclaredType(type);</span>
+<span class="nc bnc" id="L2153" title="All 2 branches missed.">        if (type.isArray())</span>
+<span class="nc" id="L2154">            _elem.setDeclaredType(type.getComponentType());</span>
+<span class="nc bnc" id="L2155" title="All 2 branches missed.">        else if (type == Properties.class) {</span>
+<span class="nc" id="L2156">            _key.setDeclaredType(String.class);</span>
+<span class="nc" id="L2157">            _elem.setDeclaredType(String.class);</span>
+        }
+<span class="nc" id="L2159">    }</span>
+
+    @Override
+    public int getDeclaredTypeCode() {
+<span class="nc" id="L2163">        return _val.getDeclaredTypeCode();</span>
+    }
+
+    @Override
+    public void setDeclaredTypeCode(int type) {
+<span class="nc" id="L2168">        _val.setDeclaredTypeCode(type);</span>
+<span class="nc" id="L2169">    }</span>
+
+    @Override
+    public boolean isDeclaredTypePC() {
+<span class="nc" id="L2173">        return _val.isDeclaredTypePC();</span>
+    }
+
+    @Override
+    public ClassMetaData getDeclaredTypeMetaData() {
+<span class="nc" id="L2178">        return _val.getDeclaredTypeMetaData();</span>
+    }
+
+    @Override
+    public boolean isEmbedded() {
+<span class="nc" id="L2183">        return _val.isEmbedded();</span>
+    }
+
+    @Override
+    public void setEmbedded(boolean embedded) {
+<span class="nc" id="L2188">        _val.setEmbedded(embedded);</span>
+<span class="nc" id="L2189">    }</span>
+
+    @Override
+    public boolean isEmbeddedPC() {
+<span class="nc" id="L2193">        return _val.isEmbeddedPC();</span>
+    }
+
+    @Override
+    public ClassMetaData getEmbeddedMetaData() {
+<span class="nc" id="L2198">        return _val.getEmbeddedMetaData();</span>
+    }
+
+    @Override
+    public ClassMetaData addEmbeddedMetaData(int access) {
+<span class="nc" id="L2203">        return _val.addEmbeddedMetaData(access);</span>
+    }
+    @Override
+    public ClassMetaData addEmbeddedMetaData() {
+<span class="nc" id="L2207">        return _val.addEmbeddedMetaData();</span>
+    }
+
+    @Override
+    public int getCascadeDelete() {
+<span class="nc" id="L2212">        return _val.getCascadeDelete();</span>
+    }
+
+    @Override
+    public void setCascadeDelete(int delete) {
+<span class="nc" id="L2217">        _val.setCascadeDelete(delete);</span>
+<span class="nc" id="L2218">    }</span>
+
+    @Override
+    public int getCascadePersist() {
+<span class="nc" id="L2222">        return _val.getCascadePersist();</span>
+    }
+
+    @Override
+    public void setCascadePersist(int persist) {
+<span class="nc" id="L2227">        _val.setCascadePersist(persist);</span>
+<span class="nc" id="L2228">    }</span>
+
+    @Override
+    public void setCascadePersist(int cascade, boolean checkPUDefault) {
+<span class="nc" id="L2232">        _val.setCascadePersist(cascade, checkPUDefault);</span>
+<span class="nc" id="L2233">    }</span>
+
+    @Override
+    public int getCascadeAttach() {
+<span class="nc" id="L2237">        return _val.getCascadeAttach();</span>
+    }
+
+    @Override
+    public void setCascadeAttach(int attach) {
+<span class="nc" id="L2242">        _val.setCascadeAttach(attach);</span>
+<span class="nc" id="L2243">    }</span>
+
+    @Override
+    public int getCascadeDetach() {
+<span class="nc" id="L2247">        return _val.getCascadeDetach();</span>
+    }
+
+    @Override
+    public void setCascadeDetach(int detach) {
+<span class="nc" id="L2252">        _val.setCascadeDetach(detach);</span>
+<span class="nc" id="L2253">    }</span>
+
+    @Override
+    public int getCascadeRefresh() {
+<span class="nc" id="L2257">        return _val.getCascadeRefresh();</span>
+    }
+
+    @Override
+    public void setCascadeRefresh(int refresh) {
+<span class="nc" id="L2262">        _val.setCascadeRefresh(refresh);</span>
+<span class="nc" id="L2263">    }</span>
+
+    @Override
+    public boolean isSerialized() {
+<span class="nc" id="L2267">        return _val.isSerialized();</span>
+    }
+
+    @Override
+    public void setSerialized(boolean serialized) {
+<span class="nc" id="L2272">        _val.setSerialized(serialized);</span>
+<span class="nc" id="L2273">    }</span>
+
+    @Override
+    public String getValueMappedBy() {
+<span class="nc" id="L2277">        return _val.getValueMappedBy();</span>
+    }
+
+    @Override
+    public void setValueMappedBy(String mapped) {
+<span class="nc" id="L2282">        _val.setValueMappedBy(mapped);</span>
+<span class="nc" id="L2283">    }</span>
+
+    @Override
+    public FieldMetaData getValueMappedByMetaData () {
+<span class="nc" id="L2287">		return _val.getValueMappedByMetaData ();</span>
+	}
+
+	@Override
+    public Class&lt;?&gt; getTypeOverride () {
+<span class="nc" id="L2292">		return _val.getTypeOverride ();</span>
+	}
+
+	@Override
+    public void setTypeOverride(Class type) {
+<span class="nc" id="L2297">		_val.setTypeOverride (type);</span>
+<span class="nc" id="L2298">	}</span>
+
+	@Override
+    public void copy (ValueMetaData vmd) {
+<span class="nc" id="L2302">		_val.copy (vmd);</span>
+<span class="nc" id="L2303">	}</span>
+
+    /**
+     * Check if this field is used by other field as &quot;order by&quot; value.
+     *
+     * @since 1.1.0
+     */
+    public boolean isUsedInOrderBy() {
+<span class="nc" id="L2311">    	return _usedInOrderBy;</span>
+    }
+
+    /**
+     * Whether this field is used by other field as &quot;order by&quot; value .
+     *
+     * @since 1.1.0
+     */
+    public void setUsedInOrderBy(boolean isUsed) {
+<span class="nc" id="L2320">    	_usedInOrderBy = isUsed;</span>
+<span class="nc" id="L2321">    }</span>
+
+    /**
+     * Serializable wrapper around a {@link Method} or {@link Field}. For
+     * space considerations, this does not support {@link Constructor}s.
+     */
+	public static class MemberProvider
+        implements Externalizable {
+
+        private transient Member _member;
+
+<span class="nc" id="L2332">        public MemberProvider() {</span>
+            // for externalization
+<span class="nc" id="L2334">        }</span>
+
+<span class="nc" id="L2336">        MemberProvider(Member member) {</span>
+<span class="nc bnc" id="L2337" title="All 2 branches missed.">            if (member instanceof Constructor)</span>
+<span class="nc" id="L2338">                throw new IllegalArgumentException();</span>
+
+<span class="nc" id="L2340">            _member = member;</span>
+<span class="nc" id="L2341">        }</span>
+
+        public Member getMember() {
+<span class="nc" id="L2344">            return _member;</span>
+        }
+
+        @Override
+        public void readExternal(ObjectInput in)
+            throws IOException, ClassNotFoundException {
+<span class="nc" id="L2350">            boolean isField = in.readBoolean();</span>
+<span class="nc" id="L2351">            Class&lt;?&gt; cls = (Class&lt;?&gt;) in.readObject();</span>
+<span class="nc" id="L2352">            String memberName = (String) in.readObject();</span>
+            try {
+<span class="nc bnc" id="L2354" title="All 2 branches missed.">                if (isField)</span>
+<span class="nc" id="L2355">                    _member = AccessController.doPrivileged(</span>
+<span class="nc" id="L2356">                        J2DoPrivHelper.getDeclaredFieldAction(</span>
+                            cls, memberName));
+                else {
+<span class="nc" id="L2359">                    Class&lt;?&gt;[] parameterTypes = (Class[]) in.readObject();</span>
+<span class="nc" id="L2360">                    _member = AccessController.doPrivileged(</span>
+<span class="nc" id="L2361">                        J2DoPrivHelper.getDeclaredMethodAction(</span>
+                            cls, memberName, parameterTypes));
+                }
+<span class="nc" id="L2364">            } catch (SecurityException e) {</span>
+<span class="nc" id="L2365">                IOException ioe = new IOException(e.getMessage());</span>
+<span class="nc" id="L2366">                ioe.initCause(e);</span>
+<span class="nc" id="L2367">                throw ioe;</span>
+<span class="nc" id="L2368">            } catch (PrivilegedActionException pae) {</span>
+<span class="nc" id="L2369">                IOException ioe = new IOException(</span>
+<span class="nc" id="L2370">                    pae.getException().getMessage());</span>
+<span class="nc" id="L2371">                ioe.initCause(pae);</span>
+<span class="nc" id="L2372">                throw ioe;</span>
+<span class="nc" id="L2373">            }</span>
+<span class="nc" id="L2374">        }</span>
+
+        @Override
+        public void writeExternal(ObjectOutput out)
+            throws IOException {
+<span class="nc" id="L2379">            boolean isField = _member instanceof Field;</span>
+<span class="nc" id="L2380">            out.writeBoolean(isField);</span>
+<span class="nc" id="L2381">            out.writeObject(_member.getDeclaringClass());</span>
+<span class="nc" id="L2382">            out.writeObject(_member.getName());</span>
+<span class="nc bnc" id="L2383" title="All 2 branches missed.">            if (!isField)</span>
+<span class="nc" id="L2384">                out.writeObject(((Method) _member).getParameterTypes());</span>
+<span class="nc" id="L2385">        }</span>
+    }
+
+    public boolean isValueGenerated() {
+<span class="nc" id="L2389">        return _generated;</span>
+    }
+
+    public void setValueGenerated(boolean generated) {
+<span class="nc" id="L2393">        this._generated = generated;</span>
+<span class="nc" id="L2394">    }</span>
+
+    public boolean isElementCollection() {
+<span class="nc" id="L2397">        return _isElementCollection;</span>
+    }
+
+    public void setElementCollection(boolean isElementCollection) {
+<span class="nc" id="L2401">        this._isElementCollection = isElementCollection;</span>
+<span class="nc" id="L2402">    }</span>
+
+    public String getMappedByIdValue() {
+<span class="nc" id="L2405">        return _mappedByIdValue;</span>
+    }
+
+    public void setMappedByIdValue(String mappedByIdValue) {
+<span class="nc" id="L2409">        this._mappedByIdValue = mappedByIdValue;</span>
+<span class="nc" id="L2410">    }</span>
+
+    public boolean isMappedById() {
+<span class="nc bnc" id="L2413" title="All 2 branches missed.">    	return (_mappedByIdValue != null);</span>
+    }
+
+    /**
+     * Gets the access type used by this field. If no access type is set for
+     * this field then return the access type used by the declaring class.
+     */
+    public int getAccessType() {
+<span class="nc bnc" id="L2421" title="All 2 branches missed.">        if (AccessCode.isUnknown(_access)) {</span>
+<span class="nc" id="L2422">        	int fCode = AccessCode.toFieldCode(getDeclaringMetaData()</span>
+<span class="nc" id="L2423">        			.getAccessType());</span>
+<span class="nc" id="L2424">        	return fCode;</span>
+        }
+<span class="nc" id="L2426">        return _access;</span>
+    }
+
+    /**
+     * Sets access type of this field. The access code is verified for validity
+     * as well as against the access style used by the declaring class.
+     */
+    public void setAccessType(int fCode) {
+<span class="nc" id="L2434">    	ClassMetaData owner = getDeclaringMetaData();</span>
+<span class="nc" id="L2435">    	owner.mergeFieldAccess(this, fCode);</span>
+<span class="nc" id="L2436">        _access = fCode;</span>
+<span class="nc" id="L2437">    }</span>
+
+    public int getAssociationType() {
+<span class="nc" id="L2440">        return _associationType;</span>
+    }
+
+    public void setAssociationType(int type) {
+<span class="nc" id="L2444">        _associationType = type;</span>
+<span class="nc" id="L2445">    }</span>
+
+    public boolean isPersistentCollection() {
+<span class="nc" id="L2448">        return _persistentCollection;</span>
+    }
+
+    public void setPersistentCollection(boolean persistentCollection) {
+<span class="nc" id="L2452">        _persistentCollection = persistentCollection;</span>
+<span class="nc" id="L2453">    }</span>
+<span class="nc" id="L2454">    private Class&lt;?&gt; _relationType = Unknown.class;</span>
+    public Class&lt;?&gt; getRelationType() {
+<span class="nc bnc" id="L2456" title="All 2 branches missed.">    	if (_relationType == Unknown.class) {</span>
+<span class="nc bnc" id="L2457" title="All 2 branches missed.">            if (isDeclaredTypePC())</span>
+<span class="nc" id="L2458">            	_relationType = getDeclaredType();</span>
+<span class="nc bnc" id="L2459" title="All 2 branches missed.">            else if (getElement().isDeclaredTypePC())</span>
+<span class="nc" id="L2460">            	_relationType = getElement().getDeclaredType();</span>
+<span class="nc bnc" id="L2461" title="All 2 branches missed.">            else if (getKey().isDeclaredTypePC())</span>
+<span class="nc" id="L2462">            	_relationType = getKey().getDeclaredType();</span>
+            else
+<span class="nc" id="L2464">            	_relationType = null;</span>
+    	}
+<span class="nc" id="L2466">    	return _relationType;</span>
+    }
+<span class="nc" id="L2468">    private class Unknown{};</span>
+
+    public boolean isDelayCapable() {
+<span class="nc bnc" id="L2471" title="All 2 branches missed.">        if (_delayCapable != null) {</span>
+<span class="nc" id="L2472">            return _delayCapable.booleanValue();</span>
+        }
+<span class="nc bnc" id="L2474" title="All 4 branches missed.">        if (getTypeCode() != JavaTypes.COLLECTION || isLRS()) {</span>
+<span class="nc" id="L2475">           _delayCapable = Boolean.FALSE;</span>
+<span class="nc" id="L2476">           return _delayCapable;</span>
+        } else {
+            // Verify the proxy manager is configured to handle delay loading
+<span class="nc" id="L2479">            ProxyManager pm = getRepository().getConfiguration().getProxyManagerInstance();</span>
+<span class="nc bnc" id="L2480" title="All 2 branches missed.">            if (pm != null) {</span>
+<span class="nc" id="L2481">                _delayCapable = pm.getDelayCollectionLoading();</span>
+            } else {
+<span class="nc" id="L2483">                _delayCapable = Boolean.FALSE;</span>
+            }
+        }
+<span class="nc" id="L2486">        return _delayCapable;</span>
+    }
+
+    public void setDelayCapable(Boolean delayCapable) {
+<span class="nc" id="L2490">        _delayCapable = delayCapable;</span>
+<span class="nc" id="L2491">    }</span>
+
+    /**
+     * Whether to include schema name in generated files
+     */
+    public boolean getUseSchemaElement() {
+<span class="nc" id="L2497">        return _useSchemaElement;</span>
+    }
+
+    /**
+     * Whether to include schema name in generated files
+     */
+    public void setUseSchemaElement(boolean _useSchemaElement) {
+<span class="nc" id="L2504">        this._useSchemaElement = _useSchemaElement;</span>
+<span class="nc" id="L2505">    }</span>
+
+    public String getSetterName() {
+<span class="nc" id="L2508">        String setterName = &quot;set&quot; + StringUtil.capitalize(_name);</span>
+<span class="nc bnc" id="L2509" title="All 6 branches missed.">        if (_name.length() &gt; 1 &amp;&amp; Character.isLowerCase(_name.charAt(0)) &amp;&amp; Character.isUpperCase(_name.charAt(1))) {</span>
+            // We have the special case where the first char is lower, and the
+            // following char is capital. We need to support using the
+            // setaStart() (correct) and setAStart() (incorrect -- old way)
+<span class="nc" id="L2513">            Class&lt;?&gt; type = getDeclaringMetaData().getDescribedType();</span>
+<span class="nc" id="L2514">            setterName = &quot;set&quot; + _name;</span>
+            try {
+<span class="nc" id="L2516">                type.getDeclaredMethod(setterName, getType());</span>
+<span class="nc" id="L2517">                return setterName;</span>
+<span class="nc" id="L2518">            } catch (Exception e) {</span>
+            }
+<span class="nc" id="L2520">            setterName = &quot;set&quot; + StringUtil.capitalize(_name);</span>
+            try {
+<span class="nc" id="L2522">                type.getDeclaredMethod(setterName, getType());</span>
+<span class="nc" id="L2523">            } catch (Exception e) {</span>
+<span class="nc" id="L2524">            }</span>
+        }
+<span class="nc" id="L2526">        return setterName;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

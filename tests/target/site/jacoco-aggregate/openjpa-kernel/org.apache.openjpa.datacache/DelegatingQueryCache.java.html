@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DelegatingQueryCache.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.datacache</a> &gt; <span class="el_source">DelegatingQueryCache.java</span></div><h1>DelegatingQueryCache.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.datacache;
+
+import java.util.Objects;
+
+import org.apache.openjpa.kernel.QueryStatistics;
+import org.apache.openjpa.util.RuntimeExceptionTranslator;
+
+/**
+ * Delegating query cache that can also perform exception translation for
+ * use in facades. This cache allows its delegate to be null, in which case
+ * it returns default values or all methods.
+ *
+ * @author Abe White
+ * @since 0.4.0
+ */
+public class DelegatingQueryCache
+    implements QueryCache {
+
+    private final QueryCache _cache;
+    private final DelegatingQueryCache _del;
+    private final RuntimeExceptionTranslator _trans;
+
+    /**
+     * Constructor. Supply delegate.
+     */
+    public DelegatingQueryCache(QueryCache cache) {
+<span class="nc" id="L45">        this(cache, null);</span>
+<span class="nc" id="L46">    }</span>
+
+    public DelegatingQueryCache(QueryCache cache,
+<span class="nc" id="L49">        RuntimeExceptionTranslator trans) {</span>
+<span class="nc" id="L50">        _cache = cache;</span>
+<span class="nc" id="L51">        _trans = trans;</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">        if (cache instanceof DelegatingQueryCache)</span>
+<span class="nc" id="L53">            _del = (DelegatingQueryCache) _cache;</span>
+        else
+<span class="nc" id="L55">            _del = null;</span>
+<span class="nc" id="L56">    }</span>
+
+    /**
+     * Return the direct delegate.
+     */
+    public QueryCache getDelegate() {
+<span class="nc" id="L62">        return _cache;</span>
+    }
+
+    /**
+     * Return the native delegate.
+     */
+    public QueryCache getInnermostDelegate() {
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        return (_del == null) ? _cache : _del.getInnermostDelegate();</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L74">        return getInnermostDelegate().hashCode();</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (other == this)</span>
+<span class="nc" id="L80">            return true;</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (other instanceof DelegatingQueryCache)</span>
+<span class="nc" id="L82">            other = ((DelegatingQueryCache) other).getInnermostDelegate();</span>
+<span class="nc" id="L83">        return Objects.equals(getInnermostDelegate(), other);</span>
+    }
+
+    /**
+     * Translate the OpenJPA exception.
+     */
+    protected RuntimeException translate(RuntimeException re) {
+<span class="nc bnc" id="L90" title="All 2 branches missed.">        return (_trans == null) ? re : _trans.translate(re);</span>
+    }
+
+    @Override
+    public void initialize(DataCacheManager mgr) {
+<span class="nc bnc" id="L95" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L96">            return;</span>
+        try {
+<span class="nc" id="L98">            _cache.initialize(mgr);</span>
+<span class="nc" id="L99">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L100">            throw translate(re);</span>
+<span class="nc" id="L101">        }</span>
+<span class="nc" id="L102">    }</span>
+
+    @Override
+    public void onTypesChanged(TypesChangedEvent e) {
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L107">            return;</span>
+        try {
+<span class="nc" id="L109">            _cache.onTypesChanged(e);</span>
+<span class="nc" id="L110">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L111">            throw translate(re);</span>
+<span class="nc" id="L112">        }</span>
+<span class="nc" id="L113">    }</span>
+
+    @Override
+    public QueryResult get(QueryKey qk) {
+<span class="nc bnc" id="L117" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L118">            return null;</span>
+        try {
+<span class="nc" id="L120">            return _cache.get(qk);</span>
+<span class="nc" id="L121">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L122">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public QueryResult put(QueryKey qk, QueryResult oids) {
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L129">            return null;</span>
+        try {
+<span class="nc" id="L131">            return _cache.put(qk, oids);</span>
+<span class="nc" id="L132">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L133">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public QueryResult remove(QueryKey qk) {
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L140">            return null;</span>
+        try {
+<span class="nc" id="L142">            return _cache.remove(qk);</span>
+<span class="nc" id="L143">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L144">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void clear() {
+<span class="nc bnc" id="L150" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L151">            return;</span>
+        try {
+<span class="nc" id="L153">            _cache.clear();</span>
+<span class="nc" id="L154">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L155">            throw translate(re);</span>
+<span class="nc" id="L156">        }</span>
+<span class="nc" id="L157">    }</span>
+
+    @Override
+    public boolean pin(QueryKey qk) {
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L162">            return false;</span>
+        try {
+<span class="nc" id="L164">            return _cache.pin(qk);</span>
+<span class="nc" id="L165">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L166">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean unpin(QueryKey qk) {
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L173">            return false;</span>
+        try {
+<span class="nc" id="L175">            return _cache.unpin(qk);</span>
+<span class="nc" id="L176">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L177">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void writeLock() {
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L184">            return;</span>
+        try {
+<span class="nc" id="L186">            _cache.writeLock();</span>
+<span class="nc" id="L187">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L188">            throw translate(re);</span>
+<span class="nc" id="L189">        }</span>
+<span class="nc" id="L190">    }</span>
+
+    @Override
+    public void writeUnlock() {
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L195">            return;</span>
+        try {
+<span class="nc" id="L197">            _cache.writeUnlock();</span>
+<span class="nc" id="L198">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L199">            throw translate(re);</span>
+<span class="nc" id="L200">        }</span>
+<span class="nc" id="L201">    }</span>
+
+    @Override
+    public void addTypesChangedListener(TypesChangedListener listen) {
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L206">            return;</span>
+        try {
+<span class="nc" id="L208">            _cache.addTypesChangedListener(listen);</span>
+<span class="nc" id="L209">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L210">            throw translate(re);</span>
+<span class="nc" id="L211">        }</span>
+<span class="nc" id="L212">    }</span>
+
+    @Override
+    public boolean removeTypesChangedListener(TypesChangedListener listen) {
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L217">            return false;</span>
+        try {
+<span class="nc" id="L219">            return _cache.removeTypesChangedListener(listen);</span>
+<span class="nc" id="L220">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L221">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void close() {
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L228">            return;</span>
+        try {
+<span class="nc" id="L230">            _cache.close();</span>
+<span class="nc" id="L231">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L232">            throw translate(re);</span>
+<span class="nc" id="L233">		}</span>
+<span class="nc" id="L234">	}</span>
+
+    @Override
+    public QueryStatistics&lt;QueryKey&gt; getStatistics() {
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (_cache == null)</span>
+<span class="nc" id="L239">            return null;</span>
+        try {
+<span class="nc" id="L241">            return _cache.getStatistics();</span>
+<span class="nc" id="L242">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L243">            throw translate(re);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

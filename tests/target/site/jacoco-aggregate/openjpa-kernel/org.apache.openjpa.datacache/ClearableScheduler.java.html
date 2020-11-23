@@ -1,0 +1,274 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ClearableScheduler.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.datacache</a> &gt; <span class="el_source">ClearableScheduler.java</span></div><h1>ClearableScheduler.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.datacache;
+
+import java.security.AccessController;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.StringTokenizer;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.lib.log.Log;
+import org.apache.openjpa.lib.util.Clearable;
+import org.apache.openjpa.lib.util.J2DoPrivHelper;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.StringUtil;
+import org.apache.openjpa.util.InvalidStateException;
+import org.apache.openjpa.util.UserException;
+
+
+/**
+ * Cron-style clearable eviction. Understands schedules based on cron format:
+ * &lt;li&gt;&lt;code&gt;minute hour mday month wday&lt;/code&gt;&lt;/li&gt;
+ * &lt;li&gt;&lt;code&gt;+minute&lt;/code&gt;&lt;/li&gt;
+ * For example:
+ * &lt;code&gt;15,30 6,19 2,10 1 2 &lt;/code&gt;
+ * Would run at 15 and 30 past the 6AM and 7PM, on the 2nd and 10th
+ * of January when its a Monday.
+ *
+ */
+public class ClearableScheduler implements Runnable {
+
+<span class="nc" id="L54">    private static final Localizer _loc = Localizer.forPackage(ClearableScheduler.class);</span>
+
+<span class="nc" id="L56">    private Map&lt;Clearable,Schedule&gt; _clearables = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L57">    private boolean _stop = false;</span>
+<span class="nc" id="L58">    private int _interval = 1;</span>
+    private Log _log;
+    private Thread _thread;
+
+<span class="nc" id="L62">    public ClearableScheduler(OpenJPAConfiguration conf) {</span>
+<span class="nc" id="L63">        _log = conf.getLogFactory().getLog(OpenJPAConfiguration.LOG_DATACACHE);</span>
+<span class="nc" id="L64">    }</span>
+
+    /**
+     * The interval time in minutes between scheduler checks. Defaults to 1.
+     */
+    public int getInterval() {
+<span class="nc" id="L70">        return _interval;</span>
+    }
+
+    /**
+     * The interval time in minutes between scheduler checks. Defaults to 1.
+     */
+    public void setInterval(int interval) {
+<span class="nc" id="L77">        _interval = interval;</span>
+<span class="nc" id="L78">    }</span>
+
+    /**
+     * Stop the associated thread if there and stop the current runnable.
+     */
+    public synchronized void stop() {
+<span class="nc" id="L84">        _stop = true;</span>
+<span class="nc" id="L85">    }</span>
+
+    private boolean isStopped() {
+<span class="nc" id="L88">        return _stop;</span>
+    }
+
+    /**
+     * Schedule the given Clearable for clear to be called. Starts the scheduling thread
+     * if not started.
+     */
+    public synchronized void scheduleEviction(Clearable clearable, String times) {
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (times == null)</span>
+<span class="nc" id="L97">            return;</span>
+
+<span class="nc" id="L99">        Schedule schedule = new Schedule(times);</span>
+<span class="nc" id="L100">        _clearables.put(clearable, schedule);</span>
+<span class="nc" id="L101">        _stop = false;</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (_thread == null) {</span>
+<span class="nc" id="L103">            _thread =</span>
+<span class="nc" id="L104">                AccessController.doPrivileged(J2DoPrivHelper</span>
+<span class="nc" id="L105">                    .newDaemonThreadAction(this, _loc.get(&quot;scheduler-name&quot;)</span>
+<span class="nc" id="L106">                        .getMessage()));</span>
+<span class="nc" id="L107">            _thread.start();</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">            if (_log.isTraceEnabled())</span>
+<span class="nc" id="L109">                _log.trace(_loc.get(&quot;scheduler-start&quot;, _thread.getName()));</span>
+        }
+<span class="nc" id="L111">    }</span>
+
+    /**
+     * Remove the given Clearable from scheduling.
+     */
+    public synchronized void removeFromSchedule(Clearable clearable) {
+<span class="nc" id="L117">        _clearables.remove(clearable);</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (_clearables.size() == 0)</span>
+<span class="nc" id="L119">            stop();</span>
+<span class="nc" id="L120">    }</span>
+
+    @Override
+    public void run() {
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (_log.isTraceEnabled())</span>
+<span class="nc" id="L125">            _log.trace(_loc.get(&quot;scheduler-interval&quot;, _interval + &quot;&quot;));</span>
+
+<span class="nc" id="L127">        Date lastRun = new Date();</span>
+<span class="nc" id="L128">        DateFormat fom = new SimpleDateFormat(&quot;E HH:mm:ss&quot;);</span>
+<span class="nc bnc" id="L129" title="All 2 branches missed.">        while (!isStopped()) {</span>
+            try {
+<span class="nc" id="L131">                Thread.sleep(_interval * 60 * 1000);</span>
+
+<span class="nc" id="L133">                Date now = new Date();</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                for(Entry&lt;Clearable, Schedule&gt; entry : _clearables.entrySet()){</span>
+<span class="nc" id="L135">                    Clearable clearable = entry.getKey();</span>
+<span class="nc" id="L136">                    Schedule schedule = entry.getValue();</span>
+<span class="nc bnc" id="L137" title="All 2 branches missed.">                    if (schedule.matches(lastRun, now)) {</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">                        if (_log.isTraceEnabled())</span>
+<span class="nc" id="L139">                            _log.trace(_loc.get(&quot;scheduler-clear&quot;, clearable, fom.format(now)));</span>
+<span class="nc" id="L140">                        evict(clearable);</span>
+                    }
+<span class="nc" id="L142">                }</span>
+<span class="nc" id="L143">                lastRun = now;</span>
+<span class="nc" id="L144">            } catch (Exception e) {</span>
+<span class="nc" id="L145">                throw new InvalidStateException(_loc.get(&quot;scheduler-fail&quot;), e).</span>
+<span class="nc" id="L146">                    setFatal(true);</span>
+<span class="nc" id="L147">            }</span>
+        }
+
+<span class="nc" id="L150">        _log.info(_loc.get(&quot;scheduler-stop&quot;));</span>
+<span class="nc" id="L151">        synchronized (this) {</span>
+<span class="nc bnc" id="L152" title="All 2 branches missed.">            if (isStopped())</span>
+<span class="nc" id="L153">                _thread = null; // be sure to deref the thread so it can restart</span>
+<span class="nc" id="L154">        }</span>
+<span class="nc" id="L155">    }</span>
+
+    protected void evict(Clearable cache) {
+<span class="nc" id="L158">        cache.clear();</span>
+<span class="nc" id="L159">    }</span>
+
+    /**
+     * Simple class which represents the given time schedule.
+     */
+    private static class Schedule {
+
+<span class="nc" id="L166">        static final int[] WILDCARD = new int[0];</span>
+<span class="nc" id="L167">        static final int[] UNITS = {</span>
+            Calendar.MONTH,
+            Calendar.DAY_OF_MONTH,
+            Calendar.DAY_OF_WEEK,
+            Calendar.HOUR_OF_DAY,
+            Calendar.MINUTE
+        };
+        final int[] month;
+        final int[] dayOfMonth;
+        final int[] dayOfWeek;
+        final int[] hour;
+        final int[] min;
+
+<span class="nc" id="L180">        public Schedule(String date) {</span>
+<span class="nc" id="L181">            int[] tmin = null;</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            if (date.startsWith(&quot;+&quot;)) {</span>
+<span class="nc" id="L183">                Calendar cal = Calendar.getInstance();</span>
+<span class="nc" id="L184">                int interval = Integer.parseInt(date.substring(1));</span>
+<span class="nc" id="L185">                int currMin = cal.get(Calendar.MINUTE);</span>
+
+<span class="nc" id="L187">                tmin = new int[60/interval];</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">                for(int i = 0; i&lt;tmin.length;i++){</span>
+                    int temp;
+<span class="nc bnc" id="L190" title="All 2 branches missed.">                    if(i==0){</span>
+<span class="nc" id="L191">                        temp=currMin+interval;</span>
+                    }else{
+<span class="nc" id="L193">                        temp=tmin[i-1]+interval;</span>
+                    }
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                    if(temp &gt;= 60 ){</span>
+<span class="nc" id="L196">                        temp -= 60;</span>
+                    }
+<span class="nc" id="L198">                    tmin[i]=temp;</span>
+                }
+<span class="nc" id="L200">                Arrays.sort(tmin);</span>
+
+<span class="nc" id="L202">                min = tmin;</span>
+<span class="nc" id="L203">                hour = WILDCARD;</span>
+<span class="nc" id="L204">                dayOfMonth = WILDCARD;</span>
+<span class="nc" id="L205">                month = WILDCARD;</span>
+<span class="nc" id="L206">                dayOfWeek = WILDCARD;</span>
+<span class="nc" id="L207">            }else{</span>
+
+<span class="nc" id="L209">                StringTokenizer token = new StringTokenizer(date, &quot; \t&quot;);</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">                if (token.countTokens() != 5)</span>
+<span class="nc" id="L211">                    throw new UserException(_loc.get(&quot;bad-count&quot;, date)).setFatal(true);</span>
+                try {
+<span class="nc" id="L213">                    min = parse(token.nextToken(), 0, 60);</span>
+<span class="nc" id="L214">                    hour = parse(token.nextToken(), 0, 24);</span>
+<span class="nc" id="L215">                    dayOfMonth = parse(token.nextToken(), 1, 31);</span>
+<span class="nc" id="L216">                    month = parse(token.nextToken(), 1, 13);</span>
+<span class="nc" id="L217">                    dayOfWeek = parse(token.nextToken(), 1, 8);</span>
+<span class="nc" id="L218">                } catch (Throwable t) {</span>
+<span class="nc" id="L219">                    throw new UserException(_loc.get(&quot;bad-schedule&quot;, date), t).setFatal(true);</span>
+<span class="nc" id="L220">                }</span>
+            }
+<span class="nc" id="L222">        }</span>
+
+        private int[] parse(String token, int min, int max) {
+<span class="nc bnc" id="L225" title="All 2 branches missed.">            if (&quot;*&quot;.equals(token.trim()))</span>
+<span class="nc" id="L226">                return WILDCARD;</span>
+<span class="nc" id="L227">            String[] tokens = StringUtil.split(token, &quot;,&quot;, 0);</span>
+<span class="nc" id="L228">            int [] times = new int[tokens.length];</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">            for (int i = 0; i &lt; tokens.length; i++) {</span>
+                try {
+<span class="nc" id="L231">                    times[i] = Integer.parseInt(tokens[i]);</span>
+<span class="nc" id="L232">                } catch (Throwable t) {</span>
+<span class="nc" id="L233">                    throw new UserException(_loc.get(&quot;not-number&quot;, token)).</span>
+<span class="nc" id="L234">                        setFatal(true);</span>
+<span class="nc" id="L235">                }</span>
+<span class="nc bnc" id="L236" title="All 4 branches missed.">                if (times[i] &lt; min || times[i] &gt;= max)</span>
+<span class="nc" id="L237">                    throw new UserException(_loc.get(&quot;not-range&quot;, token,</span>
+<span class="nc" id="L238">                        String.valueOf(min), String.valueOf(max))).</span>
+<span class="nc" id="L239">                        setFatal(true);</span>
+            }
+<span class="nc" id="L241">            return times;</span>
+        }
+
+        boolean matches(Date last, Date now) {
+<span class="nc" id="L245">            Calendar time = Calendar.getInstance();</span>
+<span class="nc" id="L246">            time.setTime(now);</span>
+<span class="nc" id="L247">            time.set(Calendar.SECOND, 0);</span>
+<span class="nc" id="L248">            time.set(Calendar.MILLISECOND, 0);</span>
+
+<span class="nc" id="L250">            int[][] all =</span>
+                new int[][]{ month, dayOfMonth, dayOfWeek, hour, min };
+<span class="nc" id="L252">            return matches(last, now, time, all, 0);</span>
+        }
+
+        private boolean matches(Date last, Date now, Calendar time,
+            int[][] times, int depth) {
+<span class="nc bnc" id="L257" title="All 2 branches missed.">            if (depth == UNITS.length) {</span>
+<span class="nc" id="L258">                Date compare = time.getTime();</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">                return compare.compareTo(last) &gt;= 0 &amp;&amp;</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">                    compare.compareTo(now) &lt; 0;</span>
+            }
+
+<span class="nc bnc" id="L263" title="All 2 branches missed.">            if (times[depth] != WILDCARD) {</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">                for (int i = 0; i &lt; times[depth].length; i++) {</span>
+<span class="nc" id="L265">                    time.set(UNITS[depth], times[depth][i]);</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                    if (matches(last, now, time, times, depth + 1))</span>
+<span class="nc" id="L267">                        return true;</span>
+                }
+            }
+<span class="nc" id="L270">            return matches(last, now, time, times, depth + 1);</span>
+		}
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

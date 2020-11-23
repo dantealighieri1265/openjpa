@@ -1,0 +1,710 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DelayedLinkedListProxy.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.util</a> &gt; <span class="el_source">DelayedLinkedListProxy.java</span></div><h1>DelayedLinkedListProxy.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.util;
+
+import java.io.ObjectStreamException;
+import java.util.Collection;
+import java.util.Comparator;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.ListIterator;
+
+import org.apache.openjpa.kernel.AutoDetach;
+import org.apache.openjpa.kernel.Broker;
+import org.apache.openjpa.kernel.BrokerFactory;
+import org.apache.openjpa.kernel.DetachedStateManager;
+import org.apache.openjpa.kernel.OpenJPAStateManager;
+
+/**
+ * LinkedList proxy with delay loading capability.  Allows non-indexed
+ * add and remove operations to occur on an unloaded collection.  Operations
+ * that require a load will trigger a load.
+ */
+@SuppressWarnings({&quot;rawtypes&quot;,&quot;unchecked&quot;})
+public class DelayedLinkedListProxy extends LinkedList implements ProxyCollection, DelayedProxy {
+
+    private transient OpenJPAStateManager sm;
+    private transient int field;
+    private transient CollectionChangeTracker changeTracker;
+    private transient Class elementType;
+
+    private transient OpenJPAStateManager _ownerSm;
+<span class="nc" id="L49">    private transient boolean _directAccess = false;</span>
+<span class="nc" id="L50">    private transient BrokerFactory _brokerFactory = null;</span>
+<span class="nc" id="L51">    private transient Broker _broker = null;</span>
+    private transient OpenJPAStateManager _delayedSm;
+    private transient int _delayedField;
+<span class="nc" id="L54">    private transient boolean _detached = false;</span>
+
+    public DelayedLinkedListProxy(Collection paramCollection) {
+<span class="nc" id="L57">        super(paramCollection);</span>
+<span class="nc" id="L58">    }</span>
+
+<span class="nc" id="L60">    public DelayedLinkedListProxy() {</span>
+<span class="nc" id="L61">    }</span>
+
+    @Override
+    public void setOwner(OpenJPAStateManager paramOpenJPAStateManager,
+            int paramInt) {
+        // If clearing the owner of this proxy, store away what is necessary for
+        // delayed loading
+<span class="nc bnc" id="L68" title="All 4 branches missed.">        if (sm != null &amp;&amp; detaching(paramOpenJPAStateManager, paramInt)) {</span>
+<span class="nc" id="L69">            _detached = true;</span>
+<span class="nc" id="L70">            _delayedSm = sm;</span>
+<span class="nc" id="L71">            _delayedField = field;</span>
+        } else {
+<span class="nc" id="L73">            _detached = false;</span>
+        }
+
+<span class="nc" id="L76">        this.sm = paramOpenJPAStateManager;</span>
+<span class="nc bnc" id="L77" title="All 4 branches missed.">        if (sm != null &amp;&amp; sm.getPersistenceCapable() != null) {</span>
+<span class="nc" id="L78">            _ownerSm = (OpenJPAStateManager) sm.getPersistenceCapable()</span>
+<span class="nc" id="L79">                    .pcGetStateManager();</span>
+        }
+<span class="nc" id="L81">        this.field = paramInt;</span>
+<span class="nc bnc" id="L82" title="All 4 branches missed.">        if (sm != null &amp;&amp; sm.getContext() != null) {</span>
+<span class="nc" id="L83">            _brokerFactory = sm.getContext().getBroker().getBrokerFactory();</span>
+        }
+<span class="nc" id="L85">    }</span>
+
+    private boolean detaching(OpenJPAStateManager paramOpenJPAStateManager,
+            int paramInt) {
+<span class="nc bnc" id="L89" title="All 8 branches missed.">        if ((paramOpenJPAStateManager == null &amp;&amp; paramInt == -1)</span>
+                || (paramOpenJPAStateManager != null &amp;&amp; paramOpenJPAStateManager instanceof DetachedStateManager)) {
+<span class="nc" id="L91">            return true;</span>
+        }
+<span class="nc" id="L93">        return false;</span>
+    }
+
+    @Override
+    public OpenJPAStateManager getOwner() {
+<span class="nc" id="L98">        return this.sm;</span>
+    }
+
+    @Override
+    public int getOwnerField() {
+<span class="nc" id="L103">        return this.field;</span>
+    }
+
+    @Override
+    public ChangeTracker getChangeTracker() {
+<span class="nc" id="L108">        return this.changeTracker;</span>
+    }
+
+    protected void setChangeTracker(CollectionChangeTracker ct) {
+<span class="nc" id="L112">        changeTracker = ct;</span>
+<span class="nc" id="L113">    }</span>
+
+    @Override
+    public Object copy(Object paramObject) {
+<span class="nc" id="L117">        return new LinkedList((Collection) paramObject);</span>
+    }
+
+    @Override
+    public Class getElementType() {
+<span class="nc" id="L122">        return this.elementType;</span>
+    }
+
+    protected void setElementType(Class&lt;?&gt; elemType) {
+<span class="nc" id="L126">        elementType = elemType;</span>
+<span class="nc" id="L127">    }</span>
+
+    @Override
+    public ProxyCollection newInstance(Class paramClass,
+            Comparator paramComparator, boolean paramBoolean1,
+            boolean paramBoolean2) {
+<span class="nc" id="L133">        DelayedLinkedListProxy localproxy = new DelayedLinkedListProxy();</span>
+<span class="nc" id="L134">        localproxy.elementType = paramClass;</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        if (paramBoolean1)</span>
+<span class="nc" id="L136">            localproxy.changeTracker = new DelayedCollectionChangeTrackerImpl(</span>
+                    localproxy, true, true, paramBoolean2);
+<span class="nc" id="L138">        return localproxy;</span>
+    }
+
+    // //////////////////////////////////////
+    // DelayedProxy methods
+    // //////////////////////////////////////
+    @Override
+    public int getDelayedField() {
+<span class="nc bnc" id="L146" title="All 4 branches missed.">        if (field == -1 || _detached) {</span>
+<span class="nc" id="L147">            return _delayedField;</span>
+        }
+<span class="nc" id="L149">        return field;</span>
+    }
+
+    @Override
+    public OpenJPAStateManager getDelayedOwner() {
+<span class="nc bnc" id="L154" title="All 4 branches missed.">        if (sm == null || _detached) {</span>
+<span class="nc" id="L155">            return _delayedSm;</span>
+        }
+<span class="nc" id="L157">        return sm;</span>
+    }
+
+    @Override
+    public boolean isDirectAccess() {
+<span class="nc" id="L162">        return _directAccess;</span>
+    }
+
+    @Override
+    public void setDirectAccess(boolean direct) {
+<span class="nc" id="L167">        _directAccess = direct;</span>
+<span class="nc" id="L168">    }</span>
+
+    public BrokerFactory getBrokerFactory() {
+<span class="nc" id="L171">        return _brokerFactory;</span>
+    }
+
+    @Override
+    public void load() {
+<span class="nc" id="L176">        ProxyCollections.loadCollection(this);</span>
+<span class="nc" id="L177">    }</span>
+
+    @Override
+    public Broker getBroker() {
+<span class="nc bnc" id="L181" title="All 4 branches missed.">        if (_broker == null || _broker.isClosed()) {</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">            if (_brokerFactory != null) {</span>
+<span class="nc" id="L183">                _broker = _brokerFactory.newBroker();</span>
+            }
+        }
+<span class="nc" id="L186">        return _broker;</span>
+    }
+
+    @Override
+    public void closeBroker() {
+<span class="nc bnc" id="L191" title="All 4 branches missed.">        if (_broker != null &amp;&amp; !_broker.isClosed()) {</span>
+<span class="nc" id="L192">            _broker.setAutoDetach(AutoDetach.DETACH_CLOSE);</span>
+<span class="nc" id="L193">            _broker.close();</span>
+<span class="nc" id="L194">            _broker = null;</span>
+        }
+<span class="nc" id="L196">    }</span>
+
+    @Override
+    public OpenJPAStateManager getOwnerStateManager() {
+<span class="nc" id="L200">        return _ownerSm;</span>
+    }
+
+    @Override
+    public boolean isDetached() {
+<span class="nc" id="L205">        return _detached;</span>
+    }
+
+    public boolean isDelayLoad() {
+<span class="nc" id="L209">        return ProxyCollections.isDelayed(this);</span>
+    }
+
+    // //////////////////////////////////////
+    // Implementation method wrappers
+    // //////////////////////////////////////
+
+    @Override
+    public Object clone() {
+<span class="nc bnc" id="L218" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L219">            return super.clone();</span>
+        }
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L222">            load();</span>
+        }
+<span class="nc" id="L224">        Proxy localProxy = (Proxy) super.clone();</span>
+<span class="nc" id="L225">        localProxy.setOwner(null, 0);</span>
+<span class="nc" id="L226">        return localProxy;</span>
+    }
+
+    @Override
+    public void add(int paramInt, Object paramObject) {
+<span class="nc bnc" id="L231" title="All 2 branches missed.">        if (!_directAccess) {</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">            if (isDelayLoad()) {</span>
+<span class="nc" id="L233">                load();</span>
+            }
+        }
+<span class="nc" id="L236">        ProxyCollections.beforeAdd(this, paramInt, paramObject);</span>
+<span class="nc" id="L237">        super.add(paramInt, paramObject);</span>
+<span class="nc" id="L238">    }</span>
+
+    @Override
+    public boolean add(Object paramObject) {
+<span class="nc bnc" id="L242" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L243">            return super.add(paramObject);</span>
+        }
+<span class="nc" id="L245">        ProxyCollections.beforeAdd(this, paramObject);</span>
+<span class="nc" id="L246">        boolean bool = super.add(paramObject);</span>
+<span class="nc" id="L247">        return ProxyCollections.afterAdd(this, paramObject, bool);</span>
+    }
+
+    @Override
+    public void clear() {
+<span class="nc bnc" id="L252" title="All 2 branches missed.">        if (!_directAccess) {</span>
+<span class="nc bnc" id="L253" title="All 2 branches missed.">            if (isDelayLoad()) {</span>
+<span class="nc" id="L254">                load();</span>
+            }
+<span class="nc" id="L256">            ProxyCollections.beforeClear(this);</span>
+        }
+<span class="nc" id="L258">        super.clear();</span>
+<span class="nc" id="L259">    }</span>
+
+    @Override
+    public boolean addAll(Collection paramCollection) {
+<span class="nc bnc" id="L263" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L264">            return super.addAll(paramCollection);</span>
+        }
+<span class="nc" id="L266">        return ProxyCollections.addAll(this, paramCollection);</span>
+    }
+
+    @Override
+    public boolean addAll(int paramInt, Collection paramCollection) {
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L272">            return super.addAll(paramInt, paramCollection);</span>
+        }
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L275">            load();</span>
+        }
+<span class="nc" id="L277">        return ProxyCollections.addAll(this, paramInt, paramCollection);</span>
+    }
+
+    @Override
+    public boolean remove(Object paramObject) {
+<span class="nc bnc" id="L282" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L283">            return super.remove(paramObject);</span>
+        }
+<span class="nc" id="L285">        ProxyCollections.beforeRemove(this, paramObject);</span>
+<span class="nc" id="L286">        setDirectAccess(true);</span>
+<span class="nc" id="L287">        boolean bool = super.remove(paramObject);</span>
+<span class="nc" id="L288">        setDirectAccess(false);</span>
+<span class="nc" id="L289">        return ProxyCollections.afterRemove(this, paramObject, bool);</span>
+    }
+
+    @Override
+    public Object remove(int paramInt) {
+<span class="nc bnc" id="L294" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L295">            return super.remove(paramInt);</span>
+        }
+<span class="nc bnc" id="L297" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L298">            load();</span>
+        }
+<span class="nc" id="L300">        ProxyCollections.beforeRemove(this, paramInt);</span>
+<span class="nc" id="L301">        Object localObject = super.remove(paramInt);</span>
+<span class="nc" id="L302">        return ProxyCollections.afterRemove(this, paramInt, localObject);</span>
+    }
+
+    @Override
+    public Object remove() {
+<span class="nc bnc" id="L307" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L308">            return super.remove();</span>
+        }
+        // queue operations require proper ordering. the collection
+        // must be loaded in order to ensure order.
+<span class="nc bnc" id="L312" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L313">            load();</span>
+        }
+<span class="nc" id="L315">        ProxyCollections.beforeRemove(this);</span>
+<span class="nc" id="L316">        Object localObject = super.remove();</span>
+<span class="nc" id="L317">        return ProxyCollections.afterRemove(this, localObject);</span>
+    }
+
+    @Override
+    public Object set(int paramInt, Object paramObject) {
+<span class="nc bnc" id="L322" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L323">            return super.set(paramInt, paramObject);</span>
+        }
+<span class="nc bnc" id="L325" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L326">            load();</span>
+        }
+<span class="nc" id="L328">        ProxyCollections.beforeSet(this, paramInt, paramObject);</span>
+<span class="nc" id="L329">        Object localObject = super.set(paramInt, paramObject);</span>
+<span class="nc" id="L330">        return ProxyCollections.afterSet(this, paramInt, paramObject,</span>
+                localObject);
+    }
+
+    @Override
+    public Object poll() {
+<span class="nc bnc" id="L336" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L337">            return super.poll();</span>
+        }
+        // queue operations require proper ordering. the collection
+        // must be loaded in order to ensure order.
+<span class="nc bnc" id="L341" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L342">            load();</span>
+        }
+<span class="nc" id="L344">        ProxyCollections.beforePoll(this);</span>
+<span class="nc" id="L345">        Object localObject = super.poll();</span>
+<span class="nc" id="L346">        return ProxyCollections.afterPoll(this, localObject);</span>
+    }
+
+    @Override
+    public ListIterator listIterator(int paramInt) {
+<span class="nc bnc" id="L351" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L352">            return super.listIterator(paramInt);</span>
+        }
+<span class="nc bnc" id="L354" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L355">            load();</span>
+        }
+<span class="nc" id="L357">        ListIterator localListIterator = super.listIterator(paramInt);</span>
+<span class="nc" id="L358">        return ProxyCollections.afterListIterator(this, paramInt,</span>
+                localListIterator);
+    }
+
+    @Override
+    public void addFirst(Object paramObject) {
+<span class="nc bnc" id="L364" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L365">            super.addFirst(paramObject);</span>
+<span class="nc" id="L366">            return;</span>
+        }
+<span class="nc bnc" id="L368" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L369">            load();</span>
+        }
+<span class="nc" id="L371">        ProxyCollections.beforeAddFirst(this, paramObject);</span>
+<span class="nc" id="L372">        super.addFirst(paramObject);</span>
+<span class="nc" id="L373">    }</span>
+
+    @Override
+    public void addLast(Object paramObject) {
+<span class="nc bnc" id="L377" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L378">            super.addLast(paramObject);</span>
+<span class="nc" id="L379">            return;</span>
+        }
+<span class="nc bnc" id="L381" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L382">            load();</span>
+        }
+<span class="nc" id="L384">        ProxyCollections.beforeAddLast(this, paramObject);</span>
+<span class="nc" id="L385">        super.addLast(paramObject);</span>
+<span class="nc" id="L386">        ProxyCollections.afterAddLast(this, paramObject);</span>
+<span class="nc" id="L387">    }</span>
+
+    @Override
+    public boolean offer(Object paramObject) {
+<span class="nc bnc" id="L391" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L392">            return super.offer(paramObject);</span>
+        }
+<span class="nc" id="L394">        ProxyCollections.beforeOffer(this, paramObject);</span>
+<span class="nc" id="L395">        boolean bool = super.offer(paramObject);</span>
+<span class="nc" id="L396">        return ProxyCollections.afterOffer(this, paramObject, bool);</span>
+    }
+
+    @Override
+    public Object removeFirst() {
+<span class="nc bnc" id="L401" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L402">            return super.removeFirst();</span>
+        }
+<span class="nc bnc" id="L404" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L405">            load();</span>
+        }
+<span class="nc" id="L407">        ProxyCollections.beforeRemoveFirst(this);</span>
+<span class="nc" id="L408">        Object localObject = super.removeFirst();</span>
+<span class="nc" id="L409">        return ProxyCollections.afterRemoveFirst(this, localObject);</span>
+    }
+
+    @Override
+    public Object removeLast() {
+<span class="nc bnc" id="L414" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L415">            return super.removeLast();</span>
+        }
+<span class="nc bnc" id="L417" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L418">            load();</span>
+        }
+<span class="nc" id="L420">        ProxyCollections.beforeRemoveLast(this);</span>
+<span class="nc" id="L421">        Object localObject = super.removeLast();</span>
+<span class="nc" id="L422">        return ProxyCollections.afterRemoveLast(this, localObject);</span>
+    }
+
+    @Override
+    public Iterator iterator() {
+<span class="nc bnc" id="L427" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L428">            return super.iterator();</span>
+        }
+<span class="nc bnc" id="L430" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L431">            load();</span>
+        }
+<span class="nc" id="L433">        Iterator localIterator = super.iterator();</span>
+<span class="nc" id="L434">        return ProxyCollections.afterIterator(this, localIterator);</span>
+    }
+
+    @Override
+    public ListIterator listIterator() {
+<span class="nc bnc" id="L439" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L440">            return super.listIterator();</span>
+        }
+<span class="nc bnc" id="L442" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L443">            load();</span>
+        }
+<span class="nc" id="L445">        ListIterator localListIterator = super.listIterator();</span>
+<span class="nc" id="L446">        return ProxyCollections.afterListIterator(this, localListIterator);</span>
+    }
+
+    @Override
+    public boolean removeAll(Collection paramCollection) {
+<span class="nc bnc" id="L451" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L452">            return super.removeAll(paramCollection);</span>
+        }
+<span class="nc" id="L454">        return ProxyCollections.removeAll(this, paramCollection);</span>
+    }
+
+    @Override
+    public boolean retainAll(Collection paramCollection) {
+<span class="nc bnc" id="L459" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L460">            return super.retainAll(paramCollection);</span>
+        }
+<span class="nc bnc" id="L462" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L463">            load();</span>
+        }
+<span class="nc" id="L465">        return ProxyCollections.retainAll(this, paramCollection);</span>
+    }
+
+    @Override
+    public boolean removeFirstOccurrence(Object paramObject) {
+<span class="nc bnc" id="L470" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L471">            return super.removeFirstOccurrence(paramObject);</span>
+        }
+<span class="nc bnc" id="L473" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L474">            load();</span>
+        }
+<span class="nc" id="L476">        Proxies.dirty(this, true);</span>
+<span class="nc" id="L477">        return super.removeFirstOccurrence(paramObject);</span>
+    }
+
+    @Override
+    public boolean removeLastOccurrence(Object paramObject) {
+<span class="nc bnc" id="L482" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L483">            return super.removeLastOccurrence(paramObject);</span>
+        }
+<span class="nc bnc" id="L485" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L486">            load();</span>
+        }
+<span class="nc" id="L488">        Proxies.dirty(this, true);</span>
+<span class="nc" id="L489">        return super.removeLastOccurrence(paramObject);</span>
+    }
+
+    protected Object writeReplace() throws ObjectStreamException {
+<span class="nc bnc" id="L493" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L494">            load();</span>
+        }
+<span class="nc" id="L496">        return Proxies.writeReplace(this, true);</span>
+    }
+
+    @Override
+    public boolean equals(Object paramObject) {
+<span class="nc bnc" id="L501" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L502">            load();</span>
+        }
+<span class="nc" id="L504">        return super.equals(paramObject);</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc bnc" id="L509" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L510">            load();</span>
+        }
+<span class="nc" id="L512">        return super.hashCode();</span>
+    }
+
+    @Override
+    public List subList(int fromIndex, int toIndex) {
+<span class="nc bnc" id="L517" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L518">            load();</span>
+        }
+<span class="nc" id="L520">        return super.subList(fromIndex, toIndex);</span>
+    }
+
+    @Override
+    public int lastIndexOf(Object o) {
+<span class="nc bnc" id="L525" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L526">            load();</span>
+        }
+<span class="nc" id="L528">        return super.lastIndexOf(o);</span>
+    }
+
+    @Override
+    public int indexOf(Object o) {
+<span class="nc bnc" id="L533" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L534">            load();</span>
+        }
+<span class="nc" id="L536">        return super.indexOf(o);</span>
+    }
+
+    @Override
+    public Object get(int index) {
+<span class="nc bnc" id="L541" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L542">            load();</span>
+        }
+<span class="nc" id="L544">        return super.get(index);</span>
+    }
+
+    @Override
+    public boolean containsAll(Collection c) {
+<span class="nc bnc" id="L549" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L550">            load();</span>
+        }
+<span class="nc" id="L552">        return super.containsAll(c);</span>
+    }
+
+    @Override
+    public Object[] toArray() {
+<span class="nc bnc" id="L557" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L558">            load();</span>
+        }
+<span class="nc" id="L560">        return super.toArray();</span>
+    }
+
+    @Override
+    public Object[] toArray(Object[] array) {
+<span class="nc bnc" id="L565" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L566">            load();</span>
+        }
+<span class="nc" id="L568">        return super.toArray(array);</span>
+    }
+
+    @Override
+    public boolean contains(Object object) {
+<span class="nc bnc" id="L573" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L574">            load();</span>
+        }
+<span class="nc" id="L576">        return super.contains(object);</span>
+    }
+
+    @Override
+    public boolean isEmpty() {
+<span class="nc bnc" id="L581" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L582">            load();</span>
+        }
+<span class="nc" id="L584">        return super.isEmpty();</span>
+    }
+
+    @Override
+    public int size() {
+<span class="nc bnc" id="L589" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L590">            load();</span>
+        }
+<span class="nc" id="L592">        return super.size();</span>
+    }
+
+    @Override
+    public boolean offerFirst(Object paramObject) {
+<span class="nc bnc" id="L597" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L598">            return super.offerFirst(paramObject);</span>
+        }
+<span class="nc bnc" id="L600" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L601">            load();</span>
+        }
+<span class="nc" id="L603">        return super.offerFirst(paramObject);</span>
+    }
+
+    @Override
+    public boolean offerLast(Object paramObject) {
+<span class="nc bnc" id="L608" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L609">            return super.offerLast(paramObject);</span>
+        }
+<span class="nc bnc" id="L611" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L612">            load();</span>
+        }
+<span class="nc" id="L614">        return super.offerLast(paramObject);</span>
+    }
+
+    @Override
+    public Object pollFirst() {
+<span class="nc bnc" id="L619" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L620">            load();</span>
+        }
+<span class="nc" id="L622">        return super.pollFirst();</span>
+
+    }
+
+    @Override
+    public Object pollLast() {
+<span class="nc bnc" id="L628" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L629">            load();</span>
+        }
+<span class="nc" id="L631">        return super.pollLast();</span>
+    }
+
+    @Override
+    public Object getFirst() {
+<span class="nc bnc" id="L636" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L637">            load();</span>
+        }
+<span class="nc" id="L639">        return super.getFirst();</span>
+    }
+
+    @Override
+    public Object getLast() {
+<span class="nc bnc" id="L644" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L645">            load();</span>
+        }
+<span class="nc" id="L647">        return super.getLast();</span>
+    }
+
+    @Override
+    public Object peekFirst() {
+<span class="nc bnc" id="L652" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L653">            load();</span>
+        }
+<span class="nc" id="L655">        return super.peekFirst();</span>
+    }
+
+    @Override
+    public Object peekLast() {
+<span class="nc bnc" id="L660" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L661">            load();</span>
+        }
+<span class="nc" id="L663">        return super.peekLast();</span>
+    }
+
+    @Override
+    public Object element() {
+<span class="nc bnc" id="L668" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L669">            load();</span>
+        }
+<span class="nc" id="L671">        return super.element();</span>
+    }
+
+    @Override
+    public Object peek() {
+<span class="nc bnc" id="L676" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L677">            load();</span>
+        }
+<span class="nc" id="L679">        return super.peek();</span>
+    }
+
+    @Override
+    public void push(Object o) {
+<span class="nc bnc" id="L684" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L685">            load();</span>
+        }
+<span class="nc" id="L687">        super.push(o);</span>
+<span class="nc" id="L688">    }</span>
+
+    @Override
+    public Object pop() {
+<span class="nc bnc" id="L692" title="All 4 branches missed.">        if (!_directAccess &amp;&amp; isDelayLoad()) {</span>
+<span class="nc" id="L693">            load();</span>
+        }
+<span class="nc" id="L695">        return super.pop();</span>
+    }
+
+    @Override
+    public Iterator descendingIterator() {
+<span class="nc bnc" id="L700" title="All 2 branches missed.">        if (_directAccess) {</span>
+<span class="nc" id="L701">            return super.descendingIterator();</span>
+        }
+<span class="nc bnc" id="L703" title="All 2 branches missed.">        if (isDelayLoad()) {</span>
+<span class="nc" id="L704">            load();</span>
+        }
+<span class="nc" id="L706">        Iterator localIterator = super.descendingIterator();</span>
+<span class="nc" id="L707">        return ProxyCollections.afterIterator(this, localIterator);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

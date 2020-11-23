@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PCClassFileTransformer.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.enhance</a> &gt; <span class="el_source">PCClassFileTransformer.java</span></div><h1>PCClassFileTransformer.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.enhance;
+
+import java.io.ByteArrayInputStream;
+import java.lang.instrument.ClassFileTransformer;
+import java.lang.instrument.IllegalClassFormatException;
+import java.security.AccessController;
+import java.security.ProtectionDomain;
+import java.util.Set;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.lib.log.Log;
+import org.apache.openjpa.lib.util.J2DoPrivHelper;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.Options;
+import org.apache.openjpa.meta.MetaDataRepository;
+import org.apache.openjpa.util.GeneralException;
+
+import serp.bytecode.BCClass;
+import serp.bytecode.Project;
+import serp.bytecode.lowlevel.ConstantPoolTable;
+
+
+/**
+ * Transformer that makes persistent classes implement the
+ * {@link PersistenceCapable} interface at runtime.
+ *
+ * @author Abe White
+ */
+public class PCClassFileTransformer
+    implements ClassFileTransformer {
+
+<span class="nc" id="L50">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L51">        (PCClassFileTransformer.class);</span>
+
+    private final MetaDataRepository _repos;
+    private final PCEnhancer.Flags _flags;
+    private final ClassLoader _tmpLoader;
+    private final Log _log;
+    private final Set _names;
+<span class="nc" id="L58">    private boolean _transforming = false;</span>
+
+    /**
+     * Constructor.
+     *
+     * @param repos metadata repository to use internally
+     * @param opts enhancer configuration options
+     * @param loader temporary class loader for loading intermediate classes
+     */
+    public PCClassFileTransformer(MetaDataRepository repos, Options opts, ClassLoader loader) {
+<span class="nc" id="L68">        this(repos, toFlags(opts), loader, opts.removeBooleanProperty</span>
+<span class="nc" id="L69">            (&quot;scanDevPath&quot;, &quot;ScanDevPath&quot;, false));</span>
+<span class="nc" id="L70">    }</span>
+
+    /**
+     * Create enhancer flags from the given options.
+     */
+    private static PCEnhancer.Flags toFlags(Options opts) {
+<span class="nc" id="L76">        PCEnhancer.Flags flags = new PCEnhancer.Flags();</span>
+<span class="nc" id="L77">        flags.addDefaultConstructor = opts.removeBooleanProperty</span>
+<span class="nc" id="L78">            (&quot;addDefaultConstructor&quot;, &quot;AddDefaultConstructor&quot;,</span>
+                flags.addDefaultConstructor);
+<span class="nc" id="L80">        flags.enforcePropertyRestrictions = opts.removeBooleanProperty</span>
+<span class="nc" id="L81">            (&quot;enforcePropertyRestrictions&quot;, &quot;EnforcePropertyRestrictions&quot;,</span>
+                flags.enforcePropertyRestrictions);
+<span class="nc" id="L83">        return flags;</span>
+    }
+
+    /**
+     * Constructor.
+     *
+     * @param repos metadata repository to use internally
+     * @param flags enhancer configuration
+     * @param tmpLoader temporary class loader for loading intermediate classes
+     * @param devscan whether to scan the dev classpath for persistent types
+     * if none are configured
+     */
+<span class="nc" id="L95">    public PCClassFileTransformer(MetaDataRepository repos, PCEnhancer.Flags flags, ClassLoader tmpLoader, boolean devscan) {</span>
+<span class="nc" id="L96">        _repos = repos;</span>
+<span class="nc" id="L97">        _tmpLoader = tmpLoader;</span>
+
+<span class="nc" id="L99">        _log = repos.getConfiguration().</span>
+<span class="nc" id="L100">            getLog(OpenJPAConfiguration.LOG_ENHANCE);</span>
+<span class="nc" id="L101">        _flags = flags;</span>
+
+<span class="nc" id="L103">        _names = repos.getPersistentTypeNames(devscan, tmpLoader);</span>
+<span class="nc bnc" id="L104" title="All 4 branches missed.">        if (_names == null &amp;&amp; _log.isInfoEnabled())</span>
+<span class="nc" id="L105">            _log.info(_loc.get(&quot;runtime-enhance-pcclasses&quot;));</span>
+<span class="nc" id="L106">    }</span>
+
+    @Override
+    public byte[] transform(ClassLoader loader, String className, Class redef, ProtectionDomain domain, byte[] bytes)
+        throws IllegalClassFormatException {
+
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (loader == _tmpLoader)</span>
+<span class="nc" id="L113">            return null;</span>
+
+        // JDK bug -- OPENJPA-1676
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (className == null) {</span>
+<span class="nc" id="L117">            return null;</span>
+        }
+        // prevent re-entrant calls, which can occur if the enhancing
+        // loader is used to also load OpenJPA libraries; this is to prevent
+        // recursive enhancement attempts for internal openjpa libraries
+<span class="nc bnc" id="L122" title="All 2 branches missed.">        if (_transforming)</span>
+<span class="nc" id="L123">            return null;</span>
+
+<span class="nc" id="L125">        _transforming = true;</span>
+
+<span class="nc" id="L127">        return transform0(className, redef, bytes);</span>
+    }
+
+    /**
+     * We have to split the transform method into two methods to avoid
+     * ClassCircularityError when executing method using pure-JIT JVMs
+     * such as JRockit.
+     */
+    private byte[] transform0(String className, Class redef, byte[] bytes)
+        throws IllegalClassFormatException {
+
+<span class="nc" id="L138">        byte[] returnBytes = null;</span>
+        try {
+<span class="nc" id="L140">            Boolean enhance = needsEnhance(className, redef, bytes);</span>
+<span class="nc bnc" id="L141" title="All 4 branches missed.">            if (enhance != null &amp;&amp; _log.isTraceEnabled())</span>
+<span class="nc" id="L142">                _log.trace(_loc.get(&quot;needs-runtime-enhance&quot;, className,</span>
+                    enhance));
+<span class="nc bnc" id="L144" title="All 2 branches missed.">            if (enhance != Boolean.TRUE)</span>
+<span class="nc" id="L145">                return null;</span>
+
+<span class="nc" id="L147">            ClassLoader oldLoader = AccessController.doPrivileged(J2DoPrivHelper.getContextClassLoaderAction());</span>
+<span class="nc" id="L148">            AccessController.doPrivileged(J2DoPrivHelper.setContextClassLoaderAction(_tmpLoader));</span>
+            try {
+<span class="nc" id="L150">                PCEnhancer enhancer = new PCEnhancer(_repos.getConfiguration(),</span>
+<span class="nc" id="L151">                        new Project().loadClass(new ByteArrayInputStream(bytes),</span>
+                                _tmpLoader), _repos);
+<span class="nc" id="L153">                enhancer.setAddDefaultConstructor(_flags.addDefaultConstructor);</span>
+<span class="nc" id="L154">                enhancer.setEnforcePropertyRestrictions</span>
+<span class="nc" id="L155">                        (_flags.enforcePropertyRestrictions);</span>
+
+<span class="nc bnc" id="L157" title="All 2 branches missed.">                if (enhancer.run() == PCEnhancer.ENHANCE_NONE)</span>
+<span class="nc" id="L158">                    return null;</span>
+<span class="nc" id="L159">                BCClass pcb = enhancer.getPCBytecode();</span>
+<span class="nc" id="L160">                returnBytes = AsmAdaptor.toByteArray(pcb, pcb.toByteArray());</span>
+<span class="nc" id="L161">                return returnBytes;</span>
+            } finally {
+<span class="nc" id="L163">                AccessController.doPrivileged(J2DoPrivHelper.setContextClassLoaderAction(oldLoader));</span>
+            }
+<span class="nc" id="L165">        } catch (Throwable t) {</span>
+<span class="nc" id="L166">            _log.warn(_loc.get(&quot;cft-exception-thrown&quot;, className), t);</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">            if (t instanceof RuntimeException)</span>
+<span class="nc" id="L168">                throw (RuntimeException) t;</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            if (t instanceof IllegalClassFormatException)</span>
+<span class="nc" id="L170">                throw (IllegalClassFormatException) t;</span>
+<span class="nc" id="L171">            throw new GeneralException(t);</span>
+        } finally {
+<span class="nc" id="L173">            _transforming = false;</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">            if (returnBytes != null &amp;&amp; _log.isTraceEnabled())</span>
+<span class="nc" id="L175">                _log.trace(_loc.get(&quot;runtime-enhance-complete&quot;, className,</span>
+<span class="nc" id="L176">                    bytes.length, returnBytes.length));</span>
+        }
+    }
+
+    /**
+     * Return whether the given class needs enhancement.
+     */
+    private Boolean needsEnhance(String clsName, Class redef, byte[] bytes) {
+<span class="nc bnc" id="L184" title="All 4 branches missed.">        if (redef != null &amp;&amp; PersistenceCapable.class.isAssignableFrom(redef)) {</span>
+            // if the original class is already enhanced (implements PersistenceCapable)
+            // then we don't need to do any further processing.
+<span class="nc" id="L187">            return null;</span>
+        }
+
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (_names != null) {</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">            if (_names.contains(clsName.replace('/', '.')))</span>
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                return Boolean.valueOf(!isEnhanced(bytes));</span>
+<span class="nc" id="L193">            return null;</span>
+        }
+
+<span class="nc bnc" id="L196" title="All 6 branches missed.">        if (clsName.startsWith(&quot;java/&quot;) || clsName.startsWith(&quot;javax/&quot;) || clsName.startsWith(&quot;jakarta/&quot;)) {</span>
+<span class="nc" id="L197">            return null;</span>
+        }
+
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (isEnhanced(bytes)) {</span>
+<span class="nc" id="L201">            return Boolean.FALSE;</span>
+        }
+
+        try {
+<span class="nc" id="L205">            Class c = Class.forName(clsName.replace('/', '.'), false,</span>
+                _tmpLoader);
+<span class="nc bnc" id="L207" title="All 2 branches missed.">            if (_repos.getMetaData(c, null, false) != null)</span>
+<span class="nc" id="L208">                return Boolean.TRUE;</span>
+<span class="nc" id="L209">            return null;</span>
+<span class="nc" id="L210">        } catch (ClassNotFoundException cnfe) {</span>
+            // cannot load the class: this might mean that it is a proxy
+            // or otherwise inaccessible class which can't be an entity
+<span class="nc" id="L213">            return Boolean.FALSE;</span>
+<span class="nc" id="L214">        } catch (LinkageError cce) {</span>
+            // this can happen if we are loading classes that this
+            // class depends on; these will never be enhanced anyway
+<span class="nc" id="L217">            return Boolean.FALSE;</span>
+<span class="nc" id="L218">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L219">            throw re;</span>
+<span class="nc" id="L220">        } catch (Throwable t) {</span>
+<span class="nc" id="L221">            throw new GeneralException(t);</span>
+        }
+    }
+
+    /**
+     * Analyze the bytecode to see if the given class definition implements
+     * {@link PersistenceCapable}.
+     */
+    private static boolean isEnhanced(byte[] b) {
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        if (AsmAdaptor.use())</span>
+        {
+<span class="nc" id="L232">            return AsmAdaptor.isEnhanced(b);</span>
+        }
+
+<span class="nc" id="L235">        ConstantPoolTable table = new ConstantPoolTable(b);</span>
+<span class="nc" id="L236">        int idx = table.getEndIndex();</span>
+
+<span class="nc" id="L238">        idx += 6; // skip access, cls, super</span>
+<span class="nc" id="L239">        int ifaces = table.readUnsignedShort(idx);</span>
+        int clsEntry, utfEntry;
+        String name;
+<span class="nc bnc" id="L242" title="All 2 branches missed.">        for (int i = 0; i &lt; ifaces; i++) {</span>
+<span class="nc" id="L243">            idx += 2;</span>
+<span class="nc" id="L244">            clsEntry = table.readUnsignedShort(idx);</span>
+<span class="nc" id="L245">            utfEntry = table.readUnsignedShort(table.get(clsEntry));</span>
+<span class="nc" id="L246">            name = table.readString(table.get(utfEntry));</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">            if (&quot;org/apache/openjpa/enhance/PersistenceCapable&quot;.equals(name))</span>
+<span class="nc" id="L248">                return true;</span>
+        }
+<span class="nc" id="L250">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

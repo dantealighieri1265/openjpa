@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>TypeBasedCacheDistributionPolicy.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.datacache</a> &gt; <span class="el_source">TypeBasedCacheDistributionPolicy.java</span></div><h1>TypeBasedCacheDistributionPolicy.java</h1><pre class="source lang-java linenums">/**
+ *  Licensed to the Apache Software Foundation (ASF) under one or more
+ *  contributor license agreements.  See the NOTICE file distributed with
+ *  this work for additional information regarding copyright ownership.
+ *  The ASF licenses this file to You under the Apache License, Version 2.0
+ *  (the &quot;License&quot;); you may not use this file except in compliance with
+ *  the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software
+ *  distributed under the License is distributed on an &quot;AS IS&quot; BASIS,
+ *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *  See the License for the specific language governing permissions and
+ *  limitations under the License.
+ */
+package org.apache.openjpa.datacache;
+
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+
+import org.apache.openjpa.kernel.OpenJPAStateManager;
+import org.apache.openjpa.lib.util.StringUtil;
+import org.apache.openjpa.meta.ClassMetaData;
+
+
+/**
+ * A cache distribution policy based on the type of the managed objects.
+ * &lt;br&gt;
+ * The policy is configured by specifying list of included or excluded types.
+ * The lists are specified as fully-qualified persistence class names separated by semicolon.
+ * &lt;br&gt;
+ * The policy checks for the given instance by its type whether the class name appears in
+ * exclusion or inclusion lists. If the class name appears in exclusion list then the
+ * instance is not cached. Otherwise, if an inclusion list exists and the class name appears in inclusion list
+ * or @DataCache annotation is specified on the class meta data, then the instance is cached.
+ *
+ * @author Pinaki Poddar
+ *
+ */
+<span class="nc" id="L43">public class TypeBasedCacheDistributionPolicy extends DefaultCacheDistributionPolicy</span>
+    implements CacheDistributionPolicy {
+    private Set&lt;String&gt; _excludedTypes;
+    private Set&lt;String&gt; _includedTypes;
+
+
+    /**
+     * Gets the excluded types, if configured.
+     */
+    public Set&lt;String&gt; getExcludedTypes() {
+<span class="nc" id="L53">        return _excludedTypes;</span>
+    }
+
+    /**
+     * Sets excluded types from a semicolon separated list of type names.
+     */
+    public void setExcludedTypes(String types) {
+<span class="nc" id="L60">        _excludedTypes = parseNames(types);</span>
+<span class="nc" id="L61">    }</span>
+
+    /**
+     * Gets the included types, if configured.
+     */
+    public Set&lt;String&gt; getIncludedTypes() {
+<span class="nc" id="L67">        return _includedTypes;</span>
+    }
+
+    /**
+     * Sets included types from a semicolon separated list of type names.
+     */
+    public void setIncludedTypes(String types) {
+<span class="nc" id="L74">        _includedTypes = parseNames(types);</span>
+<span class="nc" id="L75">    }</span>
+
+    private Set&lt;String&gt; parseNames(String types) {
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (StringUtil.isEmpty(types))</span>
+<span class="nc" id="L79">            return Collections.emptySet();</span>
+<span class="nc" id="L80">        String[] names = StringUtil.split(types, &quot;;&quot;, 0);</span>
+<span class="nc" id="L81">        Set&lt;String&gt; set = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L82">        set.addAll(Arrays.asList(names));</span>
+
+<span class="nc" id="L84">        return  Collections.unmodifiableSet(set);</span>
+    }
+
+    @Override
+    public String selectCache(OpenJPAStateManager sm, Object context) {
+<span class="nc" id="L89">        ClassMetaData meta = sm.getMetaData();</span>
+<span class="nc" id="L90">        String className = meta.getDescribedType().getName();</span>
+<span class="nc bnc" id="L91" title="All 4 branches missed.">        if (_excludedTypes != null &amp;&amp; _excludedTypes.contains(className)) {</span>
+<span class="nc" id="L92">            return null;</span>
+        }
+<span class="nc bnc" id="L94" title="All 4 branches missed.">        if (_includedTypes != null &amp;&amp; !_includedTypes.isEmpty()) {</span>
+<span class="nc bnc" id="L95" title="All 2 branches missed.">            if (_includedTypes.contains(className))</span>
+<span class="nc" id="L96">                return meta.getDataCacheName();</span>
+<span class="nc bnc" id="L97" title="All 2 branches missed.">            return (meta.getDataCacheEnabled()) ? meta.getDataCacheName() : null;</span>
+
+        } else {
+<span class="nc" id="L100">            return super.selectCache(sm, context);</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

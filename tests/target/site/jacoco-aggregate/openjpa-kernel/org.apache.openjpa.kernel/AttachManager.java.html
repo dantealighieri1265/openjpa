@@ -1,0 +1,369 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AttachManager.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">AttachManager.java</span></div><h1>AttachManager.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.openjpa.enhance.PersistenceCapable;
+import org.apache.openjpa.event.CallbackModes;
+import org.apache.openjpa.event.LifecycleEvent;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.FieldMetaData;
+import org.apache.openjpa.meta.ValueMetaData;
+import org.apache.openjpa.util.CallbackException;
+import org.apache.openjpa.util.Exceptions;
+import org.apache.openjpa.util.ImplHelper;
+import org.apache.openjpa.util.OpenJPAException;
+import org.apache.openjpa.util.OptimisticException;
+import org.apache.openjpa.util.ProxyManager;
+import org.apache.openjpa.util.UserException;
+
+/**
+ * Handles attaching instances.
+ *
+ * @author Marc Prud'hommeaux
+ */
+public class AttachManager {
+
+<span class="nc" id="L54">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L55">        (AttachManager.class);</span>
+
+    private final BrokerImpl _broker;
+    private final ProxyManager _proxy;
+    private final OpCallbacks _call;
+    private final boolean _copyNew;
+    private final boolean _failFast;
+<span class="nc" id="L62">    private final IdentityHashMap _attached = new IdentityHashMap();</span>
+<span class="nc" id="L63">    private final Collection&lt;StateManagerImpl&gt; _visitedNodes = new ArrayList();</span>
+
+    // reusable strategies
+    private AttachStrategy _version;
+    private AttachStrategy _detach;
+
+    /**
+     * Constructor. Supply broker attaching to.
+     */
+<span class="nc" id="L72">    public AttachManager(BrokerImpl broker, boolean copyNew, OpCallbacks call) {</span>
+<span class="nc" id="L73">        _broker = broker;</span>
+<span class="nc" id="L74">        _proxy = broker.getConfiguration().getProxyManagerInstance();</span>
+<span class="nc" id="L75">        _call = call;</span>
+<span class="nc" id="L76">        _copyNew = copyNew;</span>
+<span class="nc" id="L77">        _failFast = (broker.getConfiguration().getMetaDataRepositoryInstance().</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">            getMetaDataFactory().getDefaults().getCallbackMode()</span>
+            &amp; CallbackModes.CALLBACK_FAIL_FAST) != 0;
+<span class="nc" id="L80">    }</span>
+
+    /**
+     * Return the behavior supplied on construction.
+     */
+    public OpCallbacks getBehavior() {
+<span class="nc" id="L86">        return _call;</span>
+    }
+
+    /**
+     * Return whether to copy new instances being persisted.
+     */
+    public boolean getCopyNew() {
+<span class="nc" id="L93">        return _copyNew;</span>
+    }
+
+    /**
+     * Return an attached version of the given instance.
+     */
+    public Object attach(Object pc) {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (pc == null)</span>
+<span class="nc" id="L101">            return null;</span>
+
+<span class="nc" id="L103">        CallbackException excep = null;</span>
+        try {
+<span class="nc" id="L105">            return attach(pc, null, null, null, true);</span>
+<span class="nc" id="L106">        } catch (CallbackException ce) {</span>
+<span class="nc" id="L107">            excep = ce;</span>
+<span class="nc" id="L108">            return null; // won't be reached as the exceps will be rethrown</span>
+        } finally {
+<span class="nc" id="L110">            List exceps = null;</span>
+<span class="nc bnc" id="L111" title="All 4 branches missed.">            if (excep == null || !_failFast)</span>
+<span class="nc" id="L112">                exceps = invokeAfterAttach(null);</span>
+            else
+<span class="nc" id="L114">                exceps = Collections.singletonList(excep);</span>
+<span class="nc" id="L115">            _attached.clear();</span>
+<span class="nc" id="L116">            throwExceptions(exceps, null, false);</span>
+        }
+    }
+
+    /**
+     * Return attached versions of the given instances.
+     */
+    public Object[] attachAll(Collection instances) {
+<span class="nc" id="L124">        Object[] attached = new Object[instances.size()];</span>
+<span class="nc" id="L125">        List exceps = null;</span>
+<span class="nc" id="L126">        List failed = null;</span>
+<span class="nc" id="L127">        boolean opt = true;</span>
+<span class="nc" id="L128">        boolean failFast = false;</span>
+        try {
+<span class="nc" id="L130">            int i = 0;</span>
+<span class="nc bnc" id="L131" title="All 2 branches missed.">            for (Iterator itr = instances.iterator(); itr.hasNext(); i++) {</span>
+                try {
+<span class="nc" id="L133">                    attached[i] = attach(itr.next(), null, null, null, true);</span>
+<span class="nc" id="L134">                } catch (OpenJPAException ke) {</span>
+                    // track exceptions and optimistic failed objects
+<span class="nc bnc" id="L136" title="All 4 branches missed.">                    if (opt &amp;&amp; !(ke instanceof OptimisticException))</span>
+<span class="nc" id="L137">                        opt = false;</span>
+<span class="nc bnc" id="L138" title="All 4 branches missed.">                    if (opt &amp;&amp; ke.getFailedObject() != null)</span>
+<span class="nc" id="L139">                        failed = add(failed, ke.getFailedObject());</span>
+<span class="nc" id="L140">                    exceps = add(exceps, ke);</span>
+
+<span class="nc bnc" id="L142" title="All 4 branches missed.">                    if (ke instanceof CallbackException &amp;&amp; _failFast) {</span>
+<span class="nc" id="L143">                        failFast = true;</span>
+<span class="nc" id="L144">                        break;</span>
+                    }
+                }
+<span class="nc" id="L147">                catch (RuntimeException re) {</span>
+<span class="nc" id="L148">                    exceps = add(exceps, re);</span>
+<span class="nc" id="L149">                }</span>
+            }
+        } finally {
+            // invoke post callbacks unless all failed
+<span class="nc bnc" id="L153" title="All 4 branches missed.">            if (!failFast &amp;&amp; (exceps == null</span>
+<span class="nc bnc" id="L154" title="All 2 branches missed.">                || exceps.size() &lt; instances.size()))</span>
+<span class="nc" id="L155">                exceps = invokeAfterAttach(exceps);</span>
+<span class="nc" id="L156">            _attached.clear();</span>
+        }
+<span class="nc" id="L158">        throwExceptions(exceps, failed, opt);</span>
+<span class="nc" id="L159">        return attached;</span>
+    }
+
+    /**
+     * Invoke postAttach() on any attached instances that implement
+     * PostAttachCallback. This will be done after the entire graph has
+     * been attached.
+     */
+    private List invokeAfterAttach(List exceps) {
+<span class="nc" id="L168">        Set entries = _attached.entrySet();</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">        for (Iterator i = entries.iterator(); i.hasNext();) {</span>
+<span class="nc" id="L170">            Map.Entry entry = (Map.Entry) i.next();</span>
+<span class="nc" id="L171">            Object attached = entry.getValue();</span>
+<span class="nc" id="L172">            StateManagerImpl sm = _broker.getStateManagerImpl(attached, true);</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            if (sm.isNew())</span>
+<span class="nc" id="L174">                continue;</span>
+            try {
+<span class="nc" id="L176">                _broker.fireLifecycleEvent(attached, entry.getKey(),</span>
+<span class="nc" id="L177">                    sm.getMetaData(), LifecycleEvent.AFTER_ATTACH);</span>
+<span class="nc" id="L178">            } catch (RuntimeException re) {</span>
+<span class="nc" id="L179">                exceps = add(exceps, re);</span>
+<span class="nc bnc" id="L180" title="All 4 branches missed.">                if (_failFast &amp;&amp; re instanceof CallbackException)</span>
+<span class="nc" id="L181">                    break;</span>
+<span class="nc" id="L182">            }</span>
+<span class="nc" id="L183">        }</span>
+<span class="nc" id="L184">        return exceps;</span>
+    }
+
+    /**
+     * Add an object to the list.
+     */
+    private List add(List list, Object obj) {
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (list == null)</span>
+<span class="nc" id="L192">            list = new LinkedList();</span>
+<span class="nc" id="L193">        list.add(obj);</span>
+<span class="nc" id="L194">        return list;</span>
+    }
+
+    /**
+     * Throw exception for failures.
+     */
+    private void throwExceptions(List exceps, List failed, boolean opt) {
+<span class="nc bnc" id="L201" title="All 2 branches missed.">        if (exceps == null)</span>
+<span class="nc" id="L202">            return;</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if (exceps.size() == 1)</span>
+<span class="nc" id="L204">            throw (RuntimeException) exceps.get(0);</span>
+
+<span class="nc" id="L206">        Throwable[] t = (Throwable[]) exceps.toArray</span>
+<span class="nc" id="L207">            (new Throwable[exceps.size()]);</span>
+<span class="nc bnc" id="L208" title="All 4 branches missed.">        if (opt &amp;&amp; failed != null)</span>
+<span class="nc" id="L209">            throw new OptimisticException(failed, t);</span>
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        if (opt)</span>
+<span class="nc" id="L211">            throw new OptimisticException(t);</span>
+<span class="nc" id="L212">        throw new UserException(_loc.get(&quot;nested-exceps&quot;)).</span>
+<span class="nc" id="L213">            setNestedThrowables(t);</span>
+    }
+
+    /**
+     * Attach.
+     *
+     * @param toAttach the detached object
+     * @param into the instance we're attaching into
+     * @param owner state manager for &lt;code&gt;into&lt;/code&gt;
+     * @param ownerMeta the field we traversed to find &lt;code&gt;toAttach&lt;/code&gt;
+     * @param explicit whether to make new instances explicitly persistent
+     */
+    Object attach(Object toAttach, PersistenceCapable into,
+        OpenJPAStateManager owner, ValueMetaData ownerMeta, boolean explicit) {
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        if (toAttach == null)</span>
+<span class="nc" id="L228">            return null;</span>
+
+        // check if already attached
+<span class="nc" id="L231">        Object attached = _attached.get(toAttach);</span>
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (attached != null)</span>
+<span class="nc" id="L233">            return attached;</span>
+
+        //### need to handle ACT_CASCADE
+<span class="nc" id="L236">        int action = processArgument(toAttach);</span>
+<span class="nc bnc" id="L237" title="All 4 branches missed.">        if ((action &amp; OpCallbacks.ACT_RUN) == 0 &amp;&amp;</span>
+            (action &amp; OpCallbacks.ACT_CASCADE) != 0) {
+<span class="nc bnc" id="L239" title="All 2 branches missed.">            if(_visitedNodes.contains(_broker.getStateManager(toAttach)))</span>
+<span class="nc" id="L240">                return toAttach;</span>
+<span class="nc" id="L241">            return handleCascade(toAttach,owner);</span>
+        }
+
+<span class="nc bnc" id="L244" title="All 2 branches missed.">        if ((action &amp; OpCallbacks.ACT_RUN) == 0)</span>
+<span class="nc" id="L245">            return toAttach;</span>
+
+        //### need to handle ACT_RUN without also ACT_CASCADE
+<span class="nc" id="L248">        ClassMetaData meta = _broker.getConfiguration().</span>
+<span class="nc" id="L249">            getMetaDataRepositoryInstance().getMetaData(</span>
+<span class="nc" id="L250">                ImplHelper.getManagedInstance(toAttach).getClass(),</span>
+<span class="nc" id="L251">                _broker.getClassLoader(), true);</span>
+<span class="nc" id="L252">        return getStrategy(toAttach).attach(this, toAttach, meta, into,</span>
+            owner, ownerMeta, explicit);
+    }
+
+    private Object handleCascade(Object toAttach, OpenJPAStateManager owner) {
+<span class="nc" id="L257">        StateManagerImpl sm = _broker.getStateManagerImpl(toAttach, true);</span>
+<span class="nc" id="L258">        BitSet loaded = sm.getLoaded();</span>
+<span class="nc" id="L259">        FieldMetaData[] fmds = sm.getMetaData().getDefinedFields();</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        for (FieldMetaData fmd : fmds) {</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">            if (fmd.getElement().getCascadeAttach() == ValueMetaData.CASCADE_IMMEDIATE) {</span>
+<span class="nc" id="L262">                FieldMetaData[] inverseFieldMappings = fmd.getInverseMetaDatas();</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">                if (inverseFieldMappings.length != 0) {</span>
+<span class="nc" id="L264">                    _visitedNodes.add(sm);</span>
+                    // Only try to attach this field is it is loaded
+<span class="nc bnc" id="L266" title="All 2 branches missed.">                    if (loaded.get(fmd.getIndex())) {</span>
+<span class="nc" id="L267">                        getStrategy(toAttach).attachField(this, toAttach, sm, fmd, true);</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L272">        return toAttach;</span>
+    }
+
+    /**
+     * Determine the action to take on the given argument.
+     */
+    private int processArgument(Object obj) {
+<span class="nc bnc" id="L279" title="All 2 branches missed.">        if (_call == null)</span>
+<span class="nc" id="L280">            return OpCallbacks.ACT_RUN;</span>
+<span class="nc" id="L281">        return _call.processArgument(OpCallbacks.OP_ATTACH, obj,</span>
+<span class="nc" id="L282">            _broker.getStateManager(obj));</span>
+    }
+
+    /**
+     * Calculate proper attach strategy for instance.
+     */
+    private AttachStrategy getStrategy(Object toAttach) {
+<span class="nc" id="L289">        PersistenceCapable pc = ImplHelper.toPersistenceCapable(toAttach,</span>
+<span class="nc" id="L290">            getBroker().getConfiguration());</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        if (pc.pcGetStateManager() instanceof AttachStrategy)</span>
+<span class="nc" id="L292">            return (AttachStrategy) pc.pcGetStateManager();</span>
+
+<span class="nc" id="L294">        Object obj = pc.pcGetDetachedState();</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">        if (obj instanceof AttachStrategy)</span>
+<span class="nc" id="L296">            return (AttachStrategy) obj;</span>
+<span class="nc bnc" id="L297" title="All 4 branches missed.">        if (obj == null || obj == PersistenceCapable.DESERIALIZED) {</span>
+            // new or detached without state
+<span class="nc bnc" id="L299" title="All 2 branches missed.">            if (_version == null)</span>
+<span class="nc" id="L300">                _version = new VersionAttachStrategy();</span>
+<span class="nc" id="L301">            return _version;</span>
+        }
+
+        // detached state
+<span class="nc bnc" id="L305" title="All 2 branches missed.">        if (_detach == null)</span>
+<span class="nc" id="L306">            _detach = new DetachedStateAttachStrategy();</span>
+<span class="nc" id="L307">        return _detach;</span>
+    }
+
+    /**
+     * Owning broker.
+     */
+    BrokerImpl getBroker() {
+<span class="nc" id="L314">        return _broker;</span>
+    }
+
+    /**
+     * System proxy manager.
+     */
+    ProxyManager getProxyManager() {
+<span class="nc" id="L321">        return _proxy;</span>
+    }
+
+    /**
+     * If the passed in argument has already been attached, return
+     * the (cached) attached copy.
+     */
+    PersistenceCapable getAttachedCopy(Object pc) {
+<span class="nc" id="L329">        return ImplHelper.toPersistenceCapable(_attached.get(pc),</span>
+<span class="nc" id="L330">            getBroker().getConfiguration());</span>
+    }
+
+    /**
+     * Record the attached copy in the cache.
+     */
+    void setAttachedCopy(Object from, PersistenceCapable into) {
+<span class="nc" id="L337">        _attached.put(from, into);</span>
+<span class="nc" id="L338">    }</span>
+
+    /**
+     * Fire before-attach event.
+     */
+    void fireBeforeAttach(Object pc, ClassMetaData meta) {
+<span class="nc" id="L344">        _broker.fireLifecycleEvent(pc, null, meta,</span>
+            LifecycleEvent.BEFORE_ATTACH);
+<span class="nc" id="L346">    }</span>
+
+    /**
+     * Return the detached oid of the given instance.
+     */
+    Object getDetachedObjectId(Object pc) {
+<span class="nc bnc" id="L352" title="All 2 branches missed.">        if (pc == null)</span>
+<span class="nc" id="L353">            return null;</span>
+<span class="nc" id="L354">        return getStrategy(pc).getDetachedObjectId(this, pc);</span>
+    }
+
+    /**
+     * Throw an exception if the given object is not managed; otherwise
+     * return its state manager.
+     */
+    StateManagerImpl assertManaged(Object obj) {
+<span class="nc" id="L362">        StateManagerImpl sm = _broker.getStateManagerImpl(obj, true);</span>
+<span class="nc bnc" id="L363" title="All 2 branches missed.">        if (sm == null)</span>
+<span class="nc" id="L364">            throw new UserException(_loc.get(&quot;not-managed&quot;,</span>
+<span class="nc" id="L365">                Exceptions.toString(obj))).setFailedObject (obj);</span>
+<span class="nc" id="L366">		return sm;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

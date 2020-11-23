@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JNDIManagedRuntime.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.ee</a> &gt; <span class="el_source">JNDIManagedRuntime.java</span></div><h1>JNDIManagedRuntime.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.ee;
+
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.transaction.TransactionManager;
+
+/**
+ * Implementation of the {@link ManagedRuntime} interface that uses JNDI to
+ * find the TransactionManager.
+ *
+ * @author Abe White
+ */
+<span class="nc" id="L31">public class JNDIManagedRuntime extends AbstractManagedRuntime</span>
+    implements ManagedRuntime {
+
+<span class="nc" id="L34">    private String _tmLoc = &quot;java:/TransactionManager&quot;;</span>
+<span class="nc" id="L35">    private TransactionManager _tm = null;</span>
+
+    /**
+     * Return the location of the {@link TransactionManager} in JNDI.
+     */
+    public String getTransactionManagerName() {
+<span class="nc" id="L41">        return _tmLoc;</span>
+    }
+
+    /**
+     * Set the location of the {@link TransactionManager} in JNDI.
+     */
+    public void setTransactionManagerName(String name) {
+<span class="nc" id="L48">        _tmLoc = name;</span>
+<span class="nc" id="L49">        _tm = null;  // reset the cached TM</span>
+<span class="nc" id="L50">    }</span>
+
+    /**
+     * Return the cached TransactionManager instance.
+     */
+    @Override
+    public TransactionManager getTransactionManager() throws Exception {
+
+<span class="nc bnc" id="L58" title="All 2 branches missed.">        if (_tm == null) {</span>
+<span class="nc" id="L59">            Context ctx = new InitialContext();</span>
+            try {
+<span class="nc" id="L61">                _tm = (TransactionManager) ctx.lookup(_tmLoc);</span>
+            } finally {
+<span class="nc" id="L63">                ctx.close();</span>
+            }
+        }
+<span class="nc" id="L66">        return _tm;</span>
+    }
+
+    @Override
+    public void setRollbackOnly(Throwable cause)
+        throws Exception {
+        // there is no generic support for setting the rollback cause
+<span class="nc" id="L73">        getTransactionManager().getTransaction().setRollbackOnly();</span>
+<span class="nc" id="L74">    }</span>
+
+    @Override
+    public Throwable getRollbackCause()
+        throws Exception {
+        // there is no generic support for setting the rollback cause
+<span class="nc" id="L80">        return null;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

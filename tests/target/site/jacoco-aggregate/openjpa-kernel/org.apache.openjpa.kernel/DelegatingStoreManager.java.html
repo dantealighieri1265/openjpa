@@ -1,0 +1,242 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DelegatingStoreManager.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">DelegatingStoreManager.java</span></div><h1>DelegatingStoreManager.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.List;
+
+import org.apache.openjpa.lib.rop.ResultObjectProvider;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.FieldMetaData;
+
+/**
+ * Base class for store manager decorators that delegate to another
+ * store manager for some operations.
+ *
+ * @author Abe White
+ */
+public abstract class DelegatingStoreManager
+    implements StoreManager {
+
+    private final StoreManager _store;
+    private final DelegatingStoreManager _del;
+
+    /**
+     * Constructor. Supply delegate.
+     */
+<span class="nc" id="L44">    public DelegatingStoreManager(StoreManager store) {</span>
+<span class="nc" id="L45">        _store = store;</span>
+<span class="nc bnc" id="L46" title="All 2 branches missed.">        if (store instanceof DelegatingStoreManager)</span>
+<span class="nc" id="L47">            _del = (DelegatingStoreManager) _store;</span>
+        else
+<span class="nc" id="L49">            _del = null;</span>
+<span class="nc" id="L50">    }</span>
+
+    /**
+     * Return the wrapped store manager.
+     */
+    public StoreManager getDelegate() {
+<span class="nc" id="L56">        return _store;</span>
+    }
+
+    /**
+     * Return the base underlying native store manager.
+     */
+    public StoreManager getInnermostDelegate() {
+<span class="nc bnc" id="L63" title="All 2 branches missed.">        return (_del == null) ? _store : _del.getInnermostDelegate();</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L68">        return getInnermostDelegate().hashCode();</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (other == this)</span>
+<span class="nc" id="L74">            return true;</span>
+<span class="nc bnc" id="L75" title="All 2 branches missed.">        if (other instanceof DelegatingStoreManager)</span>
+<span class="nc" id="L76">            other = ((DelegatingStoreManager) other).getInnermostDelegate();</span>
+<span class="nc" id="L77">        return getInnermostDelegate().equals(other);</span>
+    }
+
+    @Override
+    public void setContext(StoreContext ctx) {
+<span class="nc" id="L82">        _store.setContext(ctx);</span>
+<span class="nc" id="L83">    }</span>
+
+    @Override
+    public void beginOptimistic() {
+<span class="nc" id="L87">        _store.beginOptimistic();</span>
+<span class="nc" id="L88">    }</span>
+
+    @Override
+    public void rollbackOptimistic() {
+<span class="nc" id="L92">        _store.rollbackOptimistic();</span>
+<span class="nc" id="L93">    }</span>
+
+    @Override
+    public void begin() {
+<span class="nc" id="L97">        _store.begin();</span>
+<span class="nc" id="L98">    }</span>
+
+    @Override
+    public void commit() {
+<span class="nc" id="L102">        _store.commit();</span>
+<span class="nc" id="L103">    }</span>
+
+    @Override
+    public void rollback() {
+<span class="nc" id="L107">        _store.rollback();</span>
+<span class="nc" id="L108">    }</span>
+
+    @Override
+    public boolean exists(OpenJPAStateManager sm, Object context) {
+<span class="nc" id="L112">        return _store.exists(sm, context);</span>
+    }
+
+    @Override
+    public boolean syncVersion(OpenJPAStateManager sm, Object context) {
+<span class="nc" id="L117">        return _store.syncVersion(sm, context);</span>
+    }
+
+    @Override
+    public boolean initialize(OpenJPAStateManager sm, PCState state,
+        FetchConfiguration fetch, Object context) {
+<span class="nc" id="L123">        return _store.initialize(sm, state, fetch, context);</span>
+    }
+
+    @Override
+    public boolean load(OpenJPAStateManager sm, BitSet fields,
+        FetchConfiguration fetch, int lockLevel, Object context) {
+<span class="nc" id="L129">        return _store.load(sm, fields, fetch, lockLevel, context);</span>
+    }
+
+    @Override
+    public Collection&lt;Object&gt; loadAll(Collection&lt;OpenJPAStateManager&gt; sms, PCState state, int load,
+        FetchConfiguration fetch, Object context) {
+<span class="nc" id="L135">        return _store.loadAll(sms, state, load, fetch, context);</span>
+    }
+
+    @Override
+    public void beforeStateChange(OpenJPAStateManager sm, PCState fromState,
+        PCState toState) {
+<span class="nc" id="L141">        _store.beforeStateChange(sm, fromState, toState);</span>
+<span class="nc" id="L142">    }</span>
+
+    @Override
+    public Collection&lt;Exception&gt; flush(Collection&lt;OpenJPAStateManager&gt; sms) {
+<span class="nc" id="L146">        return _store.flush(sms);</span>
+    }
+
+    @Override
+    public boolean assignObjectId(OpenJPAStateManager sm, boolean preFlush) {
+<span class="nc" id="L151">        return _store.assignObjectId(sm, preFlush);</span>
+    }
+
+    @Override
+    public boolean assignField(OpenJPAStateManager sm, int field,
+        boolean preFlush) {
+<span class="nc" id="L157">        return _store.assignField(sm, field, preFlush);</span>
+    }
+
+    @Override
+    public Class&lt;?&gt; getManagedType(Object oid) {
+<span class="nc" id="L162">        return _store.getManagedType(oid);</span>
+    }
+
+    @Override
+    public Class&lt;?&gt; getDataStoreIdType(ClassMetaData meta) {
+<span class="nc" id="L167">        return _store.getDataStoreIdType(meta);</span>
+    }
+
+    @Override
+    public Object copyDataStoreId(Object oid, ClassMetaData meta) {
+<span class="nc" id="L172">        return _store.copyDataStoreId(oid, meta);</span>
+    }
+
+    @Override
+    public Object newDataStoreId(Object oidVal, ClassMetaData meta) {
+<span class="nc" id="L177">        return _store.newDataStoreId(oidVal, meta);</span>
+    }
+
+    @Override
+    public Object getClientConnection() {
+<span class="nc" id="L182">        return _store.getClientConnection();</span>
+    }
+
+    @Override
+    public void retainConnection() {
+<span class="nc" id="L187">        _store.retainConnection();</span>
+<span class="nc" id="L188">    }</span>
+
+    @Override
+    public void releaseConnection() {
+<span class="nc" id="L192">        _store.releaseConnection();</span>
+<span class="nc" id="L193">    }</span>
+
+    @Override
+    public ResultObjectProvider executeExtent(ClassMetaData meta,
+        boolean subclasses, FetchConfiguration fetch) {
+<span class="nc" id="L198">        return _store.executeExtent(meta, subclasses, fetch);</span>
+    }
+
+    @Override
+    public StoreQuery newQuery(String language) {
+<span class="nc" id="L203">        return _store.newQuery(language);</span>
+    }
+
+    @Override
+    public FetchConfiguration newFetchConfiguration() {
+<span class="nc" id="L208">        return _store.newFetchConfiguration();</span>
+    }
+
+    @Override
+    public void close() {
+<span class="nc" id="L213">        _store.close();</span>
+<span class="nc" id="L214">    }</span>
+
+    @Override
+    public int compareVersion(OpenJPAStateManager state, Object v1, Object v2) {
+<span class="nc" id="L218">        return _store.compareVersion(state, v1, v2);</span>
+    }
+
+    @Override
+    public Seq getDataStoreIdSequence(ClassMetaData forClass) {
+<span class="nc" id="L223">        return _store.getDataStoreIdSequence(forClass);</span>
+    }
+
+    @Override
+    public Seq getValueSequence(FieldMetaData fmd) {
+<span class="nc" id="L228">        return _store.getValueSequence(fmd);</span>
+    }
+
+    @Override
+    public boolean cancelAll() {
+<span class="nc" id="L233">        return _store.cancelAll();</span>
+	}
+
+    @Override
+    public boolean isCached(List&lt;Object&gt; oids, BitSet edata) {
+<span class="nc" id="L238">        return _store.isCached(oids, edata);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

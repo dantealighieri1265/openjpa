@@ -1,0 +1,118 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>StoreFacadeTypeRegistry.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.util</a> &gt; <span class="el_source">StoreFacadeTypeRegistry.java</span></div><h1>StoreFacadeTypeRegistry.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.util;
+
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.apache.openjpa.kernel.StoreManager;
+
+/**
+ * Repository of store-specific facade classes. This is used by facade
+ * implementations to wrap store-specific components without knowing
+ * about all possible back-ends.
+ */
+<span class="nc" id="L31">public class StoreFacadeTypeRegistry {</span>
+
+<span class="nc" id="L33">    private Map _impls = new ConcurrentHashMap();</span>
+
+    /**
+     * Register a facade implementation.
+     *
+     * @param facadeType the facade interface
+     * @param storeType the store's
+     * {@link org.apache.openjpa.kernel.StoreManager} type, or null for generic
+     * @param implType the class implementing the facade
+     */
+    public void registerImplementation(Class facadeType, Class storeType,
+        Class implType) {
+<span class="nc bnc" id="L45" title="All 2 branches missed.">        Object key = (storeType == null) ? (Object) facadeType</span>
+<span class="nc" id="L46">            : new Key(facadeType, storeType);</span>
+<span class="nc" id="L47">        _impls.put(key, implType);</span>
+<span class="nc" id="L48">    }</span>
+
+    /**
+     * Return the implementation for the given facade and store.
+     *
+     * @param facadeType the facade interface
+     * @param storeType the store's
+     * {@link org.apache.openjpa.kernel.StoreManager} type, or null for generic
+     * @param implType the registered implementor
+     */
+    public Class getImplementation(Class facadeType, Class storeType) {
+        // traverse store type hierarchy to store manager to find most specific
+        // store avaialble
+        Class impl;
+<span class="nc bnc" id="L62" title="All 4 branches missed.">        for (; storeType != null &amp;&amp; storeType != StoreManager.class;</span>
+<span class="nc" id="L63">            storeType = storeType.getSuperclass()) {</span>
+<span class="nc" id="L64">            impl = (Class) _impls.get(new Key(facadeType, storeType));</span>
+<span class="nc bnc" id="L65" title="All 2 branches missed.">            if (impl != null)</span>
+<span class="nc" id="L66">                return impl;</span>
+        }
+<span class="nc" id="L68">        return (Class) _impls.get(facadeType);</span>
+    }
+
+    /**
+     * Return the implementation for the given facade and store. If no
+     * registered implementation is found then returns the given default type
+     * provided it the facade type is assignable from the deafult type.
+     *
+     * @param facadeType the facade interface
+     * @param storeType the store's
+     * {@link org.apache.openjpa.kernel.StoreManager} type, or null for generic
+     * @param implType the registered implementor
+     * @param defaultType class if no registered implementation is available.
+     */
+    public Class getImplementation(Class facadeType, Class storeType,
+    	Class defaultType) {
+<span class="nc" id="L84">    	Class result = getImplementation(facadeType, storeType);</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">    	if (result == null)</span>
+<span class="nc" id="L86">    		result = defaultType;</span>
+<span class="nc bnc" id="L87" title="All 4 branches missed.">    	if (facadeType == null || !facadeType.isAssignableFrom(result))</span>
+<span class="nc" id="L88">    		throw new InternalException();</span>
+<span class="nc" id="L89">    	return result;</span>
+    }
+
+    /**
+     * Lookup key for facade+store hash.
+     */
+    private static class Key {
+        public final Class _facadeType;
+        public final Class _storeType;
+
+<span class="nc" id="L99">        public Key(Class facadeType, Class storeType) {</span>
+<span class="nc" id="L100">            _facadeType = facadeType;</span>
+<span class="nc" id="L101">            _storeType = storeType;</span>
+<span class="nc" id="L102">        }</span>
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L106">            return _facadeType.hashCode() ^ _storeType.hashCode();</span>
+        }
+
+        @Override
+        public boolean equals(Object other) {
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (other == this)</span>
+<span class="nc" id="L112">                return true;</span>
+<span class="nc" id="L113">            Key k = (Key) other;</span>
+<span class="nc bnc" id="L114" title="All 4 branches missed.">            return _facadeType == k._facadeType &amp;&amp; _storeType == k._storeType;</span>
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

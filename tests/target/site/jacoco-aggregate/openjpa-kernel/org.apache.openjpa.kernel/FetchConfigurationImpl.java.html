@@ -1,0 +1,1177 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>FetchConfigurationImpl.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">FetchConfigurationImpl.java</span></div><h1>FetchConfigurationImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.io.Serializable;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.lib.rop.EagerResultList;
+import org.apache.openjpa.lib.rop.ListResultObjectProvider;
+import org.apache.openjpa.lib.rop.ResultList;
+import org.apache.openjpa.lib.rop.ResultObjectProvider;
+import org.apache.openjpa.lib.rop.SimpleResultList;
+import org.apache.openjpa.lib.rop.WindowResultList;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.StringUtil;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.FetchGroup;
+import org.apache.openjpa.meta.FieldMetaData;
+import org.apache.openjpa.meta.JavaTypes;
+import org.apache.openjpa.util.ImplHelper;
+import org.apache.openjpa.util.InternalException;
+import org.apache.openjpa.util.NoTransactionException;
+import org.apache.openjpa.util.UserException;
+
+/**
+ * Allows configuration and optimization of how objects are loaded from
+ * the data store.
+ *
+ * @since 0.3.0
+ * @author Abe White
+ * @author Pinaki Poddar
+ */
+public class FetchConfigurationImpl
+    implements FetchConfiguration, Cloneable {
+
+    private static final long serialVersionUID = 1L;
+<span class="nc" id="L65">    private static final Localizer _loc = Localizer.forPackage(FetchConfigurationImpl.class);</span>
+<span class="nc" id="L66">    private static Map&lt;String, Method&gt; _hintSetters = new HashMap&lt;&gt;();</span>
+
+    /**
+     * Registers hint keys that have a corresponding setter method.
+     * The hint keys are registered in &lt;code&gt;openjpa.FetchPlan&lt;/code&gt; and &lt;code&gt;openjpa&lt;/code&gt; as prefix.
+     * Also some keys are registered in &lt;code&gt;javax.persistence&lt;/code&gt; namespace.
+     */
+    static {
+<span class="nc" id="L74">            String[] prefixes = {&quot;openjpa.FetchPlan&quot;, &quot;openjpa&quot;};</span>
+<span class="nc" id="L75">            Class&lt;?&gt; target = FetchConfiguration.class;</span>
+<span class="nc" id="L76">            populateHintSetter(target, &quot;ExtendedPathLookup&quot;, boolean.class, prefixes);</span>
+<span class="nc" id="L77">            populateHintSetter(target, &quot;FetchBatchSize&quot;, int.class, prefixes);</span>
+<span class="nc" id="L78">            populateHintSetter(target, &quot;FlushBeforeQueries&quot;, int.class, prefixes);</span>
+<span class="nc" id="L79">            populateHintSetter(target, &quot;LockScope&quot;, int.class, prefixes);</span>
+<span class="nc" id="L80">            populateHintSetter(target, &quot;LockTimeout&quot;, int.class, prefixes);</span>
+<span class="nc" id="L81">            populateHintSetter(target, &quot;setLockTimeout&quot;, &quot;timeout&quot;, int.class, &quot;javax.persistence.lock&quot;);</span>
+<span class="nc" id="L82">            populateHintSetter(target, &quot;MaxFetchDepth&quot;, int.class, prefixes);</span>
+<span class="nc" id="L83">            populateHintSetter(target, &quot;QueryTimeout&quot;, int.class, prefixes);</span>
+<span class="nc" id="L84">            populateHintSetter(target, &quot;setQueryTimeout&quot;, &quot;timeout&quot;, int.class, &quot;javax.persistence.query&quot;);</span>
+<span class="nc" id="L85">            populateHintSetter(target, &quot;ReadLockLevel&quot;, int.class, prefixes);</span>
+<span class="nc" id="L86">            populateHintSetter(target, &quot;setReadLockLevel&quot;, &quot;ReadLockMode&quot;, int.class, prefixes);</span>
+<span class="nc" id="L87">            populateHintSetter(target, &quot;WriteLockLevel&quot;, int.class, prefixes);</span>
+<span class="nc" id="L88">            populateHintSetter(target, &quot;setWriteLockLevel&quot;, &quot;WriteLockMode&quot;, int.class, prefixes);</span>
+<span class="nc" id="L89">    }</span>
+
+    /**
+     * Populate static registry of hints.
+     *
+     * @param target The name of the target class that will receive this hint.
+     * @param hint the simple name of the hint without a prefix.
+     * @param type the value argument type of the target setter method.
+     * @param prefixes the prefixes will be added to the simple hint name.
+     */
+    protected static void populateHintSetter(Class&lt;?&gt; target, String hint, Class&lt;?&gt; type, String...prefixes) {
+<span class="nc" id="L100">        populateHintSetter(target, &quot;set&quot; + hint, hint, type, prefixes);</span>
+<span class="nc" id="L101">    }</span>
+
+    /**
+     * Populate static registry of hints.
+     *
+     * @param target The name of the target class that will receive this hint.
+     * @param method The name of the method in the target class that will receive this hint.
+     * @param hint the simple name of the hint without a prefix.
+     * @param type the value argument type of the target setter method.
+     * @param prefixes the prefixes will be added to the simple hint name.
+     */
+    protected static void populateHintSetter(Class&lt;?&gt; target, String method, String hint, Class&lt;?&gt; type,
+            String...prefixes) {
+        try {
+<span class="nc" id="L115">            Method setter = target.getMethod(method, type);</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">            for (String prefix : prefixes) {</span>
+<span class="nc" id="L117">                _hintSetters.put(prefix + &quot;.&quot; + hint, setter);</span>
+            }
+<span class="nc" id="L119">        } catch (Exception e) {</span>
+            // should not reach
+<span class="nc" id="L121">            throw new InternalException(&quot;setter for &quot; + hint + &quot; with argument &quot; + type + &quot; does not exist&quot;);</span>
+<span class="nc" id="L122">        }</span>
+<span class="nc" id="L123">    }</span>
+
+    /**
+     * Configurable state shared throughout a traversal chain.
+     */
+<span class="nc" id="L128">    protected static class ConfigurationState</span>
+        implements Serializable
+    {
+        
+        private static final long serialVersionUID = 1L;
+<span class="nc" id="L133">        public transient StoreContext ctx = null;</span>
+<span class="nc" id="L134">        public int fetchBatchSize = 0;</span>
+<span class="nc" id="L135">        public int maxFetchDepth = 1;</span>
+<span class="nc" id="L136">        public boolean queryCache = true;</span>
+<span class="nc" id="L137">        public int flushQuery = 0;</span>
+<span class="nc" id="L138">        public int lockTimeout = -1;</span>
+<span class="nc" id="L139">        public int queryTimeout = -1;</span>
+<span class="nc" id="L140">        public int lockScope = LOCKSCOPE_NORMAL;</span>
+<span class="nc" id="L141">        public int readLockLevel = LOCK_NONE;</span>
+<span class="nc" id="L142">        public int writeLockLevel = LOCK_NONE;</span>
+<span class="nc" id="L143">        public Set&lt;String&gt; fetchGroups = null;</span>
+<span class="nc" id="L144">        public Set&lt;String&gt; fields = null;</span>
+        public Set&lt;Class&lt;?&gt;&gt; rootClasses;
+        public Set&lt;Object&gt; rootInstances;
+<span class="nc" id="L147">        public Map&lt;String,Object&gt; hints = null;</span>
+<span class="nc" id="L148">        public boolean fetchGroupContainsDefault = false;</span>
+<span class="nc" id="L149">        public boolean fetchGroupContainsAll = false;</span>
+<span class="nc" id="L150">        public boolean fetchGroupIsPUDefault = false;</span>
+<span class="nc" id="L151">        public boolean extendedPathLookup = false;</span>
+<span class="nc" id="L152">        public DataCacheRetrieveMode cacheRetrieveMode = DataCacheRetrieveMode.USE;</span>
+<span class="nc" id="L153">        public DataCacheStoreMode cacheStoreMode = DataCacheStoreMode.USE;</span>
+<span class="nc" id="L154">        public boolean cacheNonDefaultFetchPlanQueries = false;</span>
+    }
+
+    private final ConfigurationState _state;
+    private FetchConfigurationImpl _parent;
+    private String _fromField;
+    private Class&lt;?&gt; _fromType;
+    private String _directRelationOwner;
+<span class="nc" id="L162">    private boolean _load = true;</span>
+    private int _availableRecursion;
+    private int _availableDepth;
+
+    public FetchConfigurationImpl() {
+<span class="nc" id="L167">        this(null);</span>
+<span class="nc" id="L168">    }</span>
+
+<span class="nc" id="L170">    protected FetchConfigurationImpl(ConfigurationState state) {</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        _state = (state == null) ? new ConfigurationState() : state;</span>
+<span class="nc" id="L172">        _availableDepth = _state.maxFetchDepth;</span>
+<span class="nc" id="L173">    }</span>
+
+    @Override
+    public StoreContext getContext() {
+<span class="nc" id="L177">        return _state.ctx;</span>
+    }
+
+    @Override
+    public void setContext(StoreContext ctx) {
+        // can't reset non-null context to another context
+<span class="nc bnc" id="L183" title="All 6 branches missed.">        if (ctx != null &amp;&amp; _state.ctx != null &amp;&amp; ctx != _state.ctx)</span>
+<span class="nc" id="L184">            throw new InternalException();</span>
+<span class="nc" id="L185">        _state.ctx = ctx;</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">        if (ctx == null)</span>
+<span class="nc" id="L187">            return;</span>
+
+        // initialize to conf info
+<span class="nc" id="L190">        OpenJPAConfiguration conf = ctx.getConfiguration();</span>
+<span class="nc" id="L191">        setFetchBatchSize(conf.getFetchBatchSize());</span>
+<span class="nc" id="L192">        setFlushBeforeQueries(conf.getFlushBeforeQueriesConstant());</span>
+<span class="nc" id="L193">        setLockTimeout(conf.getLockTimeout());</span>
+<span class="nc" id="L194">        setQueryTimeout(conf.getQueryTimeout());</span>
+
+<span class="nc" id="L196">        String[] fetchGroupList = conf.getFetchGroupsList();</span>
+<span class="nc bnc" id="L197" title="All 4 branches missed.">        clearFetchGroups((fetchGroupList == null || fetchGroupList.length == 0));</span>
+
+<span class="nc" id="L199">        addFetchGroups(Arrays.asList(fetchGroupList));</span>
+<span class="nc" id="L200">        setMaxFetchDepth(conf.getMaxFetchDepth());</span>
+
+<span class="nc" id="L202">        _state.cacheNonDefaultFetchPlanQueries = conf.getCompatibilityInstance().getCacheNonDefaultFetchPlanQueries();</span>
+<span class="nc" id="L203">    }</span>
+
+    /**
+     * Clone this instance.
+     */
+    @Override
+    public Object clone() {
+<span class="nc" id="L210">        FetchConfigurationImpl clone = newInstance(null);</span>
+<span class="nc" id="L211">        clone._state.ctx = _state.ctx;</span>
+<span class="nc" id="L212">        clone._state.cacheNonDefaultFetchPlanQueries = _state.cacheNonDefaultFetchPlanQueries;</span>
+<span class="nc" id="L213">        clone._parent = _parent;</span>
+<span class="nc" id="L214">        clone._fromField = _fromField;</span>
+<span class="nc" id="L215">        clone._fromType = _fromType;</span>
+<span class="nc" id="L216">        clone._directRelationOwner = _directRelationOwner;</span>
+<span class="nc" id="L217">        clone._load = _load;</span>
+<span class="nc" id="L218">        clone._availableRecursion = _availableRecursion;</span>
+<span class="nc" id="L219">        clone._availableDepth = _availableDepth;</span>
+<span class="nc" id="L220">        clone.copy(this);</span>
+<span class="nc" id="L221">        return clone;</span>
+    }
+
+    /**
+     * Return a new hollow instance.
+     */
+    protected FetchConfigurationImpl newInstance(ConfigurationState state) {
+<span class="nc" id="L228">        return new FetchConfigurationImpl(state);</span>
+    }
+
+    @Override
+    public void copy(FetchConfiguration fetch) {
+<span class="nc" id="L233">        setFetchBatchSize(fetch.getFetchBatchSize());</span>
+<span class="nc" id="L234">        setMaxFetchDepth(fetch.getMaxFetchDepth());</span>
+<span class="nc" id="L235">        setQueryCacheEnabled(fetch.getQueryCacheEnabled());</span>
+<span class="nc" id="L236">        setFlushBeforeQueries(fetch.getFlushBeforeQueries());</span>
+<span class="nc" id="L237">        setExtendedPathLookup(fetch.getExtendedPathLookup());</span>
+<span class="nc" id="L238">        setLockTimeout(fetch.getLockTimeout());</span>
+<span class="nc" id="L239">        setQueryTimeout(fetch.getQueryTimeout());</span>
+<span class="nc" id="L240">        setLockScope(fetch.getLockScope());</span>
+<span class="nc" id="L241">        clearFetchGroups(false);</span>
+<span class="nc" id="L242">        addFetchGroups(fetch.getFetchGroups());</span>
+<span class="nc" id="L243">        clearFields();</span>
+<span class="nc" id="L244">        copyHints(fetch);</span>
+<span class="nc" id="L245">        setCacheRetrieveMode(fetch.getCacheRetrieveMode());</span>
+<span class="nc" id="L246">        setCacheStoreMode(fetch.getCacheStoreMode());</span>
+<span class="nc" id="L247">        addFields(fetch.getFields());</span>
+
+        // don't use setters because require active transaction
+<span class="nc" id="L250">        _state.readLockLevel = fetch.getReadLockLevel();</span>
+<span class="nc" id="L251">        _state.writeLockLevel = fetch.getWriteLockLevel();</span>
+<span class="nc" id="L252">    }</span>
+
+
+    void copyHints(FetchConfiguration fetch) {
+<span class="nc bnc" id="L256" title="All 2 branches missed.">        if (fetch instanceof FetchConfigurationImpl == false)</span>
+<span class="nc" id="L257">            return;</span>
+<span class="nc" id="L258">        FetchConfigurationImpl from = (FetchConfigurationImpl)fetch;</span>
+<span class="nc bnc" id="L259" title="All 4 branches missed.">        if (from._state == null || from._state.hints == null)</span>
+<span class="nc" id="L260">            return;</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">        if (this._state == null)</span>
+<span class="nc" id="L262">            return;</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">        if (this._state.hints == null)</span>
+<span class="nc" id="L264">            this._state.hints = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L265">        this._state.hints.putAll(from._state.hints);</span>
+<span class="nc" id="L266">    }</span>
+
+    @Override
+    public int getFetchBatchSize() {
+<span class="nc" id="L270">        return _state.fetchBatchSize;</span>
+    }
+
+    @Override
+    public FetchConfiguration setFetchBatchSize(int fetchBatchSize) {
+<span class="nc bnc" id="L275" title="All 4 branches missed.">        if (fetchBatchSize == DEFAULT &amp;&amp; _state.ctx != null)</span>
+<span class="nc" id="L276">            fetchBatchSize = _state.ctx.getConfiguration().getFetchBatchSize();</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        if (fetchBatchSize != DEFAULT)</span>
+<span class="nc" id="L278">            _state.fetchBatchSize = fetchBatchSize;</span>
+<span class="nc" id="L279">        return this;</span>
+    }
+
+    @Override
+    public int getMaxFetchDepth() {
+<span class="nc" id="L284">        return _state.maxFetchDepth;</span>
+    }
+
+    @Override
+    public FetchConfiguration setMaxFetchDepth(int depth) {
+<span class="nc bnc" id="L289" title="All 4 branches missed.">        if (depth == DEFAULT &amp;&amp; _state.ctx != null)</span>
+<span class="nc" id="L290">            depth = _state.ctx.getConfiguration().getMaxFetchDepth();</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        if (depth != DEFAULT)</span>
+        {
+<span class="nc" id="L293">            _state.maxFetchDepth = depth;</span>
+<span class="nc bnc" id="L294" title="All 2 branches missed.">            if (_parent == null)</span>
+<span class="nc" id="L295">                _availableDepth = depth;</span>
+        }
+<span class="nc" id="L297">        return this;</span>
+    }
+
+    @Override
+    public boolean getQueryCacheEnabled() {
+<span class="nc" id="L302">        return _state.queryCache;</span>
+    }
+
+    @Override
+    public FetchConfiguration setQueryCacheEnabled(boolean cache) {
+<span class="nc" id="L307">        _state.queryCache = cache;</span>
+<span class="nc" id="L308">        return this;</span>
+    }
+
+    @Override
+    public int getFlushBeforeQueries() {
+<span class="nc" id="L313">        return _state.flushQuery;</span>
+    }
+
+    @Override
+    public boolean getExtendedPathLookup() {
+<span class="nc" id="L318">        return _state.extendedPathLookup;</span>
+    }
+
+    @Override
+    public FetchConfiguration setExtendedPathLookup(boolean flag) {
+<span class="nc" id="L323">        _state.extendedPathLookup = flag;</span>
+<span class="nc" id="L324">        return this;</span>
+    }
+
+    @Override
+    public FetchConfiguration setFlushBeforeQueries(int flush) {
+<span class="nc bnc" id="L329" title="All 8 branches missed.">        if (flush != DEFAULT</span>
+            &amp;&amp; flush != QueryFlushModes.FLUSH_TRUE
+            &amp;&amp; flush != QueryFlushModes.FLUSH_FALSE
+            &amp;&amp; flush != QueryFlushModes.FLUSH_WITH_CONNECTION)
+<span class="nc" id="L333">            throw new IllegalArgumentException(_loc.get(</span>
+<span class="nc" id="L334">                &quot;bad-flush-before-queries&quot;, Integer.valueOf(flush)).getMessage());</span>
+
+<span class="nc bnc" id="L336" title="All 4 branches missed.">        if (flush == DEFAULT &amp;&amp; _state.ctx != null)</span>
+<span class="nc" id="L337">            _state.flushQuery = _state.ctx.getConfiguration().</span>
+<span class="nc" id="L338">                getFlushBeforeQueriesConstant();</span>
+<span class="nc bnc" id="L339" title="All 2 branches missed.">        else if (flush != DEFAULT)</span>
+<span class="nc" id="L340">            _state.flushQuery = flush;</span>
+<span class="nc" id="L341">        return this;</span>
+    }
+
+    @Override
+    public Set&lt;String&gt; getFetchGroups() {
+<span class="nc bnc" id="L346" title="All 2 branches missed.">        if (_state.fetchGroups == null) return Collections.emptySet();</span>
+<span class="nc" id="L347">        return _state.fetchGroups;</span>
+    }
+
+    @Override
+    public boolean hasFetchGroup(String group) {
+<span class="nc bnc" id="L352" title="All 2 branches missed.">        return _state.fetchGroups != null</span>
+<span class="nc bnc" id="L353" title="All 2 branches missed.">            &amp;&amp; (_state.fetchGroups.contains(group)</span>
+<span class="nc bnc" id="L354" title="All 2 branches missed.">            || _state.fetchGroups.contains(FetchGroup.NAME_ALL));</span>
+    }
+
+     public boolean hasFetchGroupDefault() {
+         // Fetch group All includes fetch group Default by definition
+<span class="nc bnc" id="L359" title="All 4 branches missed.">         return _state.fetchGroupContainsDefault ||</span>
+             _state.fetchGroupContainsAll;
+     }
+
+     public boolean hasFetchGroupAll() {
+<span class="nc" id="L364">         return _state.fetchGroupContainsAll;</span>
+     }
+
+    @Override
+    public FetchConfiguration addFetchGroup(String name) {
+<span class="nc" id="L369">        return addFetchGroup(name, true);</span>
+    }
+
+    private FetchConfiguration addFetchGroup(String name, boolean recomputeIsDefault) {
+<span class="nc bnc" id="L373" title="All 2 branches missed.">        if (StringUtil.isEmpty(name))</span>
+<span class="nc" id="L374">            throw new UserException(_loc.get(&quot;null-fg&quot;));</span>
+
+<span class="nc" id="L376">        lock();</span>
+        try {
+<span class="nc bnc" id="L378" title="All 2 branches missed.">            if (_state.fetchGroups == null)</span>
+<span class="nc" id="L379">                _state.fetchGroups = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L380">            _state.fetchGroups.add(name);</span>
+
+<span class="nc bnc" id="L382" title="All 2 branches missed.">            if (FetchGroup.NAME_ALL.equals(name))</span>
+<span class="nc" id="L383">                _state.fetchGroupContainsAll = true;</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">            else if (FetchGroup.NAME_DEFAULT.equals(name))</span>
+<span class="nc" id="L385">                _state.fetchGroupContainsDefault = true;</span>
+        } finally {
+<span class="nc bnc" id="L387" title="All 2 branches missed.">            if (recomputeIsDefault) {</span>
+<span class="nc" id="L388">                verifyDefaultPUFetchGroups();</span>
+            }
+<span class="nc" id="L390">            unlock();</span>
+        }
+<span class="nc" id="L392">        return this;</span>
+    }
+
+    @Override
+    public FetchConfiguration addFetchGroups(Collection&lt;String&gt; groups) {
+<span class="nc bnc" id="L397" title="All 4 branches missed.">        if (groups == null || groups.isEmpty())</span>
+<span class="nc" id="L398">            return this;</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        for (String group : groups)</span>
+<span class="nc" id="L400">            addFetchGroup(group, false);</span>
+
+<span class="nc" id="L402">        verifyDefaultPUFetchGroups();</span>
+<span class="nc" id="L403">        return this;</span>
+    }
+
+    @Override
+    public FetchConfiguration removeFetchGroup(String group) {
+<span class="nc" id="L408">        return removeFetchGroup(group, true);</span>
+    }
+
+    private FetchConfiguration removeFetchGroup(String group, boolean recomputeIsDefault) {
+<span class="nc" id="L412">        lock();</span>
+        try {
+<span class="nc bnc" id="L414" title="All 2 branches missed.">            if (_state.fetchGroups != null) {</span>
+<span class="nc" id="L415">                _state.fetchGroups.remove(group);</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">                if (FetchGroup.NAME_ALL.equals(group))</span>
+<span class="nc" id="L417">                    _state.fetchGroupContainsAll = false;</span>
+<span class="nc bnc" id="L418" title="All 2 branches missed.">                else if (FetchGroup.NAME_DEFAULT.equals(group))</span>
+<span class="nc" id="L419">                    _state.fetchGroupContainsDefault = false;</span>
+            }
+        } finally {
+<span class="nc bnc" id="L422" title="All 2 branches missed.">            if (recomputeIsDefault) {</span>
+<span class="nc" id="L423">                verifyDefaultPUFetchGroups();</span>
+            }
+<span class="nc" id="L425">            unlock();</span>
+        }
+<span class="nc" id="L427">        return this;</span>
+    }
+
+    @Override
+    public FetchConfiguration removeFetchGroups(Collection&lt;String&gt; groups) {
+<span class="nc" id="L432">        lock();</span>
+        try {
+<span class="nc bnc" id="L434" title="All 4 branches missed.">            if (_state.fetchGroups != null &amp;&amp; groups != null)</span>
+<span class="nc bnc" id="L435" title="All 2 branches missed.">                for (String group : groups)</span>
+<span class="nc" id="L436">                    removeFetchGroup(group, false);</span>
+        } finally {
+<span class="nc" id="L438">            verifyDefaultPUFetchGroups();</span>
+<span class="nc" id="L439">            unlock();</span>
+        }
+<span class="nc" id="L441">        return this;</span>
+    }
+
+    @Override
+    public FetchConfiguration clearFetchGroups() {
+<span class="nc" id="L446">        return clearFetchGroups(true);</span>
+    }
+
+    private FetchConfiguration clearFetchGroups(boolean restoresDefault) {
+<span class="nc" id="L450">        lock();</span>
+        try {
+<span class="nc bnc" id="L452" title="All 2 branches missed.">            if (_state.fetchGroups != null) {</span>
+<span class="nc" id="L453">                _state.fetchGroups.clear();</span>
+            } else {
+<span class="nc" id="L455">                _state.fetchGroups = new HashSet&lt;&gt;();</span>
+            }
+
+<span class="nc" id="L458">            _state.fetchGroupContainsAll = false;</span>
+
+<span class="nc bnc" id="L460" title="All 2 branches missed.">            if (restoresDefault) {</span>
+<span class="nc" id="L461">                _state.fetchGroupContainsDefault = true;</span>
+<span class="nc" id="L462">                _state.fetchGroups.add(FetchGroup.NAME_DEFAULT); // OPENJPA-2413</span>
+            }
+        } finally {
+<span class="nc" id="L465">            verifyDefaultPUFetchGroups();</span>
+<span class="nc" id="L466">            unlock();</span>
+        }
+<span class="nc" id="L468">        return this;</span>
+    }
+
+    @Override
+    public FetchConfiguration resetFetchGroups() {
+<span class="nc" id="L473">        String[] fetchGroupList = _state.ctx.getConfiguration().getFetchGroupsList();</span>
+<span class="nc bnc" id="L474" title="All 4 branches missed.">        clearFetchGroups((fetchGroupList == null || fetchGroupList.length == 0));</span>
+
+<span class="nc bnc" id="L476" title="All 2 branches missed.">        if (_state.ctx != null)</span>
+<span class="nc" id="L477">            addFetchGroups(Arrays.asList(fetchGroupList));</span>
+
+<span class="nc" id="L479">        verifyDefaultPUFetchGroups();</span>
+
+<span class="nc" id="L481">        return this;</span>
+    }
+
+    /**
+     * Determine if the current selection of FetchGroups is equivalent to the Configuration's default FetchGroups
+     */
+    private void verifyDefaultPUFetchGroups() {
+<span class="nc" id="L488">        _state.fetchGroupIsPUDefault = false;</span>
+
+<span class="nc bnc" id="L490" title="All 4 branches missed.">        if (_state.fields != null &amp;&amp; !_state.fields.isEmpty()) {</span>
+<span class="nc" id="L491">            return;</span>
+        }
+
+<span class="nc bnc" id="L494" title="All 4 branches missed.">        if (_state.fetchGroups != null &amp;&amp; _state.ctx != null) {</span>
+<span class="nc" id="L495">            List&lt;String&gt; defaultPUFetchGroups = Arrays.asList(_state.ctx.getConfiguration().getFetchGroupsList());</span>
+<span class="nc bnc" id="L496" title="All 2 branches missed.">            if (_state.fetchGroups.size() != defaultPUFetchGroups.size()) {</span>
+<span class="nc" id="L497">                return;</span>
+            }
+
+<span class="nc bnc" id="L500" title="All 2 branches missed.">            for (String fetchGroupName : defaultPUFetchGroups) {</span>
+<span class="nc bnc" id="L501" title="All 2 branches missed.">                if (!_state.fetchGroups.contains(fetchGroupName)) {</span>
+<span class="nc" id="L502">                    return;</span>
+                }
+<span class="nc" id="L504">            }</span>
+
+<span class="nc" id="L506">            _state.fetchGroupIsPUDefault = true;</span>
+        }
+<span class="nc" id="L508">    }</span>
+
+    @Override
+    public boolean isDefaultPUFetchGroupConfigurationOnly() {
+<span class="nc" id="L512">        return _state.fetchGroupIsPUDefault;</span>
+    }
+
+    @Override
+    public boolean isFetchConfigurationSQLCacheAdmissible() {
+<span class="nc bnc" id="L517" title="All 4 branches missed.">        if (_state == null || _state.cacheNonDefaultFetchPlanQueries) {</span>
+<span class="nc" id="L518">            return false;</span>
+        } else {
+            // Only pctx-default matching FetchConfiguration generated SQL is cache permissible
+<span class="nc" id="L521">            return _state.fetchGroupIsPUDefault;</span>
+        }
+    }
+
+    @Override
+    public Set&lt;String&gt; getFields() {
+<span class="nc bnc" id="L527" title="All 2 branches missed.">        if (_state.fields == null) return Collections.emptySet();</span>
+<span class="nc" id="L528">        return _state.fields;</span>
+    }
+
+    @Override
+    public boolean hasField(String field) {
+<span class="nc bnc" id="L533" title="All 4 branches missed.">        return _state.fields != null &amp;&amp; _state.fields.contains(field);</span>
+    }
+
+    @Override
+    public FetchConfiguration addField(String field) {
+<span class="nc bnc" id="L538" title="All 2 branches missed.">        if (StringUtil.isEmpty(field))</span>
+<span class="nc" id="L539">            throw new UserException(_loc.get(&quot;null-field&quot;));</span>
+
+<span class="nc" id="L541">        lock();</span>
+        try {
+<span class="nc bnc" id="L543" title="All 2 branches missed.">            if (_state.fields == null)</span>
+<span class="nc" id="L544">                _state.fields = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L545">            _state.fields.add(field);</span>
+<span class="nc" id="L546">            _state.fetchGroupIsPUDefault = false;</span>
+        } finally {
+<span class="nc" id="L548">            unlock();</span>
+        }
+<span class="nc" id="L550">        return this;</span>
+    }
+
+    @Override
+    public FetchConfiguration addFields(Collection&lt;String&gt; fields) {
+<span class="nc bnc" id="L555" title="All 4 branches missed.">        if (fields == null || fields.isEmpty())</span>
+<span class="nc" id="L556">            return this;</span>
+
+<span class="nc" id="L558">        lock();</span>
+        try {
+<span class="nc bnc" id="L560" title="All 2 branches missed.">            if (_state.fields == null)</span>
+<span class="nc" id="L561">                _state.fields = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L562">            _state.fields.addAll(fields);</span>
+        } finally {
+<span class="nc" id="L564">            verifyDefaultPUFetchGroups();</span>
+<span class="nc" id="L565">            unlock();</span>
+        }
+<span class="nc" id="L567">        return this;</span>
+    }
+
+    @Override
+    public FetchConfiguration removeField(String field) {
+<span class="nc" id="L572">        lock();</span>
+        try {
+<span class="nc bnc" id="L574" title="All 2 branches missed.">            if (_state.fields != null) {</span>
+<span class="nc" id="L575">                _state.fields.remove(field);</span>
+
+<span class="nc bnc" id="L577" title="All 2 branches missed.">                if (_state.fields.size() == 0) {</span>
+<span class="nc" id="L578">                    verifyDefaultPUFetchGroups();</span>
+                }
+            }
+        } finally {
+<span class="nc" id="L582">            unlock();</span>
+        }
+<span class="nc" id="L584">        return this;</span>
+    }
+
+    @Override
+    public FetchConfiguration removeFields(Collection&lt;String&gt; fields) {
+<span class="nc" id="L589">        lock();</span>
+        try {
+<span class="nc bnc" id="L591" title="All 2 branches missed.">            if (_state.fields != null)</span>
+<span class="nc" id="L592">                _state.fields.removeAll(fields);</span>
+        } finally {
+<span class="nc" id="L594">            unlock();</span>
+        }
+<span class="nc" id="L596">        return this;</span>
+    }
+
+    @Override
+    public FetchConfiguration clearFields() {
+<span class="nc" id="L601">        lock();</span>
+        try {
+<span class="nc bnc" id="L603" title="All 2 branches missed.">            if (_state.fields != null)</span>
+<span class="nc" id="L604">                _state.fields.clear();</span>
+        } finally {
+<span class="nc" id="L606">            verifyDefaultPUFetchGroups();</span>
+<span class="nc" id="L607">            unlock();</span>
+        }
+<span class="nc" id="L609">        return this;</span>
+    }
+
+    @Override
+    public DataCacheRetrieveMode getCacheRetrieveMode() {
+<span class="nc" id="L614">        return _state.cacheRetrieveMode;</span>
+    }
+
+    @Override
+    public DataCacheStoreMode getCacheStoreMode() {
+<span class="nc" id="L619">        return _state.cacheStoreMode;</span>
+    }
+
+    @Override
+    public void setCacheRetrieveMode(DataCacheRetrieveMode mode) {
+<span class="nc" id="L624">        _state.cacheRetrieveMode = mode;</span>
+<span class="nc" id="L625">    }</span>
+
+    @Override
+    public void setCacheStoreMode(DataCacheStoreMode mode) {
+<span class="nc" id="L629">        _state.cacheStoreMode = mode;</span>
+<span class="nc" id="L630">    }</span>
+
+    @Override
+    public int getLockTimeout() {
+<span class="nc" id="L634">        return _state.lockTimeout;</span>
+    }
+
+    @Override
+    public FetchConfiguration setLockTimeout(int timeout) {
+<span class="nc bnc" id="L639" title="All 4 branches missed.">        if (timeout == DEFAULT &amp;&amp; _state.ctx != null)</span>
+<span class="nc" id="L640">            _state.lockTimeout = _state.ctx.getConfiguration().getLockTimeout();</span>
+<span class="nc bnc" id="L641" title="All 2 branches missed.">        else if (timeout != DEFAULT) {</span>
+<span class="nc bnc" id="L642" title="All 2 branches missed.">            if (timeout &lt; -1) {</span>
+<span class="nc" id="L643">                throw new IllegalArgumentException(_loc.get(&quot;invalid-timeout&quot;,</span>
+<span class="nc" id="L644">                    timeout).getMessage());</span>
+            } else {
+<span class="nc" id="L646">                _state.lockTimeout = timeout;</span>
+            }
+        }
+<span class="nc" id="L649">        return this;</span>
+    }
+
+    @Override
+    public int getQueryTimeout() {
+<span class="nc" id="L654">        return _state.queryTimeout;</span>
+    }
+
+    @Override
+    public FetchConfiguration setQueryTimeout(int timeout) {
+<span class="nc bnc" id="L659" title="All 4 branches missed.">        if (timeout == DEFAULT &amp;&amp; _state.ctx != null)</span>
+<span class="nc" id="L660">            _state.queryTimeout = _state.ctx.getConfiguration().</span>
+<span class="nc" id="L661">                getQueryTimeout();</span>
+<span class="nc bnc" id="L662" title="All 2 branches missed.">        else if (timeout != DEFAULT) {</span>
+<span class="nc bnc" id="L663" title="All 2 branches missed.">            if (timeout &lt; -1) {</span>
+<span class="nc" id="L664">                throw new IllegalArgumentException(_loc.get(&quot;invalid-timeout&quot;,</span>
+<span class="nc" id="L665">                    timeout).getMessage());</span>
+            } else {
+<span class="nc" id="L667">                _state.queryTimeout = timeout;</span>
+            }
+        }
+<span class="nc" id="L670">        return this;</span>
+    }
+
+    @Override
+    public int getLockScope() {
+<span class="nc" id="L675">        return _state.lockScope;</span>
+    }
+
+    @Override
+    public FetchConfiguration setLockScope(int scope) {
+<span class="nc bnc" id="L680" title="All 6 branches missed.">        if (scope != DEFAULT</span>
+                &amp;&amp; scope != LockScopes.LOCKSCOPE_NORMAL
+                &amp;&amp; scope != LockScopes.LOCKSCOPE_EXTENDED)
+<span class="nc" id="L683">                throw new IllegalArgumentException(_loc.get(</span>
+<span class="nc" id="L684">                    &quot;bad-lock-scope&quot;, Integer.valueOf(scope)).getMessage());</span>
+<span class="nc bnc" id="L685" title="All 2 branches missed.">        if (scope == DEFAULT )</span>
+<span class="nc" id="L686">            _state.lockScope = LOCKSCOPE_NORMAL;</span>
+        else
+<span class="nc" id="L688">            _state.lockScope = scope;</span>
+<span class="nc" id="L689">        return this;</span>
+    }
+
+    @Override
+    public int getReadLockLevel() {
+<span class="nc" id="L694">        return _state.readLockLevel;</span>
+    }
+
+    @Override
+    public FetchConfiguration setReadLockLevel(int level) {
+<span class="nc bnc" id="L699" title="All 2 branches missed.">        if (_state.ctx == null)</span>
+<span class="nc" id="L700">            return this;</span>
+
+<span class="nc bnc" id="L702" title="All 18 branches missed.">        if (level != DEFAULT</span>
+            &amp;&amp; level != LockLevels.LOCK_NONE
+            &amp;&amp; level != LockLevels.LOCK_READ
+            &amp;&amp; level != MixedLockLevels.LOCK_OPTIMISTIC
+            &amp;&amp; level != LockLevels.LOCK_WRITE
+            &amp;&amp; level != MixedLockLevels.LOCK_OPTIMISTIC_FORCE_INCREMENT
+            &amp;&amp; level != MixedLockLevels.LOCK_PESSIMISTIC_READ
+            &amp;&amp; level != MixedLockLevels.LOCK_PESSIMISTIC_WRITE
+            &amp;&amp; level != MixedLockLevels.LOCK_PESSIMISTIC_FORCE_INCREMENT)
+<span class="nc" id="L711">            throw new IllegalArgumentException(_loc.get(</span>
+<span class="nc" id="L712">                &quot;bad-lock-level&quot;, Integer.valueOf(level)).getMessage());</span>
+
+<span class="nc" id="L714">        lock();</span>
+        try {
+<span class="nc bnc" id="L716" title="All 2 branches missed.">            if (level != LockLevels.LOCK_NONE)</span>
+<span class="nc" id="L717">                assertActiveTransaction();</span>
+<span class="nc bnc" id="L718" title="All 2 branches missed.">            if (level == DEFAULT)</span>
+<span class="nc" id="L719">                _state.readLockLevel = _state.ctx.getConfiguration().</span>
+<span class="nc" id="L720">                    getReadLockLevelConstant();</span>
+            else
+<span class="nc" id="L722">                _state.readLockLevel = level;</span>
+        } finally {
+<span class="nc" id="L724">            unlock();</span>
+        }
+<span class="nc" id="L726">        return this;</span>
+    }
+
+    @Override
+    public int getWriteLockLevel() {
+<span class="nc" id="L731">        return _state.writeLockLevel;</span>
+    }
+
+    @Override
+    public FetchConfiguration setWriteLockLevel(int level) {
+<span class="nc bnc" id="L736" title="All 2 branches missed.">        if (_state.ctx == null)</span>
+<span class="nc" id="L737">            return this;</span>
+
+<span class="nc bnc" id="L739" title="All 18 branches missed.">        if (level != DEFAULT</span>
+            &amp;&amp; level != LockLevels.LOCK_NONE
+            &amp;&amp; level != LockLevels.LOCK_READ
+            &amp;&amp; level != MixedLockLevels.LOCK_OPTIMISTIC
+            &amp;&amp; level != LockLevels.LOCK_WRITE
+            &amp;&amp; level != MixedLockLevels.LOCK_OPTIMISTIC_FORCE_INCREMENT
+            &amp;&amp; level != MixedLockLevels.LOCK_PESSIMISTIC_READ
+            &amp;&amp; level != MixedLockLevels.LOCK_PESSIMISTIC_WRITE
+            &amp;&amp; level != MixedLockLevels.LOCK_PESSIMISTIC_FORCE_INCREMENT)
+<span class="nc" id="L748">            throw new IllegalArgumentException(_loc.get(</span>
+<span class="nc" id="L749">                &quot;bad-lock-level&quot;, Integer.valueOf(level)).getMessage());</span>
+
+<span class="nc" id="L751">        lock();</span>
+        try {
+<span class="nc" id="L753">            assertActiveTransaction();</span>
+<span class="nc bnc" id="L754" title="All 2 branches missed.">            if (level == DEFAULT)</span>
+<span class="nc" id="L755">                _state.writeLockLevel = _state.ctx.getConfiguration().</span>
+<span class="nc" id="L756">                    getWriteLockLevelConstant();</span>
+            else
+<span class="nc" id="L758">                _state.writeLockLevel = level;</span>
+        } finally {
+<span class="nc" id="L760">            unlock();</span>
+        }
+<span class="nc" id="L762">        return this;</span>
+    }
+
+    @Override
+    public ResultList&lt;?&gt; newResultList(ResultObjectProvider rop) {
+<span class="nc bnc" id="L767" title="All 2 branches missed.">        if (rop instanceof ListResultObjectProvider)</span>
+<span class="nc" id="L768">            return new SimpleResultList(rop);</span>
+<span class="nc bnc" id="L769" title="All 2 branches missed.">        if (_state.fetchBatchSize &lt; 0)</span>
+<span class="nc" id="L770">            return new EagerResultList(rop);</span>
+<span class="nc bnc" id="L771" title="All 2 branches missed.">        if (rop.supportsRandomAccess())</span>
+<span class="nc" id="L772">            return new SimpleResultList(rop);</span>
+<span class="nc" id="L773">        return new WindowResultList(rop);</span>
+    }
+
+    /**
+     * Throw an exception if no transaction is active.
+     */
+    private void assertActiveTransaction() {
+<span class="nc bnc" id="L780" title="All 2 branches missed.">        if (!isActiveTransaction())</span>
+<span class="nc" id="L781">            throw new NoTransactionException(_loc.get(&quot;not-active&quot;));</span>
+<span class="nc" id="L782">    }</span>
+
+    private boolean isActiveTransaction() {
+<span class="nc bnc" id="L785" title="All 4 branches missed.">        return (_state.ctx != null &amp;&amp; _state.ctx.isActive());</span>
+    }
+
+    /**
+     * Gets the current hints set on this receiver.
+     * The values designate the actual value specified by the caller and not the values
+     * that may have been actually set on the state variables of this receiver.
+     *
+     */
+    @Override
+    public Map&lt;String,Object&gt; getHints() {
+<span class="nc bnc" id="L796" title="All 2 branches missed.">        if (_state.hints == null)</span>
+<span class="nc" id="L797">            return Collections.emptyMap();</span>
+<span class="nc" id="L798">        return Collections.unmodifiableMap(_state.hints);</span>
+    }
+
+    /**
+     * Affirms if the given key is set as a hint.
+     */
+    @Override
+    public boolean isHintSet(String key) {
+<span class="nc bnc" id="L806" title="All 4 branches missed.">        return _state.hints != null &amp;&amp; _state.hints.containsKey(key);</span>
+    }
+
+    /**
+     * Removes the given keys and their hint value.
+     */
+    public void removeHint(String...keys) {
+<span class="nc bnc" id="L813" title="All 4 branches missed.">        if (keys == null || _state.hints == null )</span>
+<span class="nc" id="L814">            return;</span>
+<span class="nc bnc" id="L815" title="All 2 branches missed.">        for (String key : keys) {</span>
+<span class="nc" id="L816">            _state.hints.remove(key);</span>
+        }
+<span class="nc" id="L818">    }</span>
+
+    public Collection&lt;String&gt; getSupportedHints() {
+<span class="nc" id="L821">        return _hintSetters.keySet();</span>
+    }
+
+    /**
+     * Same as &lt;code&gt;setHint(key, value, value)&lt;/code&gt;.
+     *
+     * @see #setHint(String, Object, Object)
+     */
+    @Override
+    public void setHint(String key, Object value) {
+<span class="nc" id="L831">        setHint(key, value, value);</span>
+<span class="nc" id="L832">    }</span>
+
+    /**
+     * Sets the hint to the given value.
+     * If the key corresponds to a known key, then that value is set via the setter method.
+     * Otherwise it is put into opaque hints map.
+     * &lt;br&gt;
+     * In either case, the original value is put in the hints map.
+     * So essential difference between setting a value directly by a setter and via a hint is the memory
+     * of this original value.
+     * &lt;br&gt;
+     * The other important difference is setting lock levels. Setting of lock level via setter method needs
+     * active transaction. But setting via hint does not.
+     * @param key a hint key. If it is one of the statically registered hint key then the setter is called.
+     * @param value to be set. The given value type must match the argument type of the setter, if one exists.
+     * @param original value as specified by the caller. This value is put in the hints map.
+     *
+     * @exception IllegalArgumentException if the given value is not acceptable by the setter method, if one
+     * exists corresponds the given hint key.
+     */
+    @Override
+    public void setHint(String key, Object value, Object original) {
+<span class="nc bnc" id="L854" title="All 2 branches missed.">        if (key == null)</span>
+<span class="nc" id="L855">            return;</span>
+<span class="nc bnc" id="L856" title="All 2 branches missed.">        if (_hintSetters.containsKey(key)) {</span>
+<span class="nc" id="L857">            Method setter = _hintSetters.get(key);</span>
+<span class="nc" id="L858">            String methodName = setter.getName();</span>
+            try {
+<span class="nc bnc" id="L860" title="All 4 branches missed.">                if (&quot;setReadLockLevel&quot;.equals(methodName) &amp;&amp; !isActiveTransaction()) {</span>
+<span class="nc" id="L861">                    _state.readLockLevel = (Integer)value;</span>
+<span class="nc bnc" id="L862" title="All 4 branches missed.">                } else if (&quot;setWriteLockLevel&quot;.equals(methodName) &amp;&amp; !isActiveTransaction()) {</span>
+<span class="nc" id="L863">                    _state.writeLockLevel = (Integer)value;</span>
+                } else {
+<span class="nc" id="L865">                    setter.invoke(this, Filters.convertToMatchMethodArgument(value, setter));</span>
+                }
+<span class="nc" id="L867">            } catch (Exception e) {</span>
+<span class="nc" id="L868">                String message = _loc.get(&quot;bad-hint-value&quot;, key, toString(value), toString(original)).getMessage();</span>
+<span class="nc bnc" id="L869" title="All 2 branches missed.">                if (e instanceof IllegalArgumentException) {</span>
+<span class="nc" id="L870">                    throw new IllegalArgumentException(message);</span>
+                }
+<span class="nc" id="L872">                throw new IllegalArgumentException(message, e);</span>
+<span class="nc" id="L873">            }</span>
+        }
+<span class="nc" id="L875">        addHint(key, original);</span>
+<span class="nc" id="L876">    }</span>
+
+    private void addHint(String name, Object value) {
+<span class="nc" id="L879">        lock();</span>
+        try {
+<span class="nc bnc" id="L881" title="All 2 branches missed.">            if (_state.hints == null)</span>
+<span class="nc" id="L882">                _state.hints = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L883">            _state.hints.put(name, value);</span>
+        } finally {
+<span class="nc" id="L885">            unlock();</span>
+        }
+<span class="nc" id="L887">    }</span>
+
+    @Override
+    public Object getHint(String name) {
+<span class="nc bnc" id="L891" title="All 2 branches missed.">        return (_state.hints == null) ? null : _state.hints.get(name);</span>
+    }
+
+    public Object removeHint(String name) {
+<span class="nc bnc" id="L895" title="All 2 branches missed.">        return (_state.hints == null) ? null : _state.hints.remove(name);</span>
+    }
+
+    @Override
+    public Set&lt;Class&lt;?&gt;&gt; getRootClasses() {
+<span class="nc bnc" id="L900" title="All 2 branches missed.">        if (_state.rootClasses == null) return Collections.emptySet();</span>
+<span class="nc" id="L901">        return _state.rootClasses;</span>
+    }
+
+    @Override
+    public FetchConfiguration setRootClasses(Collection&lt;Class&lt;?&gt;&gt; classes) {
+<span class="nc" id="L906">        lock();</span>
+        try {
+<span class="nc bnc" id="L908" title="All 2 branches missed.">            if (_state.rootClasses != null)</span>
+<span class="nc" id="L909">                _state.rootClasses.clear();</span>
+<span class="nc bnc" id="L910" title="All 4 branches missed.">            if (classes != null &amp;&amp; !classes.isEmpty()) {</span>
+<span class="nc bnc" id="L911" title="All 2 branches missed.">                if (_state.rootClasses == null)</span>
+<span class="nc" id="L912">                    _state.rootClasses = new HashSet&lt;&gt;(classes);</span>
+                else
+<span class="nc" id="L914">                    _state.rootClasses.addAll(classes);</span>
+            }
+        } finally {
+<span class="nc" id="L917">            unlock();</span>
+        }
+<span class="nc" id="L919">        return this;</span>
+    }
+
+    @Override
+    public Set&lt;Object&gt; getRootInstances() {
+<span class="nc bnc" id="L924" title="All 2 branches missed.">        if (_state.rootInstances == null) return Collections.emptySet();</span>
+<span class="nc" id="L925">        return _state.rootInstances;</span>
+    }
+
+    @Override
+    public FetchConfiguration setRootInstances(Collection&lt;?&gt; instances) {
+<span class="nc" id="L930">        lock();</span>
+        try {
+<span class="nc bnc" id="L932" title="All 2 branches missed.">            if (_state.rootInstances != null)</span>
+<span class="nc" id="L933">                _state.rootInstances.clear();</span>
+<span class="nc bnc" id="L934" title="All 4 branches missed.">            if (instances != null &amp;&amp; !instances.isEmpty()) {</span>
+<span class="nc bnc" id="L935" title="All 2 branches missed.">                if (_state.rootInstances == null) {</span>
+<span class="nc" id="L936">                    _state.rootInstances = new HashSet&lt;&gt;(instances);</span>
+                } else {
+<span class="nc" id="L938">                    _state.rootInstances.addAll(instances);</span>
+                }
+            }
+        } finally {
+<span class="nc" id="L942">            unlock();</span>
+        }
+<span class="nc" id="L944">        return this;</span>
+    }
+
+    @Override
+    public void lock() {
+<span class="nc bnc" id="L949" title="All 2 branches missed.">        if (_state.ctx != null)</span>
+<span class="nc" id="L950">            _state.ctx.lock();</span>
+<span class="nc" id="L951">    }</span>
+
+    @Override
+    public void unlock() {
+<span class="nc bnc" id="L955" title="All 2 branches missed.">        if (_state.ctx != null)</span>
+<span class="nc" id="L956">            _state.ctx.unlock();</span>
+<span class="nc" id="L957">    }</span>
+
+    /////////////
+    // Traversal
+    /////////////
+
+    @Override
+    public int requiresFetch(FieldMetaData fm) {
+<span class="nc bnc" id="L965" title="All 2 branches missed.">        if (!includes(fm))</span>
+<span class="nc" id="L966">            return FETCH_NONE;</span>
+
+<span class="nc" id="L968">        Class&lt;?&gt; type = fm.getRelationType();</span>
+<span class="nc bnc" id="L969" title="All 2 branches missed.">        if (type == null)</span>
+<span class="nc" id="L970">            return FETCH_LOAD;</span>
+<span class="nc bnc" id="L971" title="All 2 branches missed.">        if (_availableDepth == 0)</span>
+<span class="nc" id="L972">            return FETCH_NONE;</span>
+
+        // we can skip calculating recursion depth if this is a top-level conf:
+        // the field is in our fetch groups, so can't possibly not select
+<span class="nc bnc" id="L976" title="All 2 branches missed.">        if (_parent == null)</span>
+<span class="nc" id="L977">            return FETCH_LOAD;</span>
+
+<span class="nc" id="L979">        String fieldName = fm.getFullName(false);</span>
+<span class="nc" id="L980">        int rdepth = getAvailableRecursionDepth(fm, type, fieldName, false);</span>
+<span class="nc bnc" id="L981" title="All 4 branches missed.">        if (rdepth != FetchGroup.DEPTH_INFINITE &amp;&amp; rdepth &lt;= 0)</span>
+<span class="nc" id="L982">            return FETCH_NONE;</span>
+
+<span class="nc bnc" id="L984" title="All 2 branches missed.">        if (Objects.equals(_directRelationOwner, fieldName))</span>
+<span class="nc" id="L985">            return FETCH_REF;</span>
+<span class="nc" id="L986">        return FETCH_LOAD;</span>
+    }
+
+    @Override
+    public boolean requiresLoad() {
+<span class="nc" id="L991">        return _load;</span>
+    }
+
+    @Override
+    public FetchConfiguration traverse(FieldMetaData fm) {
+<span class="nc" id="L996">        Class&lt;?&gt; type = fm.getRelationType();</span>
+<span class="nc bnc" id="L997" title="All 2 branches missed.">        if (type == null)</span>
+<span class="nc" id="L998">            return this;</span>
+
+<span class="nc" id="L1000">        FetchConfigurationImpl clone = newInstance(_state);</span>
+<span class="nc" id="L1001">        clone._parent = this;</span>
+<span class="nc" id="L1002">        clone._availableDepth = reduce(_availableDepth);</span>
+<span class="nc" id="L1003">        clone._fromField = fm.getFullName(false);</span>
+<span class="nc" id="L1004">        clone._fromType = type;</span>
+<span class="nc" id="L1005">        clone._availableRecursion = getAvailableRecursionDepth(fm, type, fm.getFullName(false), true);</span>
+<span class="nc bnc" id="L1006" title="All 2 branches missed.">        if (Objects.equals(_directRelationOwner, fm.getFullName(false)))</span>
+<span class="nc" id="L1007">            clone._load = false;</span>
+        else
+<span class="nc" id="L1009">            clone._load = _load;</span>
+
+<span class="nc" id="L1011">        FieldMetaData owner = fm.getMappedByMetaData();</span>
+<span class="nc bnc" id="L1012" title="All 4 branches missed.">        if (owner != null &amp;&amp; owner.getTypeCode() == JavaTypes.PC)</span>
+<span class="nc" id="L1013">            clone._directRelationOwner = owner.getFullName(false);</span>
+
+<span class="nc" id="L1015">        return clone;</span>
+    }
+
+    /**
+     * Whether our configuration state includes the given field.
+     */
+    private boolean includes(FieldMetaData fmd) {
+<span class="nc bnc" id="L1022" title="All 4 branches missed.">        if ((hasFetchGroupDefault() &amp;&amp; fmd.isInDefaultFetchGroup())</span>
+<span class="nc bnc" id="L1023" title="All 2 branches missed.">        || hasFetchGroupAll()</span>
+<span class="nc bnc" id="L1024" title="All 2 branches missed.">        || hasField(fmd.getFullName(false))</span>
+<span class="nc bnc" id="L1025" title="All 2 branches missed.">        || hasExtendedLookupPath(fmd))</span>
+<span class="nc" id="L1026">            return true;</span>
+<span class="nc" id="L1027">        String[] fgs = fmd.getCustomFetchGroups();</span>
+<span class="nc bnc" id="L1028" title="All 2 branches missed.">        for (int i = 0; i &lt; fgs.length; i++)</span>
+<span class="nc bnc" id="L1029" title="All 2 branches missed.">            if (hasFetchGroup(fgs[i]))</span>
+<span class="nc" id="L1030">                return true;</span>
+<span class="nc" id="L1031">        return false;</span>
+    }
+
+    private boolean hasExtendedLookupPath(FieldMetaData fmd) {
+<span class="nc bnc" id="L1035" title="All 2 branches missed.">        return getExtendedPathLookup()</span>
+<span class="nc bnc" id="L1036" title="All 4 branches missed.">            &amp;&amp; (hasField(fmd.getRealName())</span>
+                || (_fromField != null
+<span class="nc bnc" id="L1038" title="All 2 branches missed.">                &amp;&amp; hasField(_fromField + &quot;.&quot; + fmd.getName())));</span>
+    }
+
+    /**
+     * Return the available recursion depth via the given field for the
+     * given type.
+     *
+     * @param traverse whether we're traversing the field
+     */
+    private int getAvailableRecursionDepth(FieldMetaData fm, Class&lt;?&gt; type, String fromField,
+        boolean traverse) {
+        // see if there's a previous limit
+<span class="nc" id="L1050">        int avail = Integer.MIN_VALUE;</span>
+<span class="nc bnc" id="L1051" title="All 2 branches missed.">        for (FetchConfigurationImpl f = this; f != null; f = f._parent) {</span>
+<span class="nc bnc" id="L1052" title="All 2 branches missed.">            if (Objects.equals(f._fromField, fromField)</span>
+<span class="nc bnc" id="L1053" title="All 2 branches missed.">                &amp;&amp; ImplHelper.isAssignable(f._fromType, type)) {</span>
+<span class="nc" id="L1054">                avail = f._availableRecursion;</span>
+<span class="nc bnc" id="L1055" title="All 2 branches missed.">                if (traverse)</span>
+<span class="nc" id="L1056">                    avail = reduce(avail);</span>
+                break;
+            }
+        }
+<span class="nc bnc" id="L1060" title="All 2 branches missed.">        if (avail == 0)</span>
+<span class="nc" id="L1061">            return 0;</span>
+
+        // calculate fetch groups max
+<span class="nc" id="L1064">        ClassMetaData meta = fm.getDefiningMetaData();</span>
+<span class="nc" id="L1065">        int max = Integer.MIN_VALUE;</span>
+<span class="nc bnc" id="L1066" title="All 2 branches missed.">        if (fm.isInDefaultFetchGroup())</span>
+<span class="nc" id="L1067">            max = meta.getFetchGroup(FetchGroup.NAME_DEFAULT).</span>
+<span class="nc" id="L1068">                getRecursionDepth(fm);</span>
+<span class="nc" id="L1069">        String[] groups = fm.getCustomFetchGroups();</span>
+        int cur;
+<span class="nc" id="L1071">        for (int i = 0; max != FetchGroup.DEPTH_INFINITE</span>
+<span class="nc bnc" id="L1072" title="All 4 branches missed.">            &amp;&amp; i &lt; groups.length; i++) {</span>
+            // ignore custom groups that are inactive in this configuration
+<span class="nc bnc" id="L1074" title="All 2 branches missed.">            if (!this.hasFetchGroup(groups[i])) continue;</span>
+<span class="nc" id="L1075">            cur = meta.getFetchGroup(groups[i]).getRecursionDepth(fm);</span>
+<span class="nc bnc" id="L1076" title="All 4 branches missed.">            if (cur == FetchGroup.DEPTH_INFINITE || cur &gt; max)</span>
+<span class="nc" id="L1077">                max = cur;</span>
+        }
+        // reduce max if we're traversing a self-type relation
+<span class="nc bnc" id="L1080" title="All 4 branches missed.">        if (traverse &amp;&amp; max != Integer.MIN_VALUE</span>
+<span class="nc bnc" id="L1081" title="All 2 branches missed.">            &amp;&amp; ImplHelper.isAssignable(meta.getDescribedType(), type))</span>
+<span class="nc" id="L1082">            max = reduce(max);</span>
+
+        // take min/defined of previous avail and fetch group max
+<span class="nc bnc" id="L1085" title="All 4 branches missed.">        if (avail == Integer.MIN_VALUE &amp;&amp; max == Integer.MIN_VALUE) {</span>
+<span class="nc" id="L1086">            int def = FetchGroup.RECURSION_DEPTH_DEFAULT;</span>
+<span class="nc bnc" id="L1087" title="All 4 branches missed.">            return (traverse &amp;&amp; ImplHelper.isAssignable(</span>
+<span class="nc" id="L1088">                    meta.getDescribedType(), type)) ? def - 1 : def;</span>
+        }
+<span class="nc bnc" id="L1090" title="All 4 branches missed.">        if (avail == Integer.MIN_VALUE || avail == FetchGroup.DEPTH_INFINITE)</span>
+<span class="nc" id="L1091">            return max;</span>
+<span class="nc bnc" id="L1092" title="All 4 branches missed.">        if (max == Integer.MIN_VALUE || max == FetchGroup.DEPTH_INFINITE)</span>
+<span class="nc" id="L1093">            return avail;</span>
+<span class="nc" id="L1094">        return Math.min(max, avail);</span>
+    }
+
+
+    /**
+     * Reduce the given logical depth by 1.
+     */
+    private static int reduce(int d) {
+<span class="nc bnc" id="L1102" title="All 2 branches missed.">        if (d == 0)</span>
+<span class="nc" id="L1103">            return 0;</span>
+<span class="nc bnc" id="L1104" title="All 2 branches missed.">        if (d != FetchGroup.DEPTH_INFINITE)</span>
+<span class="nc" id="L1105">            d--;</span>
+<span class="nc" id="L1106">        return d;</span>
+    }
+
+    /////////////////
+    // Debug methods
+    /////////////////
+
+    FetchConfiguration getParent() {
+<span class="nc" id="L1114">        return _parent;</span>
+    }
+
+    boolean isRoot() {
+<span class="nc bnc" id="L1118" title="All 2 branches missed.">        return _parent == null;</span>
+    }
+
+    FetchConfiguration getRoot() {
+<span class="nc bnc" id="L1122" title="All 2 branches missed.">        return (isRoot()) ? this : _parent.getRoot();</span>
+    }
+
+    int getAvailableFetchDepth() {
+<span class="nc" id="L1126">        return _availableDepth;</span>
+    }
+
+    int getAvailableRecursionDepth() {
+<span class="nc" id="L1130">        return _availableRecursion;</span>
+    }
+
+    String getTraversedFromField() {
+<span class="nc" id="L1134">        return _fromField;</span>
+    }
+
+    Class&lt;?&gt; getTraversedFromType() {
+<span class="nc" id="L1138">        return _fromType;</span>
+    }
+
+    List&lt;FetchConfigurationImpl&gt; getPath() {
+<span class="nc bnc" id="L1142" title="All 2 branches missed.">        if (isRoot())</span>
+<span class="nc" id="L1143">            return Collections.emptyList();</span>
+<span class="nc" id="L1144">        return trackPath(new ArrayList&lt;FetchConfigurationImpl&gt;());</span>
+    }
+
+    List&lt;FetchConfigurationImpl&gt; trackPath(List&lt;FetchConfigurationImpl&gt; path) {
+<span class="nc bnc" id="L1148" title="All 2 branches missed.">        if (_parent != null)</span>
+<span class="nc" id="L1149">            _parent.trackPath(path);</span>
+<span class="nc" id="L1150">        path.add(this);</span>
+<span class="nc" id="L1151">        return path;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L1156">        return &quot;FetchConfiguration@&quot; + System.identityHashCode(this)</span>
+<span class="nc" id="L1157">            + &quot; (&quot; + _availableDepth + &quot;)&quot; + getPathString();</span>
+    }
+
+    private String getPathString() {
+<span class="nc" id="L1161">        List&lt;FetchConfigurationImpl&gt; path = getPath();</span>
+<span class="nc bnc" id="L1162" title="All 2 branches missed.">        if (path.isEmpty())</span>
+<span class="nc" id="L1163">            return &quot;&quot;;</span>
+<span class="nc" id="L1164">        StringBuilder buf = new StringBuilder().append (&quot;: &quot;);</span>
+<span class="nc bnc" id="L1165" title="All 2 branches missed.">        for (Iterator&lt;FetchConfigurationImpl&gt; itr = path.iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L1166">            buf.append(itr.next().getTraversedFromField());</span>
+<span class="nc bnc" id="L1167" title="All 2 branches missed.">            if (itr.hasNext())</span>
+<span class="nc" id="L1168">                buf.append(&quot;-&gt;&quot;);</span>
+        }
+<span class="nc" id="L1170">        return buf.toString();</span>
+    }
+
+    protected String toString(Object o) {
+<span class="nc bnc" id="L1174" title="All 2 branches missed.">        return o == null ? &quot;null&quot; : o.toString() + &quot;[&quot; + o.getClass().getName() + &quot;]&quot;;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>
