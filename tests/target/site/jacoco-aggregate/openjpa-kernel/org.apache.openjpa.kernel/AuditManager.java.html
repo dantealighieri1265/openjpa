@@ -1,0 +1,389 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AuditManager.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">AuditManager.java</span></div><h1>AuditManager.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
+
+import org.apache.openjpa.audit.Auditable;
+import org.apache.openjpa.audit.AuditableOperation;
+import org.apache.openjpa.audit.Auditor;
+import org.apache.openjpa.enhance.PCRegistry;
+import org.apache.openjpa.enhance.PCRegistry.RegisterClassListener;
+import org.apache.openjpa.enhance.PersistenceCapable;
+import org.apache.openjpa.enhance.StateManager;
+import org.apache.openjpa.event.LifecycleEvent;
+import org.apache.openjpa.event.LifecycleListener;
+import org.apache.openjpa.event.TransactionEvent;
+import org.apache.openjpa.event.TransactionListener;
+
+/**
+ * Controller for audit facility.
+ * This controller performs the following basic duties:
+ * &lt;LI&gt; Records auditable types at class loading time
+ * &lt;LI&gt; Listens to instance life cycle changes and transaction.
+ * &lt;LI&gt; Collects auditable instances on instance life cycle changes.
+ * &lt;LI&gt; Delegates real auditing to the {@link Auditor} at transaction boundary.
+ *
+ * @author Pinaki Poddar
+ *
+ */
+public class AuditManager extends InMemorySavepointManager
+	implements TransactionListener, RegisterClassListener {
+
+	private final Auditor _auditor;
+	private final Set&lt;Class&lt;?&gt;&gt; _allTypes;
+	private final Set&lt;Class&lt;?&gt;&gt; _newTypes;
+	private final Set&lt;Class&lt;?&gt;&gt; _updateTypes;
+	private final Set&lt;Class&lt;?&gt;&gt; _deleteTypes;
+	private final Map&lt;Broker, AuditCallback&gt; _saved;
+<span class="nc" id="L63">	private final ReentrantLock _lock = new ReentrantLock();</span>
+
+	public AuditManager(Auditor auditor) {
+<span class="nc" id="L66">		super();</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">		if (auditor == null) {</span>
+<span class="nc" id="L68">			throw new NullPointerException(&quot;null auditor&quot;);</span>
+		}
+
+<span class="nc" id="L71">		setPreFlush(false);</span>
+<span class="nc" id="L72">		_auditor = auditor;</span>
+<span class="nc" id="L73">		_allTypes = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L74">		_newTypes = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L75">		_updateTypes = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L76">		_deleteTypes = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L77">		_saved = new ConcurrentHashMap&lt;&gt;();</span>
+<span class="nc" id="L78">		PCRegistry.addRegisterClassListener(this);</span>
+<span class="nc" id="L79">	}</span>
+
+	/**
+	 * Records all auditable classes in operation-specific sets.
+	 */
+	@Override
+	public void register(Class&lt;?&gt; cls) {
+<span class="nc" id="L86">		Auditable auditable = cls.getAnnotation(Auditable.class);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">		if (auditable == null) {</span>
+<span class="nc" id="L88">			return;</span>
+		}
+
+<span class="nc" id="L91">		List&lt;AuditableOperation&gt; events = Arrays.asList(auditable.values());</span>
+<span class="nc bnc" id="L92" title="All 4 branches missed.">		if (events.contains(AuditableOperation.ALL) || events.contains(AuditableOperation.CREATE)) {</span>
+<span class="nc" id="L93">			_newTypes.add(cls);</span>
+<span class="nc" id="L94">			_allTypes.add(cls);</span>
+		}
+<span class="nc bnc" id="L96" title="All 4 branches missed.">		if (events.contains(AuditableOperation.ALL) || events.contains(AuditableOperation.UPDATE)) {</span>
+<span class="nc" id="L97">			_updateTypes.add(cls);</span>
+<span class="nc" id="L98">			_allTypes.add(cls);</span>
+		}
+<span class="nc bnc" id="L100" title="All 4 branches missed.">		if (events.contains(AuditableOperation.ALL) || events.contains(AuditableOperation.DELETE)) {</span>
+<span class="nc" id="L101">			_deleteTypes.add(cls);</span>
+<span class="nc" id="L102">			_allTypes.add(cls);</span>
+		}
+<span class="nc" id="L104">	}</span>
+
+	public Auditor getAuditor() {
+<span class="nc" id="L107">		return _auditor;</span>
+	}
+
+	public Set&lt;Class&lt;?&gt;&gt; getAuditedTypes() {
+<span class="nc" id="L111">		return Collections.unmodifiableSet(_allTypes);</span>
+	}
+
+	/**
+	 * -----------------------------------------------------------------------
+	 *                 Transaction callbacks.
+	 * -----------------------------------------------------------------------
+	 */
+
+	@Override
+	public void afterBegin(TransactionEvent event) {
+<span class="nc" id="L122">		_lock.lock();</span>
+		try {
+<span class="nc" id="L124">			Broker broker = (Broker)event.getSource();</span>
+<span class="nc" id="L125">			AuditCallback cb = new AuditCallback(broker);</span>
+<span class="nc" id="L126">			broker.addLifecycleListener(cb, _allTypes.toArray(new Class&lt;?&gt;[_allTypes.size()]));</span>
+<span class="nc" id="L127">			_saved.put(broker, cb);</span>
+		} finally {
+<span class="nc" id="L129">			_lock.unlock();</span>
+		}
+<span class="nc" id="L131">	}</span>
+
+	@Override
+	public void beforeCommit(TransactionEvent event) {
+<span class="nc" id="L135">		_lock.lock();</span>
+		try {
+<span class="nc" id="L137">			AuditCallback cb = _saved.get(event.getSource());</span>
+<span class="nc bnc" id="L138" title="All 2 branches missed.">			if (cb != null) {</span>
+<span class="nc" id="L139">				cb.audit();</span>
+			}
+		} finally {
+<span class="nc" id="L142">			_lock.unlock();</span>
+		}
+<span class="nc" id="L144">	}</span>
+
+	private void forget(Broker broker) {
+<span class="nc" id="L147">		AuditCallback cb = _saved.remove(broker);</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">		if (cb != null) {</span>
+<span class="nc" id="L149">			broker.removeLifecycleListener(cb);</span>
+<span class="nc" id="L150">			cb.clear();</span>
+		}
+<span class="nc" id="L152">	}</span>
+
+	@Override
+	public void afterCommit(TransactionEvent event) {
+<span class="nc" id="L156">		forget((Broker)event.getSource());</span>
+<span class="nc" id="L157">	}</span>
+
+	@Override
+	public void afterRollback(TransactionEvent event) {
+<span class="nc" id="L161">		forget((Broker)event.getSource());</span>
+<span class="nc" id="L162">	}</span>
+
+	@Override
+	public void afterCommitComplete(TransactionEvent event) {
+<span class="nc" id="L166">		forget((Broker)event.getSource());</span>
+<span class="nc" id="L167">	}</span>
+
+	@Override
+	public void afterRollbackComplete(TransactionEvent event) {
+<span class="nc" id="L171">		forget((Broker)event.getSource());</span>
+<span class="nc" id="L172">	}</span>
+
+	@Override
+	public void beforeFlush(TransactionEvent event) {
+<span class="nc" id="L176">	}</span>
+
+	@Override
+	public void afterFlush(TransactionEvent event) {
+<span class="nc" id="L180">	}</span>
+
+	@Override
+	public void afterStateTransitions(TransactionEvent event) {
+<span class="nc" id="L184">	}</span>
+
+
+	/**
+	 * Support functions.
+	 */
+
+	/**
+	 * Extracts the persistence capable instance from the source of the given event.
+	 * @return null if an instance can not be extracted.
+	 */
+	protected PersistenceCapable getPersistenceCapable(LifecycleEvent evt) {
+<span class="nc" id="L196">		Object source = evt.getSource();</span>
+<span class="nc bnc" id="L197" title="All 2 branches missed.">		return source instanceof PersistenceCapable ? (PersistenceCapable)source : null;</span>
+	}
+
+	/**
+	 * Extracts the broker from the given persistence capable instance.
+	 * @param pc a persistence capable instance
+	 * @return null if a Broker can notbe extracted
+	 */
+	protected Broker getBroker(PersistenceCapable pc) {
+<span class="nc bnc" id="L206" title="All 2 branches missed.">		if (pc == null) return null;</span>
+<span class="nc" id="L207">		Object ctx = pc.pcGetGenericContext();</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">		return ctx instanceof Broker ? (Broker)ctx : null;</span>
+	}
+
+	/**
+	 * Gets an implementation.
+	 */
+	private StateManagerImpl getImpl(Object instance) {
+<span class="nc bnc" id="L215" title="All 2 branches missed.">		if (instance instanceof PersistenceCapable) {</span>
+<span class="nc" id="L216">			StateManager sm = ((PersistenceCapable)instance).pcGetStateManager();</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">			if (sm instanceof StateManagerImpl) {</span>
+<span class="nc" id="L218">				return (StateManagerImpl)sm;</span>
+			} else {
+<span class="nc" id="L220">				return null;</span>
+			}
+		} else {
+<span class="nc" id="L223">			return null;</span>
+		}
+	}
+
+	/**
+	 * Affirms if the given state manager is auditable for the given operation.
+	 * @param op an auditable operation
+	 */
+	protected boolean isAuditable(AuditableOperation op, StateManagerImpl sm) {
+<span class="nc bnc" id="L232" title="All 2 branches missed.">		if (sm == null)</span>
+<span class="nc" id="L233">			return false;</span>
+<span class="nc" id="L234">		Class&lt;?&gt; cls  = sm.getMetaData().getDescribedType();</span>
+<span class="nc bnc" id="L235" title="All 6 branches missed.">		return (op == AuditableOperation.ALL    &amp;&amp; _allTypes.contains(cls)</span>
+<span class="nc bnc" id="L236" title="All 4 branches missed.">			 ||	op == AuditableOperation.CREATE &amp;&amp; _newTypes.contains(cls))</span>
+<span class="nc bnc" id="L237" title="All 4 branches missed.">		     ||(op == AuditableOperation.UPDATE &amp;&amp; _updateTypes.contains(cls))</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">		     ||(op == AuditableOperation.DELETE &amp;&amp; _deleteTypes.contains(cls));</span>
+	}
+
+	/**
+	 * Listens to entity life cycle operations and saves them for auditing.
+	 *
+	 */
+	private class AuditCallback implements LifecycleListener {
+		private final Broker _broker;
+<span class="nc" id="L247">		private final Map&lt;StateManagerImpl,PersistenceCapable&gt; _audits =</span>
+			new ConcurrentHashMap&lt;&gt;();
+
+<span class="nc" id="L250">		AuditCallback(Broker broker) {</span>
+<span class="nc" id="L251">			_broker = broker;</span>
+<span class="nc" id="L252">		}</span>
+
+		void audit() {
+<span class="nc bnc" id="L255" title="All 2 branches missed.">			if (_audits.isEmpty()) return;</span>
+<span class="nc" id="L256">			Collection&lt;Audited&gt; news = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L257">			Collection&lt;Audited&gt; updates = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L258">			Collection&lt;Audited&gt; deletes = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">			for (Map.Entry&lt;StateManagerImpl,PersistenceCapable&gt; e : _audits.entrySet()) {</span>
+<span class="nc" id="L260">				StateManagerImpl sm = e.getKey();</span>
+<span class="nc" id="L261">				Audited audited = new Audited(sm, e.getValue());</span>
+<span class="nc bnc" id="L262" title="All 2 branches missed.">				if (sm.getPCState().isNew()) {</span>
+<span class="nc" id="L263">					news.add(audited);</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">				} else if (sm.getPCState().isDeleted()) {</span>
+<span class="nc" id="L265">					deletes.add(audited);</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">				} else if (sm.getPCState().isDirty()) {</span>
+<span class="nc" id="L267">					updates.add(audited);</span>
+				}
+<span class="nc" id="L269">			}</span>
+			try {
+<span class="nc" id="L271">				_auditor.audit(_broker, news, updates, deletes);</span>
+<span class="nc" id="L272">			} catch (Exception e) {</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">				if (_auditor.isRollbackOnError()) {</span>
+<span class="nc" id="L274">					throw new RuntimeException(&quot;dump&quot;, e);</span>
+				} else {
+<span class="nc" id="L276">					e.printStackTrace();</span>
+				}
+<span class="nc" id="L278">			}</span>
+<span class="nc" id="L279">		}</span>
+
+		/**
+		 * Saves the source of the given event for auditing.
+		 * @param op an auditable operation
+		 * @param event the event
+		 */
+		protected void save(AuditableOperation op, LifecycleEvent event) {
+<span class="nc" id="L287">			StateManagerImpl sm = getImpl(event.getSource());</span>
+<span class="nc bnc" id="L288" title="All 6 branches missed.">			if (sm != null &amp;&amp; !_audits.containsKey(sm) &amp;&amp; isAuditable(op, sm)) {</span>
+<span class="nc" id="L289">				Broker broker = sm.getBroker();</span>
+
+<span class="nc" id="L291">				OpenJPASavepoint savepoint = newSavepoint(&quot;&quot;, broker);</span>
+<span class="nc" id="L292">				savepoint.save(Collections.singleton(sm));</span>
+<span class="nc" id="L293">				Map&lt;StateManagerImpl, SavepointFieldManager&gt; states = savepoint.getStates();</span>
+<span class="nc" id="L294">                Map.Entry&lt;StateManagerImpl, SavepointFieldManager&gt; e = states.entrySet().iterator().next();</span>
+<span class="nc" id="L295">				PersistenceCapable copy = e.getValue().getCopy();</span>
+<span class="nc" id="L296">				copy.pcReplaceStateManager(null);</span>
+<span class="nc" id="L297">				_audits.put(sm, copy);</span>
+			}
+<span class="nc" id="L299">		}</span>
+
+		void clear() {
+<span class="nc" id="L302">			_audits.clear();</span>
+<span class="nc" id="L303">		}</span>
+
+		/**
+		 * Life-cycle callbacks
+		 */
+		@Override
+		public void afterLoad(LifecycleEvent event) {
+<span class="nc" id="L310">			save(AuditableOperation.ALL, event);</span>
+<span class="nc" id="L311">		}</span>
+
+		@Override
+		public void afterPersist(LifecycleEvent event) {
+<span class="nc" id="L315">			save(AuditableOperation.CREATE, event);</span>
+<span class="nc" id="L316">		}</span>
+
+		@Override
+		public void beforeDelete(LifecycleEvent event) {
+<span class="nc" id="L320">			save(AuditableOperation.DELETE, event);</span>
+<span class="nc" id="L321">		}</span>
+
+		@Override
+		public void beforeDirty(LifecycleEvent event) {
+<span class="nc" id="L325">			save(AuditableOperation.UPDATE, event);</span>
+<span class="nc" id="L326">		}</span>
+
+		@Override
+		public void beforePersist(LifecycleEvent event) {
+<span class="nc" id="L330">		}</span>
+
+		@Override
+		public void afterRefresh(LifecycleEvent event) {
+<span class="nc" id="L334">		}</span>
+
+		@Override
+		public void beforeStore(LifecycleEvent event) {
+<span class="nc" id="L338">			save(AuditableOperation.UPDATE, event);</span>
+<span class="nc" id="L339">		}</span>
+
+		@Override
+		public void afterStore(LifecycleEvent event) {
+<span class="nc" id="L343">		}</span>
+
+		@Override
+		public void beforeClear(LifecycleEvent event) {
+<span class="nc" id="L347">		}</span>
+
+		@Override
+		public void afterClear(LifecycleEvent event) {
+<span class="nc" id="L351">		}</span>
+
+		@Override
+		public void afterDelete(LifecycleEvent event) {
+<span class="nc" id="L355">		}</span>
+
+		@Override
+		public void afterDirty(LifecycleEvent event) {
+<span class="nc" id="L359">			save(AuditableOperation.UPDATE, event);</span>
+<span class="nc" id="L360">		}</span>
+
+		@Override
+		public void beforeDirtyFlushed(LifecycleEvent event) {
+<span class="nc" id="L364">		}</span>
+
+		@Override
+		public void afterDirtyFlushed(LifecycleEvent event) {
+<span class="nc" id="L368">		}</span>
+
+		@Override
+		public void beforeDetach(LifecycleEvent event) {
+<span class="nc" id="L372">		}</span>
+
+		@Override
+		public void afterDetach(LifecycleEvent event) {
+<span class="nc" id="L376">		}</span>
+
+		@Override
+		public void beforeAttach(LifecycleEvent event) {
+<span class="nc" id="L380">		}</span>
+
+		@Override
+		public void afterAttach(LifecycleEvent event) {
+<span class="nc" id="L384">			save(AuditableOperation.UPDATE, event);</span>
+<span class="nc" id="L385">		}</span>
+
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

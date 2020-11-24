@@ -1,0 +1,378 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExtentImpl.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">ExtentImpl.java</span></div><h1>ExtentImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.NoSuchElementException;
+import java.util.concurrent.locks.ReentrantLock;
+
+import org.apache.commons.collections4.Predicate;
+import org.apache.commons.collections4.iterators.FilterIterator;
+import org.apache.commons.collections4.iterators.IteratorChain;
+import org.apache.commons.collections4.map.AbstractReferenceMap.ReferenceStrength;
+import org.apache.openjpa.lib.rop.ResultObjectProvider;
+import org.apache.openjpa.lib.rop.ResultObjectProviderIterator;
+import org.apache.openjpa.lib.util.Closeable;
+import org.apache.openjpa.lib.util.ReferenceHashSet;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.MetaDataRepository;
+import org.apache.openjpa.util.GeneralException;
+import org.apache.openjpa.util.ImplHelper;
+import org.apache.openjpa.util.OpenJPAException;
+
+/**
+ * Representation of all members of a persistent class.
+ *
+ * @author Abe White
+ * @author Patrick Linskey
+ */
+public class ExtentImpl&lt;T&gt;
+    implements Extent&lt;T&gt; {
+
+<span class="nc" id="L50">    private static final ClassMetaData[] EMPTY_METAS = new ClassMetaData[0];</span>
+
+    private final Broker _broker;
+    private final Class&lt;T&gt; _type;
+    private final boolean _subs;
+    private final FetchConfiguration _fc;
+    private final ReentrantLock _lock;
+<span class="nc" id="L57">    private boolean _ignore = false;</span>
+
+    // set of open iterators
+<span class="nc" id="L60">    private ReferenceHashSet _openItrs = null;</span>
+
+    /**
+     * Constructor.
+     *
+     * @param broker the owning broker
+     * @param type the candidate class
+     * @param subs whether subclasses are included in the extent
+     */
+    ExtentImpl(Broker broker, Class&lt;T&gt; type, boolean subs,
+<span class="nc" id="L70">        FetchConfiguration fetch) {</span>
+<span class="nc" id="L71">        _broker = broker;</span>
+<span class="nc" id="L72">        _type = type;</span>
+<span class="nc" id="L73">        _subs = subs;</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (fetch != null)</span>
+<span class="nc" id="L75">            _fc = fetch;</span>
+        else
+<span class="nc" id="L77">            _fc = (FetchConfiguration) broker.getFetchConfiguration().clone();</span>
+<span class="nc" id="L78">        _ignore = broker.getIgnoreChanges();</span>
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        if (broker.getMultithreaded())</span>
+<span class="nc" id="L80">            _lock = new ReentrantLock();</span>
+        else
+<span class="nc" id="L82">            _lock = null;</span>
+<span class="nc" id="L83">    }</span>
+
+    @Override
+    public FetchConfiguration getFetchConfiguration() {
+<span class="nc" id="L87">        return _fc;</span>
+    }
+
+    @Override
+    public boolean getIgnoreChanges() {
+<span class="nc" id="L92">        return _ignore;</span>
+    }
+
+    @Override
+    public void setIgnoreChanges(boolean ignoreChanges) {
+<span class="nc" id="L97">        _broker.assertOpen();</span>
+<span class="nc" id="L98">        _ignore = ignoreChanges;</span>
+<span class="nc" id="L99">    }</span>
+
+    @Override
+    public List&lt;T&gt; list() {
+<span class="nc" id="L103">        List&lt;T&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L104">        Iterator&lt;T&gt; itr = iterator();</span>
+        try {
+<span class="nc bnc" id="L106" title="All 2 branches missed.">            while (itr.hasNext())</span>
+<span class="nc" id="L107">                list.add(itr.next());</span>
+<span class="nc" id="L108">            return list;</span>
+        } finally {
+<span class="nc" id="L110">            ImplHelper.close(itr);</span>
+        }
+    }
+
+    @Override
+    public Iterator&lt;T&gt; iterator() {
+<span class="nc" id="L116">        _broker.assertNontransactionalRead();</span>
+<span class="nc" id="L117">        CloseableIterator citr = null;</span>
+        try {
+            // create an iterator chain; add pnew objects if transactional
+<span class="nc" id="L120">            CloseableIteratorChain chain = new CloseableIteratorChain();</span>
+<span class="nc bnc" id="L121" title="All 4 branches missed.">            boolean trans = !_ignore &amp;&amp; _broker.isActive();</span>
+<span class="nc bnc" id="L122" title="All 2 branches missed.">            if (trans)</span>
+<span class="nc" id="L123">                chain.addIterator(new FilterNewIterator());</span>
+
+            // add database iterators for each implementing class
+<span class="nc" id="L126">            MetaDataRepository repos = _broker.getConfiguration().</span>
+<span class="nc" id="L127">                getMetaDataRepositoryInstance();</span>
+<span class="nc" id="L128">            ClassMetaData meta = repos.getMetaData(_type,</span>
+<span class="nc" id="L129">                _broker.getClassLoader(), false);</span>
+
+            ClassMetaData[] metas;
+<span class="nc bnc" id="L132" title="All 6 branches missed.">            if (meta != null &amp;&amp; (!_subs || !meta.isManagedInterface())</span>
+<span class="nc bnc" id="L133" title="All 4 branches missed.">                &amp;&amp; (meta.isMapped() || (_subs</span>
+<span class="nc bnc" id="L134" title="All 2 branches missed.">                &amp;&amp; meta.getMappedPCSubclassMetaDatas().length &gt; 0)))</span>
+<span class="nc" id="L135">                metas = new ClassMetaData[]{ meta };</span>
+<span class="nc bnc" id="L136" title="All 6 branches missed.">            else if (_subs &amp;&amp; (meta == null || meta.isManagedInterface()))</span>
+<span class="nc" id="L137">                metas = repos.getImplementorMetaDatas(_type,</span>
+<span class="nc" id="L138">                    _broker.getClassLoader(), false);</span>
+            else
+<span class="nc" id="L140">                metas = EMPTY_METAS;</span>
+
+            ResultObjectProvider rop;
+<span class="nc bnc" id="L143" title="All 2 branches missed.">            for (int i = 0; i &lt; metas.length; i++) {</span>
+<span class="nc" id="L144">                rop = _broker.getStoreManager().executeExtent(metas[i],</span>
+                    _subs, _fc);
+<span class="nc bnc" id="L146" title="All 2 branches missed.">                if (rop != null)</span>
+<span class="nc" id="L147">                    chain.addIterator(new ResultObjectProviderIterator(rop));</span>
+            }
+
+            // filter deleted objects if transactional
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            if (trans)</span>
+<span class="nc" id="L152">                citr = new FilterDeletedIterator(chain);</span>
+            else
+<span class="nc" id="L154">                citr = chain;</span>
+<span class="nc" id="L155">            citr.setRemoveOnClose(this);</span>
+<span class="nc" id="L156">        } catch (OpenJPAException ke) {</span>
+<span class="nc" id="L157">            throw ke;</span>
+<span class="nc" id="L158">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L159">            throw new GeneralException(re);</span>
+<span class="nc" id="L160">        }</span>
+
+<span class="nc" id="L162">        lock();</span>
+        try {
+<span class="nc bnc" id="L164" title="All 2 branches missed.">            if (_openItrs == null)</span>
+<span class="nc" id="L165">                _openItrs = new ReferenceHashSet(ReferenceStrength.WEAK);</span>
+<span class="nc" id="L166">            _openItrs.add(citr);</span>
+        } finally {
+<span class="nc" id="L168">            unlock();</span>
+        }
+<span class="nc" id="L170">        return citr;</span>
+    }
+
+    @Override
+    public Broker getBroker() {
+<span class="nc" id="L175">        return _broker;</span>
+    }
+
+    @Override
+    public Class&lt;T&gt; getElementType() {
+<span class="nc" id="L180">        return _type;</span>
+    }
+
+    @Override
+    public boolean hasSubclasses() {
+<span class="nc" id="L185">        return _subs;</span>
+    }
+
+    @Override
+    public void closeAll() {
+<span class="nc bnc" id="L190" title="All 2 branches missed.">        if (_openItrs == null)</span>
+<span class="nc" id="L191">            return;</span>
+
+<span class="nc" id="L193">        lock();</span>
+        try {
+            CloseableIterator citr;
+<span class="nc bnc" id="L196" title="All 2 branches missed.">            for (Iterator itr = _openItrs.iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L197">                citr = (CloseableIterator) itr.next();</span>
+<span class="nc" id="L198">                citr.setRemoveOnClose(null);</span>
+                try {
+<span class="nc" id="L200">                    citr.close();</span>
+<span class="nc" id="L201">                } catch (Exception e) {</span>
+<span class="nc" id="L202">                }</span>
+            }
+<span class="nc" id="L204">            _openItrs.clear();</span>
+<span class="nc" id="L205">        } catch (OpenJPAException ke) {</span>
+<span class="nc" id="L206">            throw ke;</span>
+<span class="nc" id="L207">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L208">            throw new GeneralException(re);</span>
+        } finally {
+<span class="nc" id="L210">            unlock();</span>
+        }
+<span class="nc" id="L212">    }</span>
+
+    @Override
+    public void lock() {
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (_lock != null)</span>
+<span class="nc" id="L217">            _lock.lock();</span>
+<span class="nc" id="L218">    }</span>
+
+    @Override
+    public void unlock() {
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if (_lock != null)</span>
+<span class="nc" id="L223">            _lock.unlock();</span>
+<span class="nc" id="L224">    }</span>
+
+    /**
+     * Closeable iterator.
+     */
+    private interface CloseableIterator&lt;T&gt;
+        extends Closeable, Iterator&lt;T&gt; {
+
+        /**
+         * Set the extent to remove self from on close.
+         */
+        void setRemoveOnClose(ExtentImpl&lt;T&gt; extent);
+    }
+
+    /**
+     * Closeable {@link IteratorChain}.
+     */
+<span class="nc" id="L241">    private static class CloseableIteratorChain</span>
+        extends IteratorChain
+        implements CloseableIterator {
+
+<span class="nc" id="L245">        private ExtentImpl&lt;?&gt; _extent = null;</span>
+<span class="nc" id="L246">        private boolean _closed = false;</span>
+
+        @Override
+        public boolean hasNext() {
+<span class="nc bnc" id="L250" title="All 2 branches missed.">            return (_closed) ? false : super.hasNext();</span>
+        }
+
+        @Override
+        public Object next() {
+<span class="nc bnc" id="L255" title="All 2 branches missed.">            if (_closed)</span>
+<span class="nc" id="L256">                throw new NoSuchElementException();</span>
+<span class="nc" id="L257">            return super.next();</span>
+        }
+
+        @Override
+        public void remove() {
+<span class="nc" id="L262">            throw new UnsupportedOperationException();</span>
+        }
+
+        @Override
+        public void setRemoveOnClose(ExtentImpl extent) {
+<span class="nc" id="L267">            _extent = extent;</span>
+<span class="nc" id="L268">        }</span>
+
+        @Override
+        public void close()
+            throws Exception {
+<span class="nc bnc" id="L273" title="All 4 branches missed.">            if (_extent != null &amp;&amp; _extent._openItrs != null) {</span>
+<span class="nc" id="L274">                _extent.lock();</span>
+                try {
+<span class="nc" id="L276">                    _extent._openItrs.remove(this);</span>
+                } finally {
+<span class="nc" id="L278">                    _extent.unlock();</span>
+                }
+            }
+
+<span class="nc" id="L282">            _closed = true;</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">            for (Iterator itr = this; itr.hasNext();)</span>
+<span class="nc" id="L284">                ((Closeable) itr.next()).close();</span>
+<span class="nc" id="L285">        }</span>
+    }
+
+    /**
+     * {@link FilterIterator} that skips deleted objects.
+     */
+    private static class FilterDeletedIterator
+        extends FilterIterator
+        implements CloseableIterator, Predicate {
+
+<span class="nc" id="L295">        private ExtentImpl _extent = null;</span>
+<span class="nc" id="L296">        private boolean _closed = false;</span>
+
+        public FilterDeletedIterator(Iterator itr) {
+<span class="nc" id="L299">            super(itr);</span>
+<span class="nc" id="L300">            setPredicate(this);</span>
+<span class="nc" id="L301">        }</span>
+
+        @Override
+        public boolean hasNext() {
+<span class="nc bnc" id="L305" title="All 2 branches missed.">            return (_closed) ? false : super.hasNext();</span>
+        }
+
+        @Override
+        public Object next() {
+<span class="nc bnc" id="L310" title="All 2 branches missed.">            if (_closed)</span>
+<span class="nc" id="L311">                throw new NoSuchElementException();</span>
+<span class="nc" id="L312">            return super.next();</span>
+        }
+
+        @Override
+        public void remove() {
+<span class="nc" id="L317">            throw new UnsupportedOperationException();</span>
+        }
+
+        @Override
+        public void setRemoveOnClose(ExtentImpl extent) {
+<span class="nc" id="L322">            _extent = extent;</span>
+<span class="nc" id="L323">        }</span>
+
+        @Override
+        public void close()
+            throws Exception {
+<span class="nc bnc" id="L328" title="All 4 branches missed.">            if (_extent != null &amp;&amp; _extent._openItrs != null) {</span>
+<span class="nc" id="L329">                _extent.lock();</span>
+                try {
+<span class="nc" id="L331">                    _extent._openItrs.remove(this);</span>
+                } finally {
+<span class="nc" id="L333">                    _extent.unlock();</span>
+                }
+            }
+
+<span class="nc" id="L337">            _closed = true;</span>
+<span class="nc" id="L338">            ((Closeable) getIterator()).close();</span>
+<span class="nc" id="L339">        }</span>
+
+        @Override
+        public boolean evaluate(Object o) {
+<span class="nc bnc" id="L343" title="All 2 branches missed.">            return !_extent._broker.isDeleted(o);</span>
+        }
+    }
+
+    /**
+     * Iterator over all new objects in this extent. This iterator is always
+     * wrapped, so it doesn't need to keep track of whether it's closed.
+     */
+    private class FilterNewIterator
+        extends FilterIterator
+        implements Closeable, Predicate {
+
+<span class="nc" id="L355">        public FilterNewIterator() {</span>
+<span class="nc" id="L356">            super(_broker.getTransactionalObjects().iterator());</span>
+<span class="nc" id="L357">            setPredicate(this);</span>
+<span class="nc" id="L358">        }</span>
+
+        @Override
+        public void close() {
+<span class="nc" id="L362">        }</span>
+
+        @Override
+        public boolean evaluate(Object o) {
+<span class="nc bnc" id="L366" title="All 2 branches missed.">            if (!_broker.isNew(o))</span>
+<span class="nc" id="L367">                return false;</span>
+
+<span class="nc" id="L369">            Class&lt;?&gt; type = o.getClass();</span>
+<span class="nc bnc" id="L370" title="All 4 branches missed.">            if (!_subs &amp;&amp; type != _type)</span>
+<span class="nc" id="L371">                return false;</span>
+<span class="nc bnc" id="L372" title="All 4 branches missed.">            if (_subs &amp;&amp; !_type.isAssignableFrom(type))</span>
+<span class="nc" id="L373">                return false;</span>
+<span class="nc" id="L374">            return true;</span>
+		}
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

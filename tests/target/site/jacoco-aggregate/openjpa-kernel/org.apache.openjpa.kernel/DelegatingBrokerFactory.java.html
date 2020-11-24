@@ -1,0 +1,263 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DelegatingBrokerFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">DelegatingBrokerFactory.java</span></div><h1>DelegatingBrokerFactory.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.util.RuntimeExceptionTranslator;
+
+///////////////////////////////////////////////////////////////
+// NOTE: when adding a public API method, be sure to add it to
+// JDO and JPA facades!
+///////////////////////////////////////////////////////////////
+
+/**
+ * Delegating broker factory that can also perform exception translation
+ * for use in facades.
+ *
+ * @since 0.4.0
+ * @author Abe White
+ */
+public class DelegatingBrokerFactory
+    implements BrokerFactory {
+
+    
+    private static final long serialVersionUID = 1L;
+    private final BrokerFactory _factory;
+    private final DelegatingBrokerFactory _del;
+    private final RuntimeExceptionTranslator _trans;
+
+    /**
+     * Constructor; supply delegate.
+     */
+    public DelegatingBrokerFactory(BrokerFactory factory) {
+<span class="nc" id="L52">        this(factory, null);</span>
+<span class="nc" id="L53">    }</span>
+
+    /**
+     * Constructor; supply delegate and exception translator.
+     */
+    public DelegatingBrokerFactory(BrokerFactory factory,
+<span class="nc" id="L59">        RuntimeExceptionTranslator trans) {</span>
+<span class="nc" id="L60">        _factory = factory;</span>
+<span class="nc bnc" id="L61" title="All 2 branches missed.">        if (factory instanceof DelegatingBrokerFactory)</span>
+<span class="nc" id="L62">            _del = (DelegatingBrokerFactory) factory;</span>
+        else
+<span class="nc" id="L64">            _del = null;</span>
+<span class="nc" id="L65">        _trans = trans;</span>
+<span class="nc" id="L66">    }</span>
+
+    /**
+     * Return the direct delegate.
+     */
+    public BrokerFactory getDelegate() {
+<span class="nc" id="L72">        return _factory;</span>
+    }
+
+    /**
+     * Return the native delegate.
+     */
+    public BrokerFactory getInnermostDelegate() {
+<span class="nc bnc" id="L79" title="All 2 branches missed.">        return (_del == null) ? _factory : _del.getInnermostDelegate();</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L84">        return getInnermostDelegate().hashCode();</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L89" title="All 2 branches missed.">        if (other == this)</span>
+<span class="nc" id="L90">            return true;</span>
+<span class="nc bnc" id="L91" title="All 2 branches missed.">        if (other instanceof DelegatingBrokerFactory)</span>
+<span class="nc" id="L92">            other = ((DelegatingBrokerFactory) other).getInnermostDelegate();</span>
+<span class="nc" id="L93">        return getInnermostDelegate().equals(other);</span>
+    }
+
+    /**
+     * Translate the OpenJPA exception.
+     */
+    protected RuntimeException translate(RuntimeException re) {
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        return (_trans == null) ? re : _trans.translate(re);</span>
+    }
+
+    @Override
+    public OpenJPAConfiguration getConfiguration() {
+        try {
+<span class="nc" id="L106">            return _factory.getConfiguration();</span>
+<span class="nc" id="L107">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L108">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Map&lt;String,Object&gt; getProperties() {
+        try {
+<span class="nc" id="L115">            return _factory.getProperties();</span>
+<span class="nc" id="L116">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L117">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Set&lt;String&gt; getSupportedProperties() {
+        try {
+<span class="nc" id="L124">            return _factory.getSupportedProperties();</span>
+<span class="nc" id="L125">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L126">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Object putUserObject(Object key, Object val) {
+        try {
+<span class="nc" id="L133">            return _factory.putUserObject(key, val);</span>
+<span class="nc" id="L134">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L135">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Object getUserObject(Object key) {
+        try {
+<span class="nc" id="L142">            return _factory.getUserObject(key);</span>
+<span class="nc" id="L143">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L144">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Broker newBroker() {
+        try {
+<span class="nc" id="L151">            return _factory.newBroker();</span>
+<span class="nc" id="L152">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L153">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Broker newBroker(String user, String pass, boolean managed,
+        int connRetainMode, boolean findExisting) {
+<span class="nc" id="L160">        return newBroker(user, pass, managed, connRetainMode, findExisting, &quot;&quot;, &quot;&quot;);</span>
+    }
+    @Override
+    public Broker newBroker(String user, String pass, boolean managed,
+        int connRetainMode, boolean findExisting, String cfName, String cf2Name) {
+        try {
+<span class="nc" id="L166">            return _factory.newBroker(user, pass, managed, connRetainMode,</span>
+                findExisting, cfName, cf2Name);
+<span class="nc" id="L168">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L169">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void addLifecycleListener(Object listener, Class[] classes) {
+        try {
+<span class="nc" id="L176">            _factory.addLifecycleListener(listener, classes);</span>
+<span class="nc" id="L177">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L178">            throw translate(re);</span>
+<span class="nc" id="L179">        }</span>
+<span class="nc" id="L180">    }</span>
+
+    @Override
+    public void removeLifecycleListener(Object listener) {
+        try {
+<span class="nc" id="L185">            _factory.removeLifecycleListener(listener);</span>
+<span class="nc" id="L186">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L187">            throw translate(re);</span>
+<span class="nc" id="L188">        }</span>
+<span class="nc" id="L189">    }</span>
+
+    @Override
+    public void addTransactionListener(Object listener) {
+        try {
+<span class="nc" id="L194">            _factory.addTransactionListener(listener);</span>
+<span class="nc" id="L195">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L196">            throw translate(re);</span>
+<span class="nc" id="L197">        }</span>
+<span class="nc" id="L198">    }</span>
+
+    @Override
+    public void removeTransactionListener(Object listener) {
+        try {
+<span class="nc" id="L203">            _factory.removeTransactionListener(listener);</span>
+<span class="nc" id="L204">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L205">            throw translate(re);</span>
+<span class="nc" id="L206">        }</span>
+<span class="nc" id="L207">    }</span>
+
+    @Override
+    public void close() {
+        try {
+<span class="nc" id="L212">            _factory.close();</span>
+<span class="nc" id="L213">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L214">            throw translate(re);</span>
+<span class="nc" id="L215">        }</span>
+<span class="nc" id="L216">    }</span>
+
+    @Override
+    public boolean isClosed() {
+        try {
+<span class="nc" id="L221">            return _factory.isClosed();</span>
+<span class="nc" id="L222">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L223">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void lock() {
+        try {
+<span class="nc" id="L230">            _factory.lock();</span>
+<span class="nc" id="L231">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L232">            throw translate(re);</span>
+<span class="nc" id="L233">        }</span>
+<span class="nc" id="L234">    }</span>
+
+    @Override
+    public void unlock() {
+        try {
+<span class="nc" id="L239">            _factory.unlock();</span>
+<span class="nc" id="L240">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L241">            throw translate(re);</span>
+<span class="nc" id="L242">		}</span>
+<span class="nc" id="L243">	}</span>
+
+    @Override
+    public void assertOpen() {
+        try {
+<span class="nc" id="L248">            _factory.assertOpen();</span>
+<span class="nc" id="L249">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L250">            throw translate(re);</span>
+<span class="nc" id="L251">        }</span>
+<span class="nc" id="L252">    }</span>
+
+    @Override
+    public void postCreationCallback() {
+        try {
+<span class="nc" id="L257">            _factory.postCreationCallback();</span>
+<span class="nc" id="L258">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L259">            throw translate(re);</span>
+<span class="nc" id="L260">        }</span>
+<span class="nc" id="L261">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

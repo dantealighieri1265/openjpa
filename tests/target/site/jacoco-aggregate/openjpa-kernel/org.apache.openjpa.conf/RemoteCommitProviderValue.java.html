@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RemoteCommitProviderValue.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.conf</a> &gt; <span class="el_source">RemoteCommitProviderValue.java</span></div><h1>RemoteCommitProviderValue.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.conf;
+
+import org.apache.openjpa.event.RemoteCommitEventManager;
+import org.apache.openjpa.event.RemoteCommitProvider;
+import org.apache.openjpa.lib.conf.Configuration;
+import org.apache.openjpa.lib.conf.Configurations;
+import org.apache.openjpa.lib.conf.PluginValue;
+import org.apache.openjpa.lib.util.Options;
+import org.apache.openjpa.lib.util.StringUtil;
+
+/**
+ * Value type used to represent a {@link RemoteCommitProvider}. This
+ * plugin allows users to specify whether to transmit the ids of added objects
+ * in the remote commit events distributed.
+ *
+ * @author Abe White
+ */
+public class RemoteCommitProviderValue
+    extends PluginValue {
+
+<span class="nc" id="L39">    private static final String[] ALIASES = new String[]{</span>
+        &quot;sjvm&quot;, &quot;org.apache.openjpa.event.SingleJVMRemoteCommitProvider&quot;,
+        &quot;jms&quot;, &quot;org.apache.openjpa.event.JMSRemoteCommitProvider&quot;,
+        &quot;tcp&quot;, &quot;org.apache.openjpa.event.TCPRemoteCommitProvider&quot;,
+    };
+
+<span class="nc" id="L45">    private Options _opts = null;</span>
+<span class="nc" id="L46">    private Boolean _transmitPersIds = null;</span>
+
+    public RemoteCommitProviderValue() {
+<span class="nc" id="L49">        super(&quot;RemoteCommitProvider&quot;, true);</span>
+<span class="nc" id="L50">        setAliases(ALIASES);</span>
+<span class="nc" id="L51">    }</span>
+
+    @Override
+    public void setProperties(String props) {
+<span class="nc" id="L55">        super.setProperties(props);</span>
+<span class="nc" id="L56">        _opts = null;</span>
+<span class="nc" id="L57">        _transmitPersIds = null;</span>
+<span class="nc" id="L58">    }</span>
+
+    @Override
+    public void setString(String str) {
+<span class="nc" id="L62">        super.setString(str);</span>
+<span class="nc" id="L63">        _opts = null;</span>
+<span class="nc" id="L64">        _transmitPersIds = null;</span>
+<span class="nc" id="L65">    }</span>
+
+    /**
+     * The cached provider.
+     */
+    public RemoteCommitProvider getProvider() {
+<span class="nc" id="L71">        return (RemoteCommitProvider) get();</span>
+    }
+
+    /**
+     * The cached provider.
+     */
+    public void setProvider(RemoteCommitProvider provider) {
+<span class="nc" id="L78">        set(provider);</span>
+<span class="nc" id="L79">    }</span>
+
+    /**
+     * Whether to transmit persisted object ids in remote commit events.
+     */
+    public boolean getTransmitPersistedObjectIds() {
+<span class="nc" id="L85">        return Boolean.TRUE.equals(_transmitPersIds);</span>
+    }
+
+    /**
+     * The cached decorators.
+     */
+    public void setTransmitPersistedObjectIds(boolean transmit) {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        _transmitPersIds = (transmit) ? Boolean.TRUE : Boolean.FALSE;</span>
+<span class="nc" id="L93">    }</span>
+
+    /**
+     * Instantiate the provider.
+     */
+    public RemoteCommitProvider instantiateProvider(Configuration conf) {
+<span class="nc" id="L99">        return instantiateProvider(conf, true);</span>
+    }
+
+    /**
+     * Instantiate the provider.
+     */
+    public RemoteCommitProvider instantiateProvider(Configuration conf,
+        boolean fatal) {
+<span class="nc" id="L107">        return (RemoteCommitProvider) instantiate(RemoteCommitProvider.class,</span>
+            conf, fatal);
+    }
+
+    /**
+     * Configure the remote event manager.
+     */
+    public void configureEventManager(RemoteCommitEventManager mgr) {
+<span class="nc" id="L115">        parseOptions();</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (_transmitPersIds != null)</span>
+<span class="nc" id="L117">            mgr.setTransmitPersistedObjectIds(_transmitPersIds.booleanValue());</span>
+<span class="nc" id="L118">    }</span>
+
+    /**
+     * Override to keep decorators out of transport configuration.
+     */
+    @Override
+    public Object instantiate(Class type, Configuration conf, boolean fatal) {
+<span class="nc" id="L125">        Object obj = newInstance(getClassName(), type, conf, fatal);</span>
+<span class="nc" id="L126">        parseOptions();</span>
+<span class="nc" id="L127">        Configurations.configureInstance(obj, conf, _opts, getProperty());</span>
+<span class="nc" id="L128">        set(obj, true);</span>
+<span class="nc" id="L129">        return obj;</span>
+    }
+
+    private void parseOptions() {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        if (_opts != null)</span>
+<span class="nc" id="L134">            return;</span>
+
+<span class="nc" id="L136">        _opts = Configurations.parseProperties(getProperties());</span>
+<span class="nc" id="L137">        String transmit = StringUtil.trimToNull(_opts.removeProperty</span>
+<span class="nc" id="L138">            (&quot;transmitPersistedObjectIds&quot;, &quot;TransmitPersistedObjectIds&quot;, null));</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (transmit != null)</span>
+<span class="nc" id="L140">            _transmitPersIds = Boolean.valueOf (transmit);</span>
+<span class="nc" id="L141">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

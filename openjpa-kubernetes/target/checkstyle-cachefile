@@ -1,0 +1,5 @@
+#Tue Nov 24 17:56:05 CET 2020
+configuration*?=DC2E627335153E52F23FE276217EDE3795A119ED
+/home/marco/Scrivania/openjpa/openjpa-kubernetes/src/main/java/org/apache/openjpa/event/kubernetes/KubernetesTCPRemoteCommitProvider.java=1605892430707
+/home/marco/Scrivania/openjpa/openjpa-kubernetes/src/main/resources/org/apache/openjpa/event/kubernetes/localizer.properties=1605892430707
+module-resource*?\:openjpa-project/suppressions.xml=A7C2B0898B2BB7012E8B41D9818B8A47E97C0DF3

@@ -1,0 +1,322 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProxyMaps.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.util</a> &gt; <span class="el_source">ProxyMaps.java</span></div><h1>ProxyMaps.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.util;
+
+import java.io.InputStream;
+import java.io.ObjectStreamException;
+import java.util.AbstractSet;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Properties;
+import java.util.Set;
+
+/**
+ * Utility methods used by map proxies.
+ *
+ * @author Abe White
+ */
+<span class="nc" id="L35">public class ProxyMaps</span>
+    extends Proxies {
+
+    /**
+     * Call before invoking {@link Map#clear} on super.
+     */
+    public static void beforeClear(ProxyMap map) {
+<span class="nc" id="L42">        dirty(map, true);</span>
+        Map.Entry entry;
+<span class="nc bnc" id="L44" title="All 2 branches missed.">        for (Iterator itr = map.entrySet().iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L45">            entry = (Map.Entry) itr.next();</span>
+<span class="nc" id="L46">            removed(map, entry.getKey(), true);</span>
+<span class="nc" id="L47">            removed(map, entry.getValue(), false);</span>
+        }
+<span class="nc" id="L49">    }</span>
+
+    /**
+     * Override for {@link Map#keySet}.
+     */
+    public static Set keySet(ProxyMap map) {
+<span class="fc" id="L55">        ProxyEntrySet entries = (ProxyEntrySet) map.entrySet();</span>
+<span class="fc" id="L56">        entries.setView(ProxyEntrySet.VIEW_KEYS);</span>
+<span class="fc" id="L57">        return entries;</span>
+    }
+
+    /**
+     * Override for {@link Map#values}.
+     */
+    public static Collection values(ProxyMap map) {
+<span class="nc" id="L64">        ProxyEntrySet entries = (ProxyEntrySet) map.entrySet();</span>
+<span class="nc" id="L65">        entries.setView(ProxyEntrySet.VIEW_VALUES);</span>
+<span class="nc" id="L66">        return entries;</span>
+    }
+
+    /**
+     * Wrap the given entry set in a proxy.
+     */
+    public static Set afterEntrySet(ProxyMap map, Set entries) {
+<span class="fc" id="L73">        return new ProxyEntrySetImpl(map, entries);</span>
+    }
+
+    /**
+     * Call before invoking {@link Map#get} on super.
+     */
+    public static boolean beforeGet(ProxyMap map, Object key) {
+<span class="fc" id="L80">        assertAllowedType(key, map.getKeyType());</span>
+        // Java 8 solution/workaround due to containsKey() calling get!=null, which could cause infinite loop
+<span class="fc" id="L82">        return map.keySet().contains(key);</span>
+    }
+
+    /**
+     * Call after invoking {@link Map#get} on super.
+     * The potential change is tracked when the get method is called. This change
+     * will not translated to an update statement if the retrieved value
+     * is not dirty.
+     *
+     * @param ret the return value from the super's method
+     * @param before the return value from {@link #beforeGet}
+     * @return the value to return from {@link Map#get}
+     */
+    public static Object afterGet(ProxyMap map, Object key,
+        Object ret, boolean before) {
+<span class="pc bpc" id="L97" title="1 of 2 branches missed.">        if (before) {</span>
+<span class="pc bpc" id="L98" title="1 of 2 branches missed.">            if (map.getChangeTracker() != null)</span>
+<span class="fc" id="L99">                ((MapChangeTracker) map.getChangeTracker()).changed(key, ret,</span>
+                    ret);
+        }
+<span class="fc" id="L102">        return ret;</span>
+    }
+
+
+    /**
+     * Call before invoking {@link Map#put} on super.
+     */
+    public static boolean beforePut(ProxyMap map, Object key, Object value) {
+<span class="fc" id="L110">        assertAllowedType(key, map.getKeyType());</span>
+<span class="fc" id="L111">        assertAllowedType(value, map.getValueType());</span>
+<span class="fc" id="L112">        dirty(map, false);</span>
+<span class="fc" id="L113">        return map.containsKey(key);</span>
+    }
+
+    /**
+     * Call after invoking {@link Map#put} on super.
+     *
+     * @param ret the return value from the super's method
+     * @param before the return value from {@link #beforePut}
+     * @return the value to return from {@link Map#put}
+     */
+    public static Object afterPut(ProxyMap map, Object key, Object value,
+        Object ret, boolean before) {
+<span class="pc bpc" id="L125" title="1 of 2 branches missed.">        if (before) {</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">            if (map.getChangeTracker() != null)</span>
+<span class="nc" id="L127">                ((MapChangeTracker) map.getChangeTracker()).changed(key, ret,</span>
+                    value);
+<span class="nc" id="L129">            removed(map, ret, false);</span>
+<span class="pc bpc" id="L130" title="1 of 2 branches missed.">        } else if (map.getChangeTracker() != null)</span>
+<span class="fc" id="L131">            ((MapChangeTracker) map.getChangeTracker()).added(key, value);</span>
+<span class="fc" id="L132">        return ret;</span>
+    }
+
+    /**
+     * Call before invoking {@link Properties#setProperty} on super.
+     */
+    public static boolean beforeSetProperty(ProxyMap map, String key,
+        String value) {
+<span class="nc" id="L140">        return beforePut(map, key, value);</span>
+    }
+
+    /**
+     * Call after invoking {@link Properties#setProperty} on super.
+     *
+     * @param ret the return value from the super's method
+     * @param before the return value from {@link #beforeSetProperty}
+     * @return the value to return from {@link Properties#setProperty}
+     */
+    public static Object afterSetProperty(ProxyMap map, String key,
+        String value, Object ret, boolean before) {
+<span class="nc" id="L152">        return afterPut(map, key, value, ret, before);</span>
+    }
+
+    /**
+     * Call before invoking {@link Properties#load} on super.
+     */
+    public static void beforeLoad(ProxyMap map, InputStream in) {
+<span class="nc" id="L159">        dirty(map, true);</span>
+<span class="nc" id="L160">    }</span>
+
+    /**
+     * Call before invoking {@link Properties#loadXML} on super.
+     */
+    public static void beforeLoadFromXML(ProxyMap map, InputStream in) {
+<span class="nc" id="L166">        dirty(map, true);</span>
+<span class="nc" id="L167">    }</span>
+
+    /**
+     * Overload for {@link Map#putAll}.
+     */
+    public static void putAll(ProxyMap map, Map values) {
+        Map.Entry entry;
+<span class="fc bfc" id="L174" title="All 2 branches covered.">        for (Iterator itr = values.entrySet().iterator(); itr.hasNext();) {</span>
+<span class="fc" id="L175">            entry = (Map.Entry) itr.next();</span>
+<span class="fc" id="L176">            map.put(entry.getKey(), entry.getValue());</span>
+        }
+<span class="fc" id="L178">    }</span>
+
+    /**
+     * Call before invoking {@link Map#remove} on super.
+     */
+    public static boolean beforeRemove(ProxyMap map, Object key) {
+<span class="nc" id="L184">        dirty(map, false);</span>
+<span class="nc" id="L185">        return map.containsKey(key);</span>
+    }
+
+    /**
+     * Call after invoking {@link Map#remove} on super.
+     *
+     * @param ret the return value from the super's method
+     * @param before the return value from {@link #beforeRemove}
+     * @return the value to return from {@link Map#remove}
+     */
+    public static Object afterRemove(ProxyMap map, Object key, Object ret,
+        boolean before) {
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        if (before) {</span>
+<span class="nc bnc" id="L198" title="All 2 branches missed.">            if (map.getChangeTracker() != null)</span>
+<span class="nc" id="L199">                ((MapChangeTracker) map.getChangeTracker()).removed(key, ret);</span>
+<span class="nc" id="L200">            removed(map, key, true);</span>
+<span class="nc" id="L201">            removed(map, ret, false);</span>
+        }
+<span class="nc" id="L203">        return ret;</span>
+    }
+
+    /**
+     * Marker interface for a proxy entry set.
+     */
+    public interface ProxyEntrySet
+        extends Set {
+
+        int VIEW_KEYS = 0;
+        int VIEW_VALUES = 1;
+        int VIEW_ENTRIES = 2;
+
+        /**
+         * Set what entry view this set exposes.
+         */
+        void setView(int view);
+    }
+
+    /**
+     * Dirtying proxy for map entry set.
+     */
+    private static class ProxyEntrySetImpl
+        extends AbstractSet
+        implements ProxyEntrySet {
+
+        private final ProxyMap _map;
+        private final Set _entries;
+<span class="fc" id="L231">        private int _view = VIEW_ENTRIES;</span>
+
+        /**
+         * Supply owning map and delegate entry set on construction.
+         */
+<span class="fc" id="L236">        public ProxyEntrySetImpl(ProxyMap map, Set entries) {</span>
+<span class="fc" id="L237">            _map = map;</span>
+<span class="fc" id="L238">            _entries = entries;</span>
+<span class="fc" id="L239">        }</span>
+
+        /**
+         * View mode.
+         */
+        public int getView() {
+<span class="nc" id="L245">            return _view;</span>
+        }
+
+        /**
+         * View mode.
+         */
+        @Override
+        public void setView(int view) {
+<span class="fc" id="L253">            _view = view;</span>
+<span class="fc" id="L254">        }</span>
+
+        @Override
+        public int size() {
+<span class="nc" id="L258">            return _entries.size();</span>
+        }
+
+        @Override
+        public boolean remove(Object o) {
+<span class="nc bnc" id="L263" title="All 2 branches missed.">            if (_view != VIEW_KEYS)</span>
+<span class="nc" id="L264">                throw new UnsupportedOperationException();</span>
+
+<span class="nc bnc" id="L266" title="All 2 branches missed.">            if (!_map.containsKey(o))</span>
+<span class="nc" id="L267">                return false;</span>
+<span class="nc" id="L268">            _map.remove(o);</span>
+<span class="nc" id="L269">            return true;</span>
+        }
+
+        @Override
+        public Iterator iterator() {
+<span class="fc" id="L274">            final Iterator itr = _entries.iterator();</span>
+<span class="fc" id="L275">            return new Iterator() {</span>
+<span class="fc" id="L276">                private Map.Entry _last = null;</span>
+
+                @Override
+                public boolean hasNext() {
+<span class="fc" id="L280">                    return itr.hasNext();</span>
+                }
+
+                @Override
+                public Object next() {
+<span class="fc" id="L285">                    _last = (Map.Entry) itr.next();</span>
+<span class="pc bpc" id="L286" title="2 of 3 branches missed.">                    switch (_view) {</span>
+                        case VIEW_KEYS:
+<span class="fc" id="L288">                            return _last.getKey();</span>
+                        case VIEW_VALUES:
+<span class="nc" id="L290">                            return _last.getValue();</span>
+                        default:
+<span class="nc" id="L292">                            return _last;</span>
+                    }
+                }
+
+                @Override
+                public void remove() {
+<span class="nc" id="L298">                    dirty(_map, false);</span>
+<span class="nc" id="L299">                    itr.remove();</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">                    if (_map.getChangeTracker() != null)</span>
+<span class="nc" id="L301">                        ((MapChangeTracker) _map.getChangeTracker()).</span>
+<span class="nc" id="L302">                            removed(_last.getKey(), _last.getValue());</span>
+<span class="nc" id="L303">                    Proxies.removed(_map, _last.getKey(), true);</span>
+<span class="nc" id="L304">                    Proxies.removed(_map, _last.getValue(), false);</span>
+<span class="nc" id="L305">                }</span>
+            };
+        }
+
+        protected Object writeReplace()
+            throws ObjectStreamException {
+<span class="nc bnc" id="L311" title="All 3 branches missed.">            switch (_view) {</span>
+                case VIEW_KEYS:
+<span class="nc" id="L313">                    return ((Map) _map).keySet();</span>
+                case VIEW_VALUES:
+<span class="nc" id="L315">                    return ((Map) _map).values();</span>
+                default:
+<span class="nc" id="L317">                    return ((Map) _map).entrySet();</span>
+            }
+        }
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

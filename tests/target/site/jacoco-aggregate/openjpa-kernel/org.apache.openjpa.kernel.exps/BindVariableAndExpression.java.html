@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>BindVariableAndExpression.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel.exps</a> &gt; <span class="el_source">BindVariableAndExpression.java</span></div><h1>BindVariableAndExpression.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel.exps;
+
+import java.util.Collection;
+import java.util.Iterator;
+
+import org.apache.openjpa.kernel.StoreContext;
+
+/**
+ * Any contains(var) expression must be followed by at least one
+ * AND clause using the variable 'var'. This expression type represents
+ * one of those and AND clauses. It is responsible for evaluating the
+ * right subexpression for every possible value of the variable.
+ *
+ * @author Abe White
+ */
+class BindVariableAndExpression
+    extends AndExpression {
+
+    
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * Constructor. Provide expression binding the variable and the
+     * expression it is AND'd with.
+     */
+    public BindVariableAndExpression(BindVariableExpression var, Exp exp) {
+<span class="nc" id="L45">        super(var, exp);</span>
+<span class="nc" id="L46">    }</span>
+
+    @Override
+    protected boolean eval(Object candidate, Object orig,
+        StoreContext ctx, Object[] params) {
+        // execute the tree for every element in the variable's collection;
+        // the variable is aliased to the current element before each
+        // iteration so that variable paths within the tree can
+        // use the current value; the expression is true if true for any
+        // value of the collection
+
+        // if the collection is empty it cannot contain any variable
+<span class="nc" id="L58">        BindVariableExpression bind = (BindVariableExpression)</span>
+<span class="nc" id="L59">            getExpression1();</span>
+<span class="nc" id="L60">        Collection vals = bind.getVariableValues(candidate, orig, ctx,</span>
+            params);
+<span class="nc bnc" id="L62" title="All 4 branches missed.">        if (vals == null || vals.isEmpty())</span>
+<span class="nc" id="L63">            return false;</span>
+
+        // the subtree is true if true for any variable in the collection
+<span class="nc" id="L66">        BoundVariable var = bind.getVariable();</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        for (Iterator itr = vals.iterator(); itr.hasNext();) {</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">            if (!var.setValue(itr.next()))</span>
+<span class="nc" id="L69">                continue;</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">            if (getExpression2().evaluate(candidate, orig, ctx, params))</span>
+<span class="nc" id="L71">                return true;</span>
+        }
+<span class="nc" id="L73">        return false;</span>
+    }
+
+    @Override
+    protected boolean eval(Collection candidates, StoreContext ctx,
+        Object[] params) {
+<span class="nc bnc" id="L79" title="All 4 branches missed.">        if (candidates == null || candidates.isEmpty())</span>
+<span class="nc" id="L80">            return false;</span>
+<span class="nc" id="L81">        Object obj = candidates.iterator().next();</span>
+<span class="nc" id="L82">        return eval(obj, obj, ctx, params);</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

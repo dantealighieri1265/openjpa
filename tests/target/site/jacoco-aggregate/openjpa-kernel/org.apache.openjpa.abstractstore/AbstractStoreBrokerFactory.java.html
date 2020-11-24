@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractStoreBrokerFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.abstractstore</a> &gt; <span class="el_source">AbstractStoreBrokerFactory.java</span></div><h1>AbstractStoreBrokerFactory.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.abstractstore;
+
+import java.security.AccessController;
+import java.util.Map;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.kernel.AbstractBrokerFactory;
+import org.apache.openjpa.kernel.Bootstrap;
+import org.apache.openjpa.kernel.BrokerFactory;
+import org.apache.openjpa.kernel.StoreManager;
+import org.apache.openjpa.lib.conf.ConfigurationProvider;
+import org.apache.openjpa.lib.conf.Configurations;
+import org.apache.openjpa.lib.conf.ProductDerivations;
+import org.apache.openjpa.lib.util.J2DoPrivHelper;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.util.UserException;
+
+/**
+ * {@link BrokerFactory} implementation for use with the
+ * {@link AbstractStoreManager}. This provides integration into the
+ * {@link Bootstrap#getBrokerFactory()} bootstrapping mechanism, to facilitate
+ * the process of creating a subclass of {@link AbstractStoreManager}. New
+ * store manager implementations need not extend this class. Instead, set the
+ * &lt;code&gt;openjpa.BrokerFactory&lt;/code&gt; configuration property to
+ * &lt;code&gt;abstractstore&lt;/code&gt;,
+ * and set the &lt;code&gt;openjpa.abstractstore.AbstractStoreManager&lt;/code&gt;
+ * configuration property to the full class name of your implementation.
+ *  Additionally, you can optionally create your own
+ * &lt;code&gt;BrokerFactory&lt;/code&gt; implementation. However, we recommend that you
+ * use the &lt;code&gt;AbstractStoreBrokerFactory&lt;/code&gt;, as it deals with pooling
+ * and bootstrapping from a {@link Map} object (the strategy used by
+ * {@link Bootstrap} to create a factory in a vendor-neutral manner).
+ */
+public class AbstractStoreBrokerFactory
+    extends AbstractBrokerFactory {
+
+    
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * The property name under which to name the concrete store manager
+     * class for this runtime.
+     */
+    private static final String PROP_ABSTRACT_STORE =
+        &quot;abstractstore.AbstractStoreManager&quot;;
+
+<span class="nc" id="L65">    private static final Localizer s_loc = Localizer.forPackage</span>
+<span class="nc" id="L66">        (AbstractStoreBrokerFactory.class);</span>
+
+<span class="nc" id="L68">    private String _storeCls = null;</span>
+<span class="nc" id="L69">    private String _storeProps = null;</span>
+<span class="nc" id="L70">    private String _platform = null;</span>
+
+    /**
+     * Factory method for obtaining a possibly-pooled {@link BrokerFactory}
+     * from properties. Invoked from {@link Bootstrap#getBrokerFactory()}.
+     */
+    public static AbstractStoreBrokerFactory getInstance(
+        ConfigurationProvider cp) {
+<span class="nc" id="L78">        Object key = toPoolKey(cp.getProperties());</span>
+<span class="nc" id="L79">        AbstractStoreBrokerFactory factory = (AbstractStoreBrokerFactory)</span>
+<span class="nc" id="L80">            getPooledFactoryForKey(key);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (factory != null)</span>
+<span class="nc" id="L82">            return factory;</span>
+
+<span class="nc" id="L84">        factory = newInstance(cp);</span>
+<span class="nc" id="L85">        AbstractBrokerFactory.pool(key, factory);</span>
+<span class="nc" id="L86">        return factory;</span>
+    }
+
+    /**
+     * Factory method for constructing a {@link BrokerFactory}
+     * from properties. Invoked from {@link Bootstrap#newBrokerFactory()}.
+     */
+    public static AbstractStoreBrokerFactory newInstance
+        (ConfigurationProvider cp) {
+        // use a tmp store manager to get metadata about the capabilities of
+        // this runtime
+<span class="nc" id="L97">        Map map = cp.getProperties();</span>
+<span class="nc" id="L98">        String storePlugin = (String) map.get(ProductDerivations</span>
+<span class="nc" id="L99">            .getConfigurationKey(PROP_ABSTRACT_STORE, map));</span>
+<span class="nc" id="L100">        String storeCls = Configurations.getClassName(storePlugin);</span>
+<span class="nc" id="L101">        String storeProps = Configurations.getProperties(storePlugin);</span>
+<span class="nc" id="L102">        AbstractStoreManager store = createStoreManager(storeCls,</span>
+            storeProps);
+
+        // populate configuration
+<span class="nc" id="L106">        OpenJPAConfiguration conf = store.newConfiguration();</span>
+<span class="nc" id="L107">        cp.setInto(conf);</span>
+<span class="nc" id="L108">        conf.supportedOptions().removeAll(store.getUnsupportedOptions());</span>
+
+        // create and pool a new factory
+<span class="nc" id="L111">        return new AbstractStoreBrokerFactory(conf, storeCls, storeProps,</span>
+<span class="nc" id="L112">            store.getPlatform());</span>
+    }
+
+    /**
+     * Construct the factory with the given settings.
+     */
+    protected AbstractStoreBrokerFactory(OpenJPAConfiguration conf,
+        String storeCls, String storeProps, String platform) {
+<span class="nc" id="L120">        super(conf);</span>
+<span class="nc" id="L121">        _storeCls = storeCls;</span>
+<span class="nc" id="L122">        _storeProps = storeProps;</span>
+<span class="nc" id="L123">        _platform = platform;</span>
+<span class="nc" id="L124">    }</span>
+
+    @Override
+    public Map&lt;String,Object&gt; getProperties() {
+<span class="nc" id="L128">        Map&lt;String,Object&gt; props = super.getProperties();</span>
+<span class="nc" id="L129">        props.put(&quot;Platform&quot;, _platform);</span>
+<span class="nc" id="L130">        return props;</span>
+    }
+
+    @Override
+    protected StoreManager newStoreManager() {
+<span class="nc" id="L135">        return createStoreManager(_storeCls, _storeProps);</span>
+    }
+
+    private static AbstractStoreManager createStoreManager(String cls,
+        String props) {
+<span class="nc" id="L140">        AbstractStoreManager store =</span>
+<span class="nc" id="L141">            (AbstractStoreManager) Configurations.newInstance(cls,</span>
+<span class="nc" id="L142">                AccessController.doPrivileged(J2DoPrivHelper</span>
+<span class="nc" id="L143">                    .getClassLoaderAction(AbstractStoreManager.class)));</span>
+<span class="nc" id="L144">        Configurations.configureInstance(store, null, props,</span>
+            PROP_ABSTRACT_STORE);
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        if (store == null)</span>
+<span class="nc" id="L147">            throw new UserException(s_loc.get(&quot;no-store-manager&quot;,</span>
+<span class="nc" id="L148">                PROP_ABSTRACT_STORE)).setFatal(true);</span>
+
+<span class="nc" id="L150">        return store;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

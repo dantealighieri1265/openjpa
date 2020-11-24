@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PartitionedDataCache.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.datacache</a> &gt; <span class="el_source">PartitionedDataCache.java</span></div><h1>PartitionedDataCache.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.datacache;
+
+import java.lang.reflect.Array;
+import java.security.AccessController;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.openjpa.lib.conf.PluginListValue;
+import org.apache.openjpa.lib.conf.Value;
+import org.apache.openjpa.lib.util.J2DoPrivHelper;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.util.UserException;
+
+/**
+ * A partitioned data cache maintains a set of partitions that are DataCache themselves.
+ * Each of the partitioned DataCaches can be individually configured.
+ * However, all partitions must be of the same type. By default, this cache uses
+ * {@linkplain ConcurrentDataCache} as its partitions.
+ * &lt;br&gt;
+ * This cache can be configured as a plug-in as follows:
+ * &lt;br&gt;
+ * &lt;code&gt;&amp;lt;property name='openjpa.DataCache&quot;
+ *         value=&quot;partitioned(name=X, PartitionType=concurrent,Partitions='(name=a,cacheSize=100),
+ *         (name=b,cacheSize=200)')&lt;/code&gt;
+ * &lt;br&gt;
+ * Notice that the individual partition properties are enclosed parentheses, separated by comma
+ * and finally the whole property string is enclosed in single quote.
+ * Each partition must have a non-empty name that are unique among the partitions.
+ * The {@linkplain CacheDistributionPolicy policy} can return
+ * the name of a partition to distribute the managed instances to be cached in respective partition.
+ *
+ * The above configuration will configure a partitioned cache named &lt;code&gt;X&lt;/code&gt; with two partitions named
+ * &lt;code&gt;a&lt;/code&gt; and &lt;code&gt;b&lt;/code&gt; with cache size &lt;code&gt;100&lt;/code&gt; and &lt;code&gt;200&lt;/code&gt; respectively.
+ * Besides the two partitions, this cache instance itself can store data and referred by its own name
+ * (&lt;code&gt;X&lt;/code&gt; in the above example).
+ * &lt;br&gt;
+ *
+ * @author Pinaki Poddar
+ *
+ * @since 2.0.0
+ */
+<span class="nc" id="L64">public class PartitionedDataCache extends ConcurrentDataCache {</span>
+    private static final long serialVersionUID = 1L;
+<span class="nc" id="L66">    private static final Localizer _loc = Localizer.forPackage(PartitionedDataCache.class);</span>
+<span class="nc" id="L67">    private Class&lt;? extends DataCache&gt; _type = ConcurrentDataCache.class;</span>
+<span class="nc" id="L68">    private final List&lt;String&gt; _partProperties = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L69">    private final Map&lt;String, DataCache&gt; _partitions = new HashMap&lt;&gt;();</span>
+
+    @Override
+    public void initialize(DataCacheManager mgr) {
+<span class="nc" id="L73">        super.initialize(mgr);</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        for(DataCache part : _partitions.values()){</span>
+<span class="nc" id="L75">            part.initialize(mgr);</span>
+<span class="nc" id="L76">        }</span>
+<span class="nc" id="L77">    }</span>
+    /**
+     * Sets the type of the partitions.
+     * Each partition is a DataCache itself.
+     *
+     * @param type the name of the type that implements {@linkplain DataCache} interface.
+     * Aliases such as &lt;code&gt;&quot;concurrent&quot;&lt;/code&gt; is also recognized.
+     *
+     * @throws Exception if the given type is not resolvable to a loadable type.
+     */
+    public void setPartitionType(String type) throws Exception {
+<span class="nc" id="L88">        Value value = conf.getValue(&quot;DataCache&quot;);</span>
+<span class="nc" id="L89">        ClassLoader ctxLoader = AccessController.doPrivileged(J2DoPrivHelper.getContextClassLoaderAction());</span>
+<span class="nc" id="L90">        ClassLoader loader = conf.getClassResolverInstance().getClassLoader(null, ctxLoader);</span>
+<span class="nc" id="L91">        _type = (Class&lt;? extends DataCache&gt;) AccessController.doPrivileged(</span>
+<span class="nc" id="L92">                J2DoPrivHelper.getForNameAction(value.unalias(type), true, loader));</span>
+<span class="nc" id="L93">    }</span>
+
+    /**
+     * Set partitions from a String configuration.
+     *
+     * @param parts a String of the form &lt;code&gt;(p1, p2, p3)&lt;/code&gt; where p1, p2 etc. itself are plug-in strings
+     * for individual Data Cache configuration.
+     */
+    public void setPartitions(String parts) {
+<span class="nc" id="L102">        _partProperties.clear();</span>
+<span class="nc" id="L103">        parsePartitionProperties(parts);</span>
+<span class="nc" id="L104">        PluginListValue partitions = new PluginListValue(&quot;partitions&quot;);</span>
+<span class="nc" id="L105">        String[] types = (String[])Array.newInstance(String.class, _partProperties.size());</span>
+<span class="nc" id="L106">        Arrays.fill(types, _type.getName());</span>
+<span class="nc" id="L107">        partitions.setClassNames(types);</span>
+<span class="nc" id="L108">        partitions.setProperties(_partProperties.toArray(new String[_partProperties.size()]));</span>
+<span class="nc" id="L109">        DataCache[] array = (DataCache[])partitions.instantiate(_type, conf);</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        for (DataCache part : array) {</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (part.getName() == null)</span>
+<span class="nc" id="L112">                throw new UserException(_loc.get(&quot;partition-cache-null-partition&quot;, parts));</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">            if (_partitions.containsKey(part.getName()))</span>
+<span class="nc" id="L114">                throw new UserException(_loc.get(&quot;partition-cache-duplicate-partition&quot;, part.getName(), parts));</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">            if (part.getName().equals(DataCache.NAME_DEFAULT))</span>
+<span class="nc" id="L116">                throw new UserException(_loc.get(&quot;partition-cache-default-partition&quot;, part.getName(), parts));</span>
+<span class="nc" id="L117">            _partitions.put(part.getName(), part);</span>
+        }
+<span class="nc" id="L119">    }</span>
+
+    /**
+     * Returns the individual partition configuration properties.
+     */
+    public List&lt;String&gt; getPartitions() {
+<span class="nc" id="L125">        return _partProperties;</span>
+    }
+
+    @Override
+    public DataCache getPartition(String name, boolean create) {
+<span class="nc" id="L130">        return _partitions.get(name);</span>
+    }
+
+    /**
+     * Gets the name of the configured partitions.
+     */
+    @Override
+    public Set&lt;String&gt; getPartitionNames() {
+<span class="nc" id="L138">        return _partitions.keySet();</span>
+    }
+
+    /**
+     * Always returns true.
+     */
+    @Override
+    public final boolean isPartitioned() {
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        return !_partitions.isEmpty();</span>
+    }
+
+    @Override
+    public void endConfiguration() {
+<span class="nc bnc" id="L151" title="All 2 branches missed.">        if (!isPartitioned())</span>
+<span class="nc" id="L152">            conf.getConfigurationLog().warn(_loc.get(&quot;partition-cache-no-config&quot;));</span>
+<span class="nc" id="L153">    }</span>
+
+    /**
+     * Parses property string of the form &lt;code&gt;(p1),(p2),(p3)&lt;/code&gt; to produce a list of
+     * &lt;code&gt;p1&lt;/code&gt;, &lt;code&gt;p2&lt;/code&gt; and &lt;code&gt;p3&lt;/code&gt;. The component strings
+     * &lt;code&gt;p1&lt;/code&gt; etc. must be enclosed in parentheses and separated by comma.
+     * plug-in string to produce a list of
+     *
+     * @param properties property string of the form &lt;code&gt;(p1),(p2),(p3)&lt;/code&gt;
+     */
+    private void parsePartitionProperties(String full) {
+<span class="nc" id="L164">        String properties = new String(full);</span>
+        while (true) {
+<span class="nc bnc" id="L166" title="All 2 branches missed.">            if (properties == null)</span>
+<span class="nc" id="L167">                break;</span>
+<span class="nc" id="L168">            properties = properties.trim();</span>
+<span class="nc bnc" id="L169" title="All 2 branches missed.">            if (properties.length() == 0)</span>
+<span class="nc" id="L170">                break;</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">            if (properties.startsWith(&quot;,&quot;)) {</span>
+<span class="nc" id="L172">                properties = properties.substring(1);</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">            } else if (!_partProperties.isEmpty()) {</span>
+<span class="nc" id="L174">                throw new UserException(_loc.get(&quot;partition-cache-parse-error-comma&quot;, full, properties));</span>
+            }
+<span class="nc bnc" id="L176" title="All 4 branches missed.">            if (properties.startsWith(&quot;(&quot;) &amp;&amp; properties.endsWith(&quot;)&quot;)) {</span>
+<span class="nc" id="L177">                int i = properties.indexOf(&quot;)&quot;);</span>
+<span class="nc" id="L178">                String p = properties.substring(1,i); // exclude the end parentheses</span>
+<span class="nc" id="L179">                _partProperties.add(p);</span>
+<span class="nc bnc" id="L180" title="All 2 branches missed.">                 if (i &lt; properties.length()-1) {</span>
+<span class="nc" id="L181">                    properties = properties.substring(i+1);</span>
+                 } else {
+                     break;
+                 }
+<span class="nc" id="L185">            } else {</span>
+<span class="nc" id="L186">                throw new UserException(_loc.get(&quot;partition-cache-parse-error-paren&quot;, full, properties));</span>
+            }
+        }
+<span class="nc" id="L189">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

@@ -1,0 +1,478 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Extensions.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.meta</a> &gt; <span class="el_source">Extensions.java</span></div><h1>Extensions.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.meta;
+
+import java.io.Serializable;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.lib.log.Log;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.StringDistance;
+import org.apache.openjpa.lib.util.StringUtil;
+
+
+/**
+ * Vendor extensions. This class is thread safe for reads, but not for
+ * mutations.
+ *
+ * @author Abe White
+ */
+<span class="nc" id="L43">public abstract class Extensions</span>
+    implements Serializable {
+
+    
+    private static final long serialVersionUID = 1L;
+
+    public static final String OPENJPA = &quot;openjpa&quot;;
+
+<span class="nc" id="L51">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L52">        (Extensions.class);</span>
+
+<span class="nc" id="L54">    private Map _exts = null;</span>
+<span class="nc" id="L55">    private Map _embed = null;</span>
+
+    /**
+     * Return true if there are no keys for any vendor.
+     */
+    public boolean isEmpty() {
+<span class="nc bnc" id="L61" title="All 6 branches missed.">        return (_exts == null || _exts.isEmpty())</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">            &amp;&amp; (_embed == null || _embed.isEmpty());</span>
+    }
+
+    /**
+     * Return all vendors who have extension keys at this level.
+     */
+    public String[] getExtensionVendors() {
+<span class="nc bnc" id="L69" title="All 4 branches missed.">        if (_exts == null || _exts.isEmpty())</span>
+<span class="nc" id="L70">            return new String[0];</span>
+
+<span class="nc" id="L72">        Set vendors = new TreeSet();</span>
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        for (Iterator itr = _exts.keySet().iterator(); itr.hasNext();)</span>
+<span class="nc" id="L74">            vendors.add(getVendor(itr.next()));</span>
+<span class="nc" id="L75">        return (String[]) vendors.toArray(new String[vendors.size()]);</span>
+    }
+
+    /**
+     * Return all extension keys.
+     */
+    public String[] getExtensionKeys() {
+<span class="nc" id="L82">        return getExtensionKeys(OPENJPA);</span>
+    }
+
+    /**
+     * Return all extension keys for the given vendor.
+     */
+    public String[] getExtensionKeys(String vendor) {
+<span class="nc bnc" id="L89" title="All 4 branches missed.">        if (_exts == null || _exts.isEmpty())</span>
+<span class="nc" id="L90">            return new String[0];</span>
+
+<span class="nc" id="L92">        Collection keys = new TreeSet();</span>
+        Object key;
+<span class="nc bnc" id="L94" title="All 2 branches missed.">        for (Iterator itr = _exts.keySet().iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L95">            key = itr.next();</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">            if (vendor.equals(getVendor(key)))</span>
+<span class="nc" id="L97">                keys.add(getKey(key));</span>
+        }
+<span class="nc" id="L99">        return (String[]) keys.toArray(new String[keys.size()]);</span>
+    }
+
+    /**
+     * Return true if the extension with the given key exists.
+     */
+    public boolean hasExtension(String key) {
+<span class="nc" id="L106">        return hasExtension(OPENJPA, key);</span>
+    }
+
+    /**
+     * Return true if the extension with the given key exists.
+     */
+    public boolean hasExtension(String vendor, String key) {
+<span class="nc bnc" id="L113" title="All 4 branches missed.">        return _exts != null &amp;&amp; _exts.containsKey(getHashKey(vendor, key));</span>
+    }
+
+    /**
+     * Add a vendor extension to this entity.
+     */
+    public void addExtension(String key, Object value) {
+<span class="nc" id="L120">        addExtension(OPENJPA, key, value);</span>
+<span class="nc" id="L121">    }</span>
+
+    /**
+     * Add a vendor extension to this entity.
+     */
+    public void addExtension(String vendor, String key, Object value) {
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        if (_exts == null)</span>
+<span class="nc" id="L128">            _exts = new HashMap();</span>
+<span class="nc" id="L129">        _exts.put(getHashKey(vendor, key), value);</span>
+<span class="nc" id="L130">    }</span>
+
+    /**
+     * Remove a vendor extension.
+     */
+    public boolean removeExtension(String key) {
+<span class="nc" id="L136">        return removeExtension(OPENJPA, key);</span>
+    }
+
+    /**
+     * Remove a vendor extension.
+     */
+    public boolean removeExtension(String vendor, String key) {
+<span class="nc bnc" id="L143" title="All 4 branches missed.">        if (_exts != null &amp;&amp; _exts.remove(getHashKey(vendor, key)) != null) {</span>
+<span class="nc" id="L144">            removeEmbeddedExtensions(key);</span>
+<span class="nc" id="L145">            return true;</span>
+        }
+<span class="nc" id="L147">        return false;</span>
+    }
+
+    /**
+     * Get the value of an extension.
+     */
+    public Object getObjectExtension(String key) {
+<span class="nc" id="L154">        return getObjectExtension(OPENJPA, key);</span>
+    }
+
+    /**
+     * Get the value of an extension.
+     */
+    public Object getObjectExtension(String vendor, String key) {
+<span class="nc bnc" id="L161" title="All 2 branches missed.">        if (_exts == null)</span>
+<span class="nc" id="L162">            return null;</span>
+<span class="nc" id="L163">        return _exts.get(getHashKey(vendor, key));</span>
+    }
+
+    /**
+     * Get the value as a string.
+     */
+    public String getStringExtension(String key) {
+<span class="nc" id="L170">        return getStringExtension(OPENJPA, key);</span>
+    }
+
+    /**
+     * Get the value as a string.
+     */
+    public String getStringExtension(String vendor, String key) {
+<span class="nc" id="L177">        Object val = getObjectExtension(vendor, key);</span>
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        return (val == null) ? null : val.toString();</span>
+    }
+
+    /**
+     * Get the value as an int.
+     */
+    public int getIntExtension(String key) {
+<span class="nc" id="L185">        return getIntExtension(OPENJPA, key);</span>
+    }
+
+    /**
+     * Get the value as an int.
+     */
+    public int getIntExtension(String vendor, String key) {
+<span class="nc" id="L192">        String str = getStringExtension(vendor, key);</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        return (str == null) ? 0 : Integer.parseInt(str);</span>
+    }
+
+    /**
+     * Get the value as a double.
+     */
+    public double getDoubleExtension(String key) {
+<span class="nc" id="L200">        return getDoubleExtension(OPENJPA, key);</span>
+    }
+
+    /**
+     * Get the value as a double.
+     */
+    public double getDoubleExtension(String vendor, String key) {
+<span class="nc" id="L207">        String str = getStringExtension(vendor, key);</span>
+<span class="nc bnc" id="L208" title="All 2 branches missed.">        return (str == null) ? 0D : Double.parseDouble(str);</span>
+    }
+
+    /**
+     * Get the value as a boolean.
+     */
+    public boolean getBooleanExtension(String key) {
+<span class="nc" id="L215">        return getBooleanExtension(OPENJPA, key);</span>
+    }
+
+    /**
+     * Get the value as a boolean.
+     */
+    public boolean getBooleanExtension(String vendor, String key) {
+<span class="nc" id="L222">        String str = getStringExtension(vendor, key);</span>
+<span class="nc bnc" id="L223" title="All 2 branches missed.">        return (str == null) ? false : Boolean.valueOf(str).booleanValue();</span>
+    }
+
+    /**
+     * Return the embedded extensions under the given key.
+     */
+    public Extensions getEmbeddedExtensions(String key, boolean create) {
+<span class="nc" id="L230">        return getEmbeddedExtensions(OPENJPA, key, create);</span>
+    }
+
+    /**
+     * Return the embedded extensions under the given key.
+     */
+    public Extensions getEmbeddedExtensions(String vendor, String key,
+        boolean create) {
+<span class="nc bnc" id="L238" title="All 4 branches missed.">        if (_embed == null &amp;&amp; !create)</span>
+<span class="nc" id="L239">            return null;</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        if (_embed == null)</span>
+<span class="nc" id="L241">            _embed = new HashMap();</span>
+
+<span class="nc" id="L243">        Object hk = getHashKey(vendor, key);</span>
+<span class="nc" id="L244">        Extensions exts = (Extensions) _embed.get(hk);</span>
+<span class="nc bnc" id="L245" title="All 4 branches missed.">        if (exts == null &amp;&amp; !create)</span>
+<span class="nc" id="L246">            return null;</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        if (exts == null) {</span>
+<span class="nc" id="L248">            exts = new EmbeddedExtensions(this);</span>
+<span class="nc" id="L249">            _embed.put(hk, exts);</span>
+
+            // required to recognize embedded extensions without values
+<span class="nc bnc" id="L252" title="All 2 branches missed.">            if (_exts == null)</span>
+<span class="nc" id="L253">                _exts = new HashMap();</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">            if (!_exts.containsKey(hk))</span>
+<span class="nc" id="L255">                _exts.put(hk, null);</span>
+        }
+<span class="nc" id="L257">        return exts;</span>
+    }
+
+    public boolean removeEmbeddedExtensions(String key) {
+<span class="nc" id="L261">        return removeEmbeddedExtensions(OPENJPA, key);</span>
+    }
+
+    public boolean removeEmbeddedExtensions(String vendor, String key) {
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        return _embed != null</span>
+<span class="nc bnc" id="L266" title="All 2 branches missed.">            &amp;&amp; _embed.remove(getHashKey(vendor, key)) != null;</span>
+    }
+
+    /**
+     * Copy the extensions not present in this instance but present in the
+     * given instance.
+     */
+    protected void copy(Extensions exts) {
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        if (exts.isEmpty())</span>
+<span class="nc" id="L275">            return;</span>
+
+<span class="nc bnc" id="L277" title="All 4 branches missed.">        if (exts._exts != null &amp;&amp; !exts._exts.isEmpty()) {</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">            if (_exts == null)</span>
+<span class="nc" id="L279">                _exts = new HashMap();</span>
+
+            Map.Entry entry;
+<span class="nc" id="L282">            for (Iterator itr = exts._exts.entrySet().iterator();</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">                itr.hasNext();) {</span>
+<span class="nc" id="L284">                entry = (Map.Entry) itr.next();</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">                if (!_exts.containsKey(entry.getKey()))</span>
+<span class="nc" id="L286">                    _exts.put(entry.getKey(), entry.getValue());</span>
+            }
+        }
+
+<span class="nc bnc" id="L290" title="All 4 branches missed.">        if (exts._embed != null &amp;&amp; !exts._embed.isEmpty()) {</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">            if (_embed == null)</span>
+<span class="nc" id="L292">                _embed = new HashMap();</span>
+
+            Map.Entry entry;
+            Extensions embedded;
+<span class="nc" id="L296">            for (Iterator itr = exts._embed.entrySet().iterator();</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">                itr.hasNext();) {</span>
+<span class="nc" id="L298">                entry = (Map.Entry) itr.next();</span>
+<span class="nc" id="L299">                embedded = (Extensions) _embed.get(entry.getKey());</span>
+<span class="nc bnc" id="L300" title="All 2 branches missed.">                if (embedded == null) {</span>
+<span class="nc" id="L301">                    embedded = new EmbeddedExtensions(this);</span>
+<span class="nc" id="L302">                    _embed.put(entry.getKey(), embedded);</span>
+                }
+<span class="nc" id="L304">                embedded.copy((Extensions) entry.getValue());</span>
+            }
+        }
+<span class="nc" id="L307">    }</span>
+
+    /**
+     * Helper method to issue warnings for any extensions that we
+     * recognize but do not use.
+     *
+     * @since 0.3.1.3
+     */
+    public void validateExtensionKeys() {
+<span class="nc bnc" id="L316" title="All 4 branches missed.">        if (_exts == null || _exts.isEmpty())</span>
+<span class="nc" id="L317">            return;</span>
+
+<span class="nc" id="L319">        OpenJPAConfiguration conf = getRepository().getConfiguration();</span>
+<span class="nc" id="L320">        Log log = conf.getLog(OpenJPAConfiguration.LOG_METADATA);</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">        if (!log.isWarnEnabled())</span>
+<span class="nc" id="L322">            return;</span>
+
+<span class="nc" id="L324">        Collection validNames = new TreeSet();</span>
+<span class="nc" id="L325">        addExtensionKeys(validNames);</span>
+
+        // this is where we store things like &quot;jdbc-&quot; for a
+        // prefix for an extension name that we won't validate; that
+        // way a new vendor could theoretically add in their
+        // own prefix into the localizer.properties file and
+        // not have to issue warnings for their extensions
+<span class="nc" id="L332">        String prefixes = _loc.get(&quot;extension-datastore-prefix&quot;).getMessage();</span>
+<span class="nc" id="L333">        String[] allowedPrefixes = null;</span>
+<span class="nc bnc" id="L334" title="All 2 branches missed.">        if (prefixes != null)</span>
+<span class="nc" id="L335">            allowedPrefixes = StringUtil.split(prefixes, &quot;,&quot;, 0);</span>
+
+        Object next;
+        String key;
+        outer:
+<span class="nc bnc" id="L340" title="All 2 branches missed.">        for (Iterator itr = _exts.keySet().iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L341">            next = itr.next();</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">            if (!OPENJPA.equals(getVendor(next)))</span>
+<span class="nc" id="L343">                continue;</span>
+<span class="nc" id="L344">            key = getKey(next);</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">            if (validNames.contains(key))</span>
+<span class="nc" id="L346">                continue;</span>
+
+<span class="nc bnc" id="L348" title="All 2 branches missed.">            if (allowedPrefixes != null) {</span>
+<span class="nc bnc" id="L349" title="All 2 branches missed.">                for (int j = 0; j &lt; allowedPrefixes.length; j++) {</span>
+<span class="nc bnc" id="L350" title="All 2 branches missed.">                    if (key.startsWith(allowedPrefixes[j])</span>
+                        &amp;&amp; !validateDataStoreExtensionPrefix
+<span class="nc bnc" id="L352" title="All 2 branches missed.">                        (allowedPrefixes[j]))</span>
+<span class="nc" id="L353">                        continue outer;</span>
+                }
+            }
+
+            // try to determine if there are any other names that are
+            // similiar to this one, so we can add in a hint
+<span class="nc" id="L359">            String closestName = StringDistance.getClosestLevenshteinDistance</span>
+<span class="nc" id="L360">                (key, validNames, 0.5f);</span>
+
+<span class="nc bnc" id="L362" title="All 2 branches missed.">            if (closestName == null)</span>
+<span class="nc" id="L363">                log.warn(_loc.get(&quot;unrecognized-extension&quot;, this,</span>
+                    key, validNames));
+            else
+<span class="nc" id="L366">                log.warn(_loc.get(&quot;unrecognized-extension-hint&quot;,</span>
+                    new Object[]{ this, key, validNames, closestName }));
+<span class="nc" id="L368">        }</span>
+<span class="nc" id="L369">    }</span>
+
+    /**
+     * Add all the known extension keys to the specified collection; any
+     * implementation that utilized new extensions should override this
+     * method to include both the known extensions of its superclass as well
+     * as its own extension keys.
+     *
+     * @since 0.3.1.3
+     */
+    protected void addExtensionKeys(Collection exts) {
+        // no extensions by default
+<span class="nc" id="L381">    }</span>
+
+    /**
+     * Return true if extensions starting with the given official datastore
+     * prefix should be validated for this runtime.
+     */
+    protected boolean validateDataStoreExtensionPrefix(String prefix) {
+<span class="nc" id="L388">        return false;</span>
+    }
+
+    /**
+     * Return the metadata repository.
+     */
+    public abstract MetaDataRepository getRepository();
+
+    /**
+     * Create a hash key for the given vendor/key combo.
+     */
+    private Object getHashKey(String vendor, String key) {
+<span class="nc bnc" id="L400" title="All 2 branches missed.">        if (OPENJPA.equals(vendor))</span>
+<span class="nc" id="L401">            return key;</span>
+<span class="nc" id="L402">        return new HashKey(vendor, key);</span>
+    }
+
+    /**
+     * Extract the vendor from the given hash key.
+     */
+    private String getVendor(Object hashKey) {
+<span class="nc bnc" id="L409" title="All 2 branches missed.">        return (hashKey instanceof String) ? OPENJPA :</span>
+<span class="nc" id="L410">            ((HashKey) hashKey).vendor;</span>
+    }
+
+    /**
+     * Extract the key from the given hash key.
+     */
+    private String getKey(Object hashKey) {
+<span class="nc bnc" id="L417" title="All 2 branches missed.">        return (hashKey instanceof String) ? (String) hashKey</span>
+<span class="nc" id="L418">            : ((HashKey) hashKey).key;</span>
+    }
+
+    /**
+     * Key class.
+     */
+    private static class HashKey
+        implements Serializable {
+
+        
+        private static final long serialVersionUID = 1L;
+        public final String vendor;
+        public final String key;
+
+<span class="nc" id="L432">        public HashKey(String vendor, String key) {</span>
+<span class="nc" id="L433">            this.vendor = vendor;</span>
+<span class="nc" id="L434">            this.key = key;</span>
+<span class="nc" id="L435">        }</span>
+
+        @Override
+        public int hashCode() {
+<span class="nc" id="L439">            int i = 0;</span>
+<span class="nc bnc" id="L440" title="All 2 branches missed.">            if (vendor != null)</span>
+<span class="nc" id="L441">                i = vendor.hashCode();</span>
+<span class="nc bnc" id="L442" title="All 2 branches missed.">            if (key != null)</span>
+<span class="nc" id="L443">                i += 17 * key.hashCode();</span>
+<span class="nc" id="L444">            return i;</span>
+        }
+
+        @Override
+        public boolean equals(Object other) {
+<span class="nc bnc" id="L449" title="All 2 branches missed.">            if (other == this)</span>
+<span class="nc" id="L450">                return true;</span>
+<span class="nc" id="L451">            HashKey hk = (HashKey) other;</span>
+<span class="nc bnc" id="L452" title="All 2 branches missed.">            return Objects.equals(vendor, hk.vendor)</span>
+<span class="nc bnc" id="L453" title="All 2 branches missed.">                &amp;&amp; Objects.equals(key, hk.key);</span>
+        }
+    }
+
+    /**
+     * Embedded extensions implementation.
+     */
+    private static class EmbeddedExtensions
+        extends Extensions {
+
+        
+        private static final long serialVersionUID = 1L;
+        private final Extensions _parent;
+
+<span class="nc" id="L467">        public EmbeddedExtensions(Extensions parent) {</span>
+<span class="nc" id="L468">            _parent = parent;</span>
+<span class="nc" id="L469">        }</span>
+
+        @Override
+        public MetaDataRepository getRepository ()
+		{
+<span class="nc" id="L474">			return _parent.getRepository ();</span>
+		}
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

@@ -1,0 +1,1675 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DelegatingBroker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">DelegatingBroker.java</span></div><h1>DelegatingBroker.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.util.BitSet;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.ee.ManagedRuntime;
+import org.apache.openjpa.event.LifecycleEventManager;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.FieldMetaData;
+import org.apache.openjpa.meta.ValueMetaData;
+import org.apache.openjpa.util.Exceptions;
+import org.apache.openjpa.util.OpenJPAException;
+import org.apache.openjpa.util.RuntimeExceptionTranslator;
+
+///////////////////////////////////////////////////////////////
+// NOTE: when adding a public API method, be sure to add it to
+// JDO and JPA facades!
+///////////////////////////////////////////////////////////////
+
+/**
+ * Delegating broker that can also perform exception translation
+ * for use in facades.
+ *
+ * @since 0.4.0
+ * @author Abe White
+ */
+public class DelegatingBroker
+    implements Broker {
+
+    private final Broker _broker;
+    private final DelegatingBroker _del;
+    private final RuntimeExceptionTranslator _trans;
+
+    /**
+     * Constructor; supply delegate.
+     */
+    public DelegatingBroker(Broker broker) {
+<span class="nc" id="L61">        this(broker, null);</span>
+<span class="nc" id="L62">    }</span>
+
+    /**
+     * Constructor; supply delegate and exception translator.
+     */
+<span class="nc" id="L67">    public DelegatingBroker(Broker broker, RuntimeExceptionTranslator trans) {</span>
+<span class="nc" id="L68">        _broker = broker;</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">        if (broker instanceof DelegatingBroker)</span>
+<span class="nc" id="L70">            _del = (DelegatingBroker) broker;</span>
+        else
+<span class="nc" id="L72">            _del = null;</span>
+<span class="nc" id="L73">        _trans = trans;</span>
+<span class="nc" id="L74">    }</span>
+
+    /**
+     * Return the direct delegate.
+     */
+    public Broker getDelegate() {
+<span class="nc" id="L80">        return _broker;</span>
+    }
+
+    /**
+     * Return the native delegate.
+     */
+    public Broker getInnermostDelegate() {
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        return (_del == null) ? _broker : _del.getInnermostDelegate();</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L92">        return getInnermostDelegate().hashCode();</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L97" title="All 2 branches missed.">        if (other == this)</span>
+<span class="nc" id="L98">            return true;</span>
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        if (other instanceof DelegatingBroker)</span>
+<span class="nc" id="L100">            other = ((DelegatingBroker) other).getInnermostDelegate();</span>
+<span class="nc" id="L101">        return getInnermostDelegate().equals(other);</span>
+    }
+
+    /**
+     * Translate the OpenJPA exception.
+     */
+    protected RuntimeException translate(RuntimeException re) {
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        return (_trans == null) ? re : _trans.translate(re);</span>
+    }
+
+    /**
+     * Translate the exception with the failed object.
+     *
+     * @param re exception raised by the delegate.
+     * @param failed the context that failed.
+     *
+     * @return the translated exception. If the given input exception had not set
+     * the failed instance, then sets the given instance as the failed context.
+     */
+    protected RuntimeException translate(RuntimeException re, Object failed) {
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (re instanceof OpenJPAException) {</span>
+<span class="nc" id="L122">            Object o = ((OpenJPAException) re).getFailedObject();</span>
+<span class="nc bnc" id="L123" title="All 4 branches missed.">            if (o == null || &quot;null&quot;.equals(o)) {</span>
+<span class="nc" id="L124">                ((OpenJPAException) re).setFailedObject(Exceptions.toString(failed));</span>
+            }
+        }
+<span class="nc bnc" id="L127" title="All 2 branches missed.">        return (_trans == null) ? re : _trans.translate(re);</span>
+    }
+
+    @Override
+    public Broker getBroker() {
+<span class="nc" id="L132">        return this;</span>
+    }
+
+    @Override
+    public OpenJPAConfiguration getConfiguration() {
+        try {
+<span class="nc" id="L138">            return _broker.getConfiguration();</span>
+<span class="nc" id="L139">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L140">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration getFetchConfiguration() {
+        try {
+<span class="nc" id="L147">            return _broker.getFetchConfiguration();</span>
+<span class="nc" id="L148">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L149">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration pushFetchConfiguration() {
+        try {
+<span class="nc" id="L156">            return _broker.pushFetchConfiguration();</span>
+<span class="nc" id="L157">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L158">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public FetchConfiguration pushFetchConfiguration(FetchConfiguration fc) {
+        try {
+<span class="nc" id="L165">            return _broker.pushFetchConfiguration(fc);</span>
+<span class="nc" id="L166">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L167">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void popFetchConfiguration() {
+        try {
+<span class="nc" id="L174">            _broker.popFetchConfiguration();</span>
+<span class="nc" id="L175">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L176">            throw translate(re);</span>
+<span class="nc" id="L177">        }</span>
+<span class="nc" id="L178">    }</span>
+
+    @Override
+    public ClassLoader getClassLoader() {
+        try {
+<span class="nc" id="L183">            return _broker.getClassLoader();</span>
+<span class="nc" id="L184">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L185">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public LockManager getLockManager() {
+        try {
+<span class="nc" id="L192">            return _broker.getLockManager();</span>
+<span class="nc" id="L193">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L194">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public DelegatingStoreManager getStoreManager() {
+        try {
+<span class="nc" id="L201">            return _broker.getStoreManager();</span>
+<span class="nc" id="L202">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L203">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public String getConnectionUserName() {
+        try {
+<span class="nc" id="L210">            return _broker.getConnectionUserName();</span>
+<span class="nc" id="L211">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L212">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public String getConnectionPassword() {
+        try {
+<span class="nc" id="L219">            return _broker.getConnectionPassword();</span>
+<span class="nc" id="L220">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L221">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Map&lt;String,Object&gt; getProperties() {
+        try {
+<span class="nc" id="L228">            return _broker.getProperties();</span>
+<span class="nc" id="L229">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L230">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Set&lt;String&gt; getSupportedProperties() {
+        try {
+<span class="nc" id="L237">            return _broker.getSupportedProperties();</span>
+<span class="nc" id="L238">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L239">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Object find(Object oid, boolean validate, FindCallbacks call) {
+        try {
+<span class="nc" id="L246">            return _broker.find(oid, validate, call);</span>
+<span class="nc" id="L247">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L248">            throw translate(re, oid);</span>
+        }
+    }
+
+    @Override
+    public Object[] findAll(Collection oids, boolean validate,
+        FindCallbacks call) {
+        try {
+<span class="nc" id="L256">            return _broker.findAll(oids, validate, call);</span>
+<span class="nc" id="L257">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L258">            throw translate(re, oids);</span>
+        }
+    }
+
+    @Override
+    public Object findCached(Object oid, FindCallbacks call) {
+        try {
+<span class="nc" id="L265">            return _broker.findCached(oid, call);</span>
+<span class="nc" id="L266">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L267">            throw translate(re, oid);</span>
+        }
+    }
+
+    @Override
+    public Object find(Object oid, FetchConfiguration fetch, BitSet exclude,
+        Object edata, int flags) {
+        try {
+<span class="nc" id="L275">            return _broker.find(oid, fetch, exclude, edata, flags);</span>
+<span class="nc" id="L276">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L277">            throw translate(re, oid);</span>
+        }
+    }
+
+    @Override
+    public Object[] findAll(Collection oids, FetchConfiguration fetch,
+        BitSet exclude, Object edata, int flags) {
+        try {
+<span class="nc" id="L285">            return _broker.findAll(oids, fetch, exclude, edata, flags);</span>
+<span class="nc" id="L286">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L287">            throw translate(re, oids);</span>
+        }
+    }
+
+    @Override
+    public Iterator extentIterator(Class cls, boolean subs,
+        FetchConfiguration fetch, boolean ignoreChanges) {
+        try {
+<span class="nc" id="L295">            return _broker.extentIterator(cls, subs, fetch, ignoreChanges);</span>
+<span class="nc" id="L296">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L297">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void retrieve(Object obj, boolean fgOnly, OpCallbacks call) {
+        try {
+<span class="nc" id="L304">            _broker.retrieve(obj, fgOnly, call);</span>
+<span class="nc" id="L305">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L306">            throw translate(re);</span>
+<span class="nc" id="L307">        }</span>
+<span class="nc" id="L308">    }</span>
+
+    @Override
+    public void retrieveAll(Collection objs, boolean fgOnly, OpCallbacks call) {
+        try {
+<span class="nc" id="L313">            _broker.retrieveAll(objs, fgOnly, call);</span>
+<span class="nc" id="L314">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L315">            throw translate(re);</span>
+<span class="nc" id="L316">        }</span>
+<span class="nc" id="L317">    }</span>
+
+    @Override
+    public OpenJPAStateManager embed(Object obj, Object id,
+        OpenJPAStateManager owner, ValueMetaData ownerMeta) {
+        try {
+<span class="nc" id="L323">            return _broker.embed(obj, id, owner, ownerMeta);</span>
+<span class="nc" id="L324">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L325">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Class getObjectIdType(Class cls) {
+        try {
+<span class="nc" id="L332">            return _broker.getObjectIdType(cls);</span>
+<span class="nc" id="L333">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L334">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Object newObjectId(Class cls, Object val) {
+        try {
+<span class="nc" id="L341">            return _broker.newObjectId(cls, val);</span>
+<span class="nc" id="L342">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L343">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Collection getManagedObjects() {
+        try {
+<span class="nc" id="L350">            return _broker.getManagedObjects();</span>
+<span class="nc" id="L351">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L352">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Collection getTransactionalObjects() {
+        try {
+<span class="nc" id="L359">            return _broker.getTransactionalObjects();</span>
+<span class="nc" id="L360">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L361">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Collection getPendingTransactionalObjects() {
+        try {
+<span class="nc" id="L368">            return _broker.getPendingTransactionalObjects();</span>
+<span class="nc" id="L369">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L370">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Collection getDirtyObjects() {
+        try {
+<span class="nc" id="L377">            return _broker.getDirtyObjects();</span>
+<span class="nc" id="L378">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L379">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean getOrderDirtyObjects() {
+        try {
+<span class="nc" id="L386">            return _broker.getOrderDirtyObjects();</span>
+<span class="nc" id="L387">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L388">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setOrderDirtyObjects(boolean order) {
+        try {
+<span class="nc" id="L395">            _broker.setOrderDirtyObjects(order);</span>
+<span class="nc" id="L396">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L397">            throw translate(re);</span>
+<span class="nc" id="L398">        }</span>
+<span class="nc" id="L399">    }</span>
+
+    @Override
+    public Collection getPersistedTypes() {
+        try {
+<span class="nc" id="L404">            return _broker.getPersistedTypes();</span>
+<span class="nc" id="L405">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L406">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Collection getUpdatedTypes() {
+        try {
+<span class="nc" id="L413">            return _broker.getUpdatedTypes();</span>
+<span class="nc" id="L414">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L415">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Collection getDeletedTypes() {
+        try {
+<span class="nc" id="L422">            return _broker.getDeletedTypes();</span>
+<span class="nc" id="L423">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L424">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public OpenJPAStateManager getStateManager(Object obj) {
+        try {
+<span class="nc" id="L431">            return _broker.getStateManager(obj);</span>
+<span class="nc" id="L432">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L433">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public int getLockLevel(Object obj) {
+        try {
+<span class="nc" id="L440">            return _broker.getLockLevel(obj);</span>
+<span class="nc" id="L441">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L442">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Object getVersion(Object obj) {
+        try {
+<span class="nc" id="L449">            return _broker.getVersion(obj);</span>
+<span class="nc" id="L450">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L451">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean isDirty(Object obj) {
+        try {
+<span class="nc" id="L458">            return _broker.isDirty(obj);</span>
+<span class="nc" id="L459">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L460">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean isTransactional(Object obj) {
+        try {
+<span class="nc" id="L467">            return _broker.isTransactional(obj);</span>
+<span class="nc" id="L468">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L469">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean isPersistent(Object obj) {
+        try {
+<span class="nc" id="L476">            return _broker.isPersistent(obj);</span>
+<span class="nc" id="L477">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L478">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean isNew(Object obj) {
+        try {
+<span class="nc" id="L485">            return _broker.isNew(obj);</span>
+<span class="nc" id="L486">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L487">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean isDeleted(Object obj) {
+        try {
+<span class="nc" id="L494">            return _broker.isDeleted(obj);</span>
+<span class="nc" id="L495">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L496">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Object getObjectId(Object obj) {
+        try {
+<span class="nc" id="L503">            return _broker.getObjectId(obj);</span>
+<span class="nc" id="L504">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L505">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean isManaged() {
+        try {
+<span class="nc" id="L512">            return _broker.isManaged();</span>
+<span class="nc" id="L513">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L514">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean isActive() {
+        try {
+<span class="nc" id="L521">            return _broker.isActive();</span>
+<span class="nc" id="L522">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L523">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean isStoreActive() {
+        try {
+<span class="nc" id="L530">            return _broker.isStoreActive();</span>
+<span class="nc" id="L531">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L532">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean hasConnection() {
+        try {
+<span class="nc" id="L539">            return _broker.hasConnection();</span>
+<span class="nc" id="L540">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L541">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Object getConnection() {
+        try {
+<span class="nc" id="L548">            return _broker.getConnection();</span>
+<span class="nc" id="L549">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L550">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void lock() {
+        try {
+<span class="nc" id="L557">            _broker.lock();</span>
+<span class="nc" id="L558">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L559">            throw translate(re);</span>
+<span class="nc" id="L560">        }</span>
+<span class="nc" id="L561">    }</span>
+
+    @Override
+    public void unlock() {
+        try {
+<span class="nc" id="L566">            _broker.unlock();</span>
+<span class="nc" id="L567">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L568">            throw translate(re);</span>
+<span class="nc" id="L569">        }</span>
+<span class="nc" id="L570">    }</span>
+
+    @Override
+    public boolean beginOperation(boolean read) {
+        try {
+<span class="nc" id="L575">            return _broker.beginOperation(read);</span>
+<span class="nc" id="L576">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L577">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean endOperation() {
+        try {
+<span class="nc" id="L584">            return _broker.endOperation();</span>
+<span class="nc" id="L585">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L586">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setImplicitBehavior(OpCallbacks call,
+        RuntimeExceptionTranslator ex) {
+        try {
+<span class="nc" id="L594">            _broker.setImplicitBehavior(call, ex);</span>
+<span class="nc" id="L595">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L596">            throw translate(re);</span>
+<span class="nc" id="L597">        }</span>
+<span class="nc" id="L598">    }</span>
+
+    @Override
+    public BrokerFactory getBrokerFactory() {
+        try {
+<span class="nc" id="L603">            return _broker.getBrokerFactory();</span>
+<span class="nc" id="L604">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L605">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public int getConnectionRetainMode() {
+        try {
+<span class="nc" id="L612">            return _broker.getConnectionRetainMode();</span>
+<span class="nc" id="L613">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L614">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public ManagedRuntime getManagedRuntime() {
+        try {
+<span class="nc" id="L621">            return _broker.getManagedRuntime();</span>
+<span class="nc" id="L622">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L623">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public InverseManager getInverseManager() {
+        try {
+<span class="nc" id="L630">            return _broker.getInverseManager();</span>
+<span class="nc" id="L631">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L632">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean getMultithreaded() {
+        try {
+<span class="nc" id="L639">            return _broker.getMultithreaded();</span>
+<span class="nc" id="L640">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L641">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setMultithreaded(boolean multi) {
+        try {
+<span class="nc" id="L648">            _broker.setMultithreaded(multi);</span>
+<span class="nc" id="L649">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L650">            throw translate(re);</span>
+<span class="nc" id="L651">        }</span>
+<span class="nc" id="L652">    }</span>
+
+    @Override
+    public boolean getIgnoreChanges() {
+        try {
+<span class="nc" id="L657">            return _broker.getIgnoreChanges();</span>
+<span class="nc" id="L658">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L659">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setIgnoreChanges(boolean ignore) {
+        try {
+<span class="nc" id="L666">            _broker.setIgnoreChanges(ignore);</span>
+<span class="nc" id="L667">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L668">            throw translate(re);</span>
+<span class="nc" id="L669">        }</span>
+<span class="nc" id="L670">    }</span>
+
+    @Override
+    public boolean getNontransactionalRead() {
+        try {
+<span class="nc" id="L675">            return _broker.getNontransactionalRead();</span>
+<span class="nc" id="L676">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L677">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setNontransactionalRead(boolean read) {
+        try {
+<span class="nc" id="L684">            _broker.setNontransactionalRead(read);</span>
+<span class="nc" id="L685">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L686">            throw translate(re);</span>
+<span class="nc" id="L687">        }</span>
+<span class="nc" id="L688">    }</span>
+
+    @Override
+    public boolean getNontransactionalWrite() {
+        try {
+<span class="nc" id="L693">            return _broker.getNontransactionalWrite();</span>
+<span class="nc" id="L694">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L695">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setNontransactionalWrite(boolean write) {
+        try {
+<span class="nc" id="L702">            _broker.setNontransactionalWrite(write);</span>
+<span class="nc" id="L703">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L704">            throw translate(re);</span>
+<span class="nc" id="L705">        }</span>
+<span class="nc" id="L706">    }</span>
+
+    @Override
+    public int getRestoreState() {
+        try {
+<span class="nc" id="L711">            return _broker.getRestoreState();</span>
+<span class="nc" id="L712">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L713">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setRestoreState(int restore) {
+        try {
+<span class="nc" id="L720">            _broker.setRestoreState(restore);</span>
+<span class="nc" id="L721">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L722">            throw translate(re);</span>
+<span class="nc" id="L723">        }</span>
+<span class="nc" id="L724">    }</span>
+
+    @Override
+    public boolean getOptimistic() {
+        try {
+<span class="nc" id="L729">            return _broker.getOptimistic();</span>
+<span class="nc" id="L730">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L731">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setOptimistic(boolean opt) {
+        try {
+<span class="nc" id="L738">            _broker.setOptimistic(opt);</span>
+<span class="nc" id="L739">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L740">            throw translate(re);</span>
+<span class="nc" id="L741">        }</span>
+<span class="nc" id="L742">    }</span>
+
+    @Override
+    public boolean getRetainState() {
+        try {
+<span class="nc" id="L747">            return _broker.getRetainState();</span>
+<span class="nc" id="L748">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L749">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setRetainState(boolean retain) {
+        try {
+<span class="nc" id="L756">            _broker.setRetainState(retain);</span>
+<span class="nc" id="L757">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L758">            throw translate(re);</span>
+<span class="nc" id="L759">        }</span>
+<span class="nc" id="L760">    }</span>
+
+    @Override
+    public int getAutoClear() {
+        try {
+<span class="nc" id="L765">            return _broker.getAutoClear();</span>
+<span class="nc" id="L766">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L767">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setAutoClear(int clear) {
+        try {
+<span class="nc" id="L774">            _broker.setAutoClear(clear);</span>
+<span class="nc" id="L775">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L776">            throw translate(re);</span>
+<span class="nc" id="L777">        }</span>
+<span class="nc" id="L778">    }</span>
+
+    @Override
+    public int getAutoDetach() {
+        try {
+<span class="nc" id="L783">            return _broker.getAutoDetach();</span>
+<span class="nc" id="L784">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L785">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setAutoDetach(int flags) {
+        try {
+<span class="nc" id="L792">            _broker.setAutoDetach(flags);</span>
+<span class="nc" id="L793">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L794">            throw translate(re);</span>
+<span class="nc" id="L795">        }</span>
+<span class="nc" id="L796">    }</span>
+
+    @Override
+    public void setAutoDetach(int flag, boolean on) {
+        try {
+<span class="nc" id="L801">            _broker.setAutoDetach(flag, on);</span>
+<span class="nc" id="L802">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L803">            throw translate(re);</span>
+<span class="nc" id="L804">        }</span>
+<span class="nc" id="L805">    }</span>
+
+    @Override
+    public int getDetachState() {
+        try {
+<span class="nc" id="L810">            return _broker.getDetachState();</span>
+<span class="nc" id="L811">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L812">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setDetachState(int mode) {
+        try {
+<span class="nc" id="L819">            _broker.setDetachState(mode);</span>
+<span class="nc" id="L820">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L821">            throw translate(re);</span>
+<span class="nc" id="L822">        }</span>
+<span class="nc" id="L823">    }</span>
+
+    @Override
+    public boolean isDetachedNew() {
+        try {
+<span class="nc" id="L828">            return _broker.isDetachedNew();</span>
+<span class="nc" id="L829">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L830">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setDetachedNew(boolean isNew) {
+        try {
+<span class="nc" id="L837">            _broker.setDetachedNew(isNew);</span>
+<span class="nc" id="L838">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L839">            throw translate(re);</span>
+<span class="nc" id="L840">        }</span>
+<span class="nc" id="L841">    }</span>
+
+    @Override
+    public boolean getSyncWithManagedTransactions() {
+        try {
+<span class="nc" id="L846">            return _broker.getSyncWithManagedTransactions();</span>
+<span class="nc" id="L847">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L848">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setSyncWithManagedTransactions(boolean sync) {
+        try {
+<span class="nc" id="L855">            _broker.setSyncWithManagedTransactions(sync);</span>
+<span class="nc" id="L856">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L857">            throw translate(re);</span>
+<span class="nc" id="L858">        }</span>
+<span class="nc" id="L859">    }</span>
+
+    @Override
+    public boolean getEvictFromDataCache() {
+        try {
+<span class="nc" id="L864">            return _broker.getEvictFromDataCache();</span>
+<span class="nc" id="L865">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L866">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setEvictFromDataCache(boolean evict) {
+        try {
+<span class="nc" id="L873">            _broker.setEvictFromDataCache(evict);</span>
+<span class="nc" id="L874">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L875">            throw translate(re);</span>
+<span class="nc" id="L876">        }</span>
+<span class="nc" id="L877">    }</span>
+
+    @Override
+    public boolean getPopulateDataCache() {
+        try {
+<span class="nc" id="L882">            return _broker.getPopulateDataCache();</span>
+<span class="nc" id="L883">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L884">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setPopulateDataCache(boolean cache) {
+        try {
+<span class="nc" id="L891">            _broker.setPopulateDataCache(cache);</span>
+<span class="nc" id="L892">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L893">            throw translate(re);</span>
+<span class="nc" id="L894">        }</span>
+<span class="nc" id="L895">    }</span>
+
+    @Override
+    public boolean isTrackChangesByType() {
+        try {
+<span class="nc" id="L900">            return _broker.isTrackChangesByType();</span>
+<span class="nc" id="L901">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L902">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setTrackChangesByType(boolean largeTransaction) {
+        try {
+<span class="nc" id="L909">            _broker.setTrackChangesByType(largeTransaction);</span>
+<span class="nc" id="L910">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L911">            throw translate(re);</span>
+<span class="nc" id="L912">        }</span>
+<span class="nc" id="L913">    }</span>
+
+    @Override
+    public Object putUserObject(Object key, Object val) {
+        try {
+<span class="nc" id="L918">            return _broker.putUserObject(key, val);</span>
+<span class="nc" id="L919">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L920">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Object getUserObject(Object key) {
+        try {
+<span class="nc" id="L927">            return _broker.getUserObject(key);</span>
+<span class="nc" id="L928">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L929">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void addTransactionListener(Object listener) {
+        try {
+<span class="nc" id="L936">            _broker.addTransactionListener(listener);</span>
+<span class="nc" id="L937">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L938">            throw translate(re);</span>
+<span class="nc" id="L939">        }</span>
+<span class="nc" id="L940">    }</span>
+
+    @Override
+    public void removeTransactionListener(Object listener) {
+        try {
+<span class="nc" id="L945">            _broker.removeTransactionListener(listener);</span>
+<span class="nc" id="L946">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L947">            throw translate(re);</span>
+<span class="nc" id="L948">        }</span>
+<span class="nc" id="L949">    }</span>
+
+    @Override
+    public Collection&lt;Object&gt; getTransactionListeners() {
+        try {
+<span class="nc" id="L954">            return _broker.getTransactionListeners();</span>
+<span class="nc" id="L955">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L956">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public int getTransactionListenerCallbackMode() {
+        try {
+<span class="nc" id="L963">            return _broker.getTransactionListenerCallbackMode();</span>
+<span class="nc" id="L964">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L965">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setTransactionListenerCallbackMode(int mode) {
+        try {
+<span class="nc" id="L972">            _broker.setTransactionListenerCallbackMode(mode);</span>
+<span class="nc" id="L973">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L974">            throw translate(re);</span>
+<span class="nc" id="L975">        }</span>
+<span class="nc" id="L976">    }</span>
+
+    @Override
+    public void addLifecycleListener(Object listener, Class[] classes) {
+        try {
+<span class="nc" id="L981">            _broker.addLifecycleListener(listener, classes);</span>
+<span class="nc" id="L982">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L983">            throw translate(re);</span>
+<span class="nc" id="L984">        }</span>
+<span class="nc" id="L985">    }</span>
+
+    @Override
+    public void removeLifecycleListener(Object listener) {
+        try {
+<span class="nc" id="L990">            _broker.removeLifecycleListener(listener);</span>
+<span class="nc" id="L991">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L992">            throw translate(re);</span>
+<span class="nc" id="L993">        }</span>
+<span class="nc" id="L994">    }</span>
+
+    @Override
+    public int getLifecycleListenerCallbackMode() {
+        try {
+<span class="nc" id="L999">            return _broker.getLifecycleListenerCallbackMode();</span>
+<span class="nc" id="L1000">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1001">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setLifecycleListenerCallbackMode(int mode) {
+        try {
+<span class="nc" id="L1008">            _broker.setLifecycleListenerCallbackMode(mode);</span>
+<span class="nc" id="L1009">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1010">            throw translate(re);</span>
+<span class="nc" id="L1011">        }</span>
+<span class="nc" id="L1012">    }</span>
+
+    @Override
+    public LifecycleEventManager getLifecycleEventManager() {
+        try {
+<span class="nc" id="L1017">            return _broker.getLifecycleEventManager();</span>
+<span class="nc" id="L1018">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1019">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void begin() {
+        try {
+<span class="nc" id="L1026">            _broker.begin();</span>
+<span class="nc" id="L1027">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1028">            throw translate(re);</span>
+<span class="nc" id="L1029">        }</span>
+<span class="nc" id="L1030">    }</span>
+
+    @Override
+    public void commit() {
+        try {
+<span class="nc" id="L1035">            _broker.commit();</span>
+<span class="nc" id="L1036">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1037">            throw translate(re);</span>
+<span class="nc" id="L1038">        }</span>
+<span class="nc" id="L1039">    }</span>
+
+    @Override
+    public void rollback() {
+        try {
+<span class="nc" id="L1044">            _broker.rollback();</span>
+<span class="nc" id="L1045">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1046">            throw translate(re);</span>
+<span class="nc" id="L1047">        }</span>
+<span class="nc" id="L1048">    }</span>
+
+    @Override
+    public boolean syncWithManagedTransaction() {
+        try {
+<span class="nc" id="L1053">            return _broker.syncWithManagedTransaction();</span>
+<span class="nc" id="L1054">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1055">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void commitAndResume() {
+        try {
+<span class="nc" id="L1062">            _broker.commitAndResume();</span>
+<span class="nc" id="L1063">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1064">            throw translate(re);</span>
+<span class="nc" id="L1065">        }</span>
+<span class="nc" id="L1066">    }</span>
+
+    @Override
+    public void rollbackAndResume() {
+        try {
+<span class="nc" id="L1071">            _broker.rollbackAndResume();</span>
+<span class="nc" id="L1072">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1073">            throw translate(re);</span>
+<span class="nc" id="L1074">        }</span>
+<span class="nc" id="L1075">    }</span>
+
+    @Override
+    public void setRollbackOnly() {
+        try {
+<span class="nc" id="L1080">            _broker.setRollbackOnly();</span>
+<span class="nc" id="L1081">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1082">            throw translate(re);</span>
+<span class="nc" id="L1083">        }</span>
+<span class="nc" id="L1084">    }</span>
+
+    @Override
+    public void setRollbackOnly(Throwable cause) {
+        try {
+<span class="nc" id="L1089">            _broker.setRollbackOnly(cause);</span>
+<span class="nc" id="L1090">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1091">            throw translate(re);</span>
+<span class="nc" id="L1092">        }</span>
+<span class="nc" id="L1093">    }</span>
+
+    @Override
+    public Throwable getRollbackCause() {
+        try {
+<span class="nc" id="L1098">            return _broker.getRollbackCause();</span>
+<span class="nc" id="L1099">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1100">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean getRollbackOnly() {
+        try {
+<span class="nc" id="L1107">            return _broker.getRollbackOnly();</span>
+<span class="nc" id="L1108">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1109">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void setSavepoint(String name) {
+        try {
+<span class="nc" id="L1116">            _broker.setSavepoint(name);</span>
+<span class="nc" id="L1117">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1118">            throw translate(re);</span>
+<span class="nc" id="L1119">        }</span>
+<span class="nc" id="L1120">    }</span>
+
+    @Override
+    public void rollbackToSavepoint() {
+        try {
+<span class="nc" id="L1125">            _broker.rollbackToSavepoint();</span>
+<span class="nc" id="L1126">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1127">            throw translate(re);</span>
+<span class="nc" id="L1128">        }</span>
+<span class="nc" id="L1129">    }</span>
+
+    @Override
+    public void rollbackToSavepoint(String name) {
+        try {
+<span class="nc" id="L1134">            _broker.rollbackToSavepoint(name);</span>
+<span class="nc" id="L1135">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1136">            throw translate(re);</span>
+<span class="nc" id="L1137">        }</span>
+<span class="nc" id="L1138">    }</span>
+
+    @Override
+    public void releaseSavepoint() {
+        try {
+<span class="nc" id="L1143">            _broker.releaseSavepoint();</span>
+<span class="nc" id="L1144">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1145">            throw translate(re);</span>
+<span class="nc" id="L1146">        }</span>
+<span class="nc" id="L1147">    }</span>
+
+    @Override
+    public void releaseSavepoint(String name) {
+        try {
+<span class="nc" id="L1152">            _broker.releaseSavepoint(name);</span>
+<span class="nc" id="L1153">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1154">            throw translate(re);</span>
+<span class="nc" id="L1155">        }</span>
+<span class="nc" id="L1156">    }</span>
+
+    @Override
+    public void flush() {
+        try {
+<span class="nc" id="L1161">            _broker.flush();</span>
+<span class="nc" id="L1162">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1163">            throw translate(re);</span>
+<span class="nc" id="L1164">        }</span>
+<span class="nc" id="L1165">    }</span>
+
+    @Override
+    public void preFlush() {
+        try {
+<span class="nc" id="L1170">            _broker.preFlush();</span>
+<span class="nc" id="L1171">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1172">            throw translate(re);</span>
+<span class="nc" id="L1173">        }</span>
+<span class="nc" id="L1174">    }</span>
+
+    @Override
+    public void validateChanges() {
+        try {
+<span class="nc" id="L1179">            _broker.validateChanges();</span>
+<span class="nc" id="L1180">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1181">            throw translate(re);</span>
+<span class="nc" id="L1182">        }</span>
+<span class="nc" id="L1183">    }</span>
+
+    @Override
+    public void beginStore() {
+        try {
+<span class="nc" id="L1188">            _broker.beginStore();</span>
+<span class="nc" id="L1189">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1190">            throw translate(re);</span>
+<span class="nc" id="L1191">        }</span>
+<span class="nc" id="L1192">    }</span>
+
+    @Override
+    public void persist(Object obj, OpCallbacks call) {
+        try {
+<span class="nc" id="L1197">            _broker.persist(obj, call);</span>
+<span class="nc" id="L1198">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1199">            throw translate(re);</span>
+<span class="nc" id="L1200">        }</span>
+<span class="nc" id="L1201">    }</span>
+
+    @Override
+    public void persistAll(Collection objs, OpCallbacks call) {
+        try {
+<span class="nc" id="L1206">            _broker.persistAll(objs, call);</span>
+<span class="nc" id="L1207">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1208">            throw translate(re);</span>
+<span class="nc" id="L1209">        }</span>
+<span class="nc" id="L1210">    }</span>
+
+    @Override
+    public OpenJPAStateManager persist(Object obj, Object id,
+        OpCallbacks call) {
+        try {
+<span class="nc" id="L1216">            return _broker.persist(obj, id, call);</span>
+<span class="nc" id="L1217">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1218">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void delete(Object obj, OpCallbacks call) {
+        try {
+<span class="nc" id="L1225">            _broker.delete(obj, call);</span>
+<span class="nc" id="L1226">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1227">            throw translate(re, obj);</span>
+<span class="nc" id="L1228">        }</span>
+<span class="nc" id="L1229">    }</span>
+
+    @Override
+    public void deleteAll(Collection objs, OpCallbacks call) {
+        try {
+<span class="nc" id="L1234">            _broker.deleteAll(objs, call);</span>
+<span class="nc" id="L1235">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1236">            throw translate(re, objs);</span>
+<span class="nc" id="L1237">        }</span>
+<span class="nc" id="L1238">    }</span>
+
+    @Override
+    public void release(Object obj, OpCallbacks call) {
+        try {
+<span class="nc" id="L1243">            _broker.release(obj, call);</span>
+<span class="nc" id="L1244">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1245">            throw translate(re, obj);</span>
+<span class="nc" id="L1246">        }</span>
+<span class="nc" id="L1247">    }</span>
+
+    @Override
+    public void releaseAll(Collection objs, OpCallbacks call) {
+        try {
+<span class="nc" id="L1252">            _broker.releaseAll(objs, call);</span>
+<span class="nc" id="L1253">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1254">            throw translate(re, objs);</span>
+<span class="nc" id="L1255">        }</span>
+<span class="nc" id="L1256">    }</span>
+
+    @Override
+    public void refresh(Object obj, OpCallbacks call) {
+        try {
+<span class="nc" id="L1261">            _broker.refresh(obj, call);</span>
+<span class="nc" id="L1262">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1263">            throw translate(re, obj);</span>
+<span class="nc" id="L1264">        }</span>
+<span class="nc" id="L1265">    }</span>
+
+    @Override
+    public void refreshAll(Collection objs, OpCallbacks call) {
+        try {
+<span class="nc" id="L1270">            _broker.refreshAll(objs, call);</span>
+<span class="nc" id="L1271">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1272">            throw translate(re, objs);</span>
+<span class="nc" id="L1273">        }</span>
+<span class="nc" id="L1274">    }</span>
+
+    @Override
+    public void evict(Object obj, OpCallbacks call) {
+        try {
+<span class="nc" id="L1279">            _broker.evict(obj, call);</span>
+<span class="nc" id="L1280">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1281">            throw translate(re, obj);</span>
+<span class="nc" id="L1282">        }</span>
+<span class="nc" id="L1283">    }</span>
+
+    @Override
+    public void evictAll(Collection objs, OpCallbacks call) {
+        try {
+<span class="nc" id="L1288">            _broker.evictAll(objs, call);</span>
+<span class="nc" id="L1289">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1290">            throw translate(re, objs);</span>
+<span class="nc" id="L1291">        }</span>
+<span class="nc" id="L1292">    }</span>
+
+    @Override
+    public void evictAll(OpCallbacks call) {
+        try {
+<span class="nc" id="L1297">            _broker.evictAll(call);</span>
+<span class="nc" id="L1298">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1299">            throw translate(re);</span>
+<span class="nc" id="L1300">        }</span>
+<span class="nc" id="L1301">    }</span>
+
+    @Override
+    public void evictAll(Extent extent, OpCallbacks call) {
+        try {
+<span class="nc" id="L1306">            _broker.evictAll(extent, call);</span>
+<span class="nc" id="L1307">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1308">            throw translate(re, extent.getElementType());</span>
+<span class="nc" id="L1309">        }</span>
+<span class="nc" id="L1310">    }</span>
+
+    @Override
+    public Object detach(Object obj, OpCallbacks call) {
+        try {
+<span class="nc" id="L1315">            return _broker.detach(obj, call);</span>
+<span class="nc" id="L1316">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1317">            throw translate(re, obj);</span>
+        }
+    }
+
+    @Override
+    public Object[] detachAll(Collection objs, OpCallbacks call) {
+        try {
+<span class="nc" id="L1324">            return _broker.detachAll(objs, call);</span>
+<span class="nc" id="L1325">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1326">            throw translate(re, objs);</span>
+        }
+    }
+
+    @Override
+    public void detachAll(OpCallbacks call) {
+        try {
+<span class="nc" id="L1333">            _broker.detachAll(call);</span>
+<span class="nc" id="L1334">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1335">            throw translate(re);</span>
+<span class="nc" id="L1336">        }</span>
+<span class="nc" id="L1337">    }</span>
+
+    @Override
+    public void detachAll(OpCallbacks call, boolean flush) {
+        try {
+<span class="nc" id="L1342">            _broker.detachAll(call, flush);</span>
+<span class="nc" id="L1343">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1344">            throw translate(re);</span>
+<span class="nc" id="L1345">        }</span>
+<span class="nc" id="L1346">    }</span>
+
+    @Override
+    public Object attach(Object obj, boolean copyNew, OpCallbacks call) {
+        try {
+<span class="nc" id="L1351">            return _broker.attach(obj, copyNew, call);</span>
+<span class="nc" id="L1352">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1353">            throw translate(re, obj);</span>
+        }
+    }
+
+    @Override
+    public Object[] attachAll(Collection objs, boolean copyNew,
+        OpCallbacks call) {
+        try {
+<span class="nc" id="L1361">            return _broker.attachAll(objs, copyNew, call);</span>
+<span class="nc" id="L1362">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1363">            throw translate(re, objs);</span>
+        }
+    }
+
+    @Override
+    public void transactional(Object pc, boolean updateVersion, OpCallbacks
+        call) {
+        try {
+<span class="nc" id="L1371">            _broker.transactional(pc, updateVersion, call);</span>
+<span class="nc" id="L1372">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1373">            throw translate(re, pc);</span>
+<span class="nc" id="L1374">        }</span>
+<span class="nc" id="L1375">    }</span>
+
+    @Override
+    public void transactionalAll(Collection objs, boolean updateVersion,
+        OpCallbacks call) {
+        try {
+<span class="nc" id="L1381">            _broker.transactionalAll(objs, updateVersion, call);</span>
+<span class="nc" id="L1382">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1383">            throw translate(re, objs);</span>
+<span class="nc" id="L1384">        }</span>
+<span class="nc" id="L1385">    }</span>
+
+    @Override
+    public void nontransactional(Object pc, OpCallbacks call) {
+        try {
+<span class="nc" id="L1390">            _broker.nontransactional(pc, call);</span>
+<span class="nc" id="L1391">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1392">            throw translate(re, pc);</span>
+<span class="nc" id="L1393">        }</span>
+<span class="nc" id="L1394">    }</span>
+
+    @Override
+    public void nontransactionalAll(Collection objs, OpCallbacks call) {
+        try {
+<span class="nc" id="L1399">            _broker.nontransactionalAll(objs, call);</span>
+<span class="nc" id="L1400">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1401">            throw translate(re, objs);</span>
+<span class="nc" id="L1402">        }</span>
+<span class="nc" id="L1403">    }</span>
+
+    @Override
+    public Extent newExtent(Class cls, boolean subs) {
+        try {
+<span class="nc" id="L1408">            return _broker.newExtent(cls, subs);</span>
+<span class="nc" id="L1409">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1410">            throw translate(re, cls);</span>
+        }
+    }
+
+    @Override
+    public Query newQuery(String language, Class cls, Object query) {
+        try {
+<span class="nc" id="L1417">            return _broker.newQuery(language, cls, query);</span>
+<span class="nc" id="L1418">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1419">            throw translate(re, query);</span>
+        }
+    }
+
+    @Override
+    public Query newQuery(String language, Object query) {
+        try {
+<span class="nc" id="L1426">            return _broker.newQuery(language, query);</span>
+<span class="nc" id="L1427">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1428">            throw translate(re, query);</span>
+        }
+    }
+
+    @Override
+    public Seq getIdentitySequence(ClassMetaData meta) {
+        try {
+<span class="nc" id="L1435">            return _broker.getIdentitySequence(meta);</span>
+<span class="nc" id="L1436">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1437">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Seq getValueSequence(FieldMetaData fmd) {
+        try {
+<span class="nc" id="L1444">            return _broker.getValueSequence(fmd);</span>
+<span class="nc" id="L1445">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1446">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void lock(Object obj, int level, int timeout, OpCallbacks call) {
+        try {
+<span class="nc" id="L1453">            _broker.lock(obj, level, timeout, call);</span>
+<span class="nc" id="L1454">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1455">            throw translate(re, obj);</span>
+<span class="nc" id="L1456">        }</span>
+<span class="nc" id="L1457">    }</span>
+
+    @Override
+    public void lock(Object obj, OpCallbacks call) {
+        try {
+<span class="nc" id="L1462">            _broker.lock(obj, call);</span>
+<span class="nc" id="L1463">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1464">            throw translate(re, obj);</span>
+<span class="nc" id="L1465">        }</span>
+<span class="nc" id="L1466">    }</span>
+
+    @Override
+    public void lockAll(Collection objs, int level, int timeout,
+        OpCallbacks call) {
+        try {
+<span class="nc" id="L1472">            _broker.lockAll(objs, level, timeout, call);</span>
+<span class="nc" id="L1473">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1474">            throw translate(re, objs);</span>
+<span class="nc" id="L1475">        }</span>
+<span class="nc" id="L1476">    }</span>
+
+    @Override
+    public void lockAll(Collection objs, OpCallbacks call) {
+        try {
+<span class="nc" id="L1481">            _broker.lockAll(objs, call);</span>
+<span class="nc" id="L1482">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1483">            throw translate(re, objs);</span>
+<span class="nc" id="L1484">        }</span>
+<span class="nc" id="L1485">    }</span>
+
+    @Override
+    public boolean cancelAll() {
+        try {
+<span class="nc" id="L1490">            return _broker.cancelAll();</span>
+<span class="nc" id="L1491">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1492">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void dirtyType(Class cls) {
+        try {
+<span class="nc" id="L1499">            _broker.dirtyType(cls);</span>
+<span class="nc" id="L1500">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1501">            throw translate(re);</span>
+<span class="nc" id="L1502">        }</span>
+<span class="nc" id="L1503">    }</span>
+
+    @Override
+    public void close() {
+        try {
+<span class="nc" id="L1508">            _broker.close();</span>
+<span class="nc" id="L1509">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1510">            throw translate(re);</span>
+<span class="nc" id="L1511">        }</span>
+<span class="nc" id="L1512">    }</span>
+
+    @Override
+    public boolean isClosed() {
+        try {
+<span class="nc" id="L1517">            return _broker.isClosed();</span>
+<span class="nc" id="L1518">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1519">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean isCloseInvoked() {
+        try {
+<span class="nc" id="L1526">            return _broker.isCloseInvoked();</span>
+<span class="nc" id="L1527">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1528">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void assertOpen() {
+        try {
+<span class="nc" id="L1535">            _broker.assertOpen();</span>
+<span class="nc" id="L1536">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1537">            throw translate(re);</span>
+<span class="nc" id="L1538">        }</span>
+<span class="nc" id="L1539">    }</span>
+
+    @Override
+    public void assertActiveTransaction() {
+        try {
+<span class="nc" id="L1544">            _broker.assertActiveTransaction();</span>
+<span class="nc" id="L1545">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1546">            throw translate(re);</span>
+<span class="nc" id="L1547">        }</span>
+<span class="nc" id="L1548">    }</span>
+
+    @Override
+    public void assertNontransactionalRead() {
+        try {
+<span class="nc" id="L1553">            _broker.assertNontransactionalRead();</span>
+<span class="nc" id="L1554">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1555">            throw translate(re);</span>
+<span class="nc" id="L1556">        }</span>
+<span class="nc" id="L1557">    }</span>
+
+    @Override
+    public void assertWriteOperation() {
+        try {
+<span class="nc" id="L1562">            _broker.assertWriteOperation();</span>
+<span class="nc" id="L1563">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1564">            throw translate(re);</span>
+<span class="nc" id="L1565">        }</span>
+<span class="nc" id="L1566">    }</span>
+
+    ///////////////////////////////////////////////
+    // Implementation of Synchronization interface
+    ///////////////////////////////////////////////
+
+    @Override
+    public void beforeCompletion() {
+        try {
+<span class="nc" id="L1575">            _broker.beforeCompletion();</span>
+<span class="nc" id="L1576">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1577">            throw translate(re);</span>
+<span class="nc" id="L1578">        }</span>
+<span class="nc" id="L1579">    }</span>
+
+    @Override
+    public void afterCompletion(int status) {
+        try {
+<span class="nc" id="L1584">            _broker.afterCompletion(status);</span>
+<span class="nc" id="L1585">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1586">            throw translate(re);</span>
+<span class="nc" id="L1587">        }</span>
+<span class="nc" id="L1588">    }</span>
+
+    @Override
+    public Object newInstance(Class cls) {
+        try {
+<span class="nc" id="L1593">            return _broker.newInstance(cls);</span>
+<span class="nc" id="L1594">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1595">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean isDetached(Object obj) {
+        try {
+<span class="nc" id="L1602">            return _broker.isDetached(obj);</span>
+<span class="nc" id="L1603">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L1604">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean getCachePreparedQuery() {
+<span class="nc" id="L1610">        return _broker.getCachePreparedQuery();</span>
+    }
+
+    @Override
+    public void setCachePreparedQuery(boolean flag) {
+<span class="nc" id="L1615">        _broker.setCachePreparedQuery(flag);</span>
+<span class="nc" id="L1616">    }</span>
+
+    @Override
+    public String getConnectionFactoryName() {
+<span class="nc" id="L1620">        return _broker.getConnectionFactoryName();</span>
+    }
+
+    @Override
+    public void setConnectionFactoryName(String connectionFactoryName) {
+<span class="nc" id="L1625">        _broker.setConnectionFactoryName(connectionFactoryName);</span>
+<span class="nc" id="L1626">    }</span>
+
+    @Override
+    public String getConnectionFactory2Name() {
+<span class="nc" id="L1630">        return _broker.getConnectionFactory2Name();</span>
+    }
+
+    @Override
+    public void setConnectionFactory2Name(String connectionFactory2Name) {
+<span class="nc" id="L1635">        _broker.setConnectionFactory2Name(connectionFactory2Name);</span>
+<span class="nc" id="L1636">    }</span>
+
+    @Override
+    public Object getConnectionFactory() {
+<span class="nc" id="L1640">        return _broker.getConnectionFactory();</span>
+    }
+
+    @Override
+    public Object getConnectionFactory2() {
+<span class="nc" id="L1645">        return _broker.getConnectionFactory2();</span>
+    }
+
+    @Override
+    public boolean isCached(List&lt;Object&gt; oid) {
+<span class="nc" id="L1650">        return _broker.isCached(oid);</span>
+    }
+
+    @Override
+    public boolean getAllowReferenceToSiblingContext() {
+<span class="nc" id="L1655">        return _broker.getAllowReferenceToSiblingContext();</span>
+    }
+
+    @Override
+    public void setAllowReferenceToSiblingContext(boolean allow) {
+<span class="nc" id="L1660">        _broker.setAllowReferenceToSiblingContext(allow);</span>
+<span class="nc" id="L1661">    }</span>
+
+    @Override
+    public boolean getPostLoadOnMerge() {
+<span class="nc" id="L1665">        return _broker.getPostLoadOnMerge();</span>
+    }
+
+    @Override
+    public void setPostLoadOnMerge(boolean allow) {
+<span class="nc" id="L1670">        _broker.setPostLoadOnMerge(allow);</span>
+<span class="nc" id="L1671">    }</span>
+
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

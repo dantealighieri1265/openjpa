@@ -1,0 +1,222 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>NoneMetaDataFactory.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.meta</a> &gt; <span class="el_source">NoneMetaDataFactory.java</span></div><h1>NoneMetaDataFactory.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.meta;
+
+import java.io.File;
+import java.lang.reflect.Member;
+import java.util.Collection;
+import java.util.Map;
+import java.util.Set;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.lib.meta.ClassArgParser;
+
+/**
+ * No-op metadata I/O to prevent attempts to load other classes.
+ *
+ * @author Abe White
+ */
+<span class="nc" id="L35">public class NoneMetaDataFactory</span>
+    implements MetaDataFactory, MetaDataDefaults {
+
+<span class="nc" id="L38">    private static final NoneMetaDataFactory _instance =</span>
+        new NoneMetaDataFactory();
+
+    public static NoneMetaDataFactory getInstance() {
+<span class="nc" id="L42">        return _instance;</span>
+    }
+
+    @Override
+    public void setRepository(MetaDataRepository repos) {
+<span class="nc" id="L47">    }</span>
+
+    @Override
+    public void setStoreDirectory(File dir) {
+<span class="nc" id="L51">    }</span>
+
+    @Override
+    public void setStoreMode(int store) {
+<span class="nc" id="L55">    }</span>
+
+    @Override
+    public void setStrict(boolean strict) {
+<span class="nc" id="L59">    }</span>
+
+    @Override
+    public void load(Class cls, int mode, ClassLoader envLoader) {
+<span class="nc" id="L63">    }</span>
+
+    @Override
+    public boolean store(ClassMetaData[] metas, QueryMetaData[] queries,
+        SequenceMetaData[] seqs, int mode, Map output) {
+<span class="nc" id="L68">        return false;</span>
+    }
+
+    @Override
+    public boolean drop(Class[] cls, int mode, ClassLoader envLoader) {
+<span class="nc" id="L73">        return false;</span>
+    }
+
+    @Override
+    public MetaDataDefaults getDefaults() {
+<span class="nc" id="L78">        return this;</span>
+    }
+
+    @Override
+    public Set getPersistentTypeNames(boolean classpath,
+        ClassLoader envLoader) {
+<span class="nc" id="L84">        return null;</span>
+    }
+
+    @Override
+    public Class getQueryScope(String queryName, ClassLoader loader) {
+<span class="nc" id="L89">        return null;</span>
+    }
+
+    @Override
+    public Class getResultSetMappingScope(String resultSetMappingName,
+        ClassLoader loader) {
+<span class="nc" id="L95">        return null;</span>
+    }
+
+    @Override
+    public ClassArgParser newClassArgParser() {
+<span class="nc" id="L100">        return new ClassArgParser();</span>
+    }
+
+    @Override
+    public void clear() {
+<span class="nc" id="L105">    }</span>
+
+    @Override
+    public void addClassExtensionKeys(Collection exts) {
+<span class="nc" id="L109">    }</span>
+
+    @Override
+    public void addFieldExtensionKeys(Collection exts) {
+<span class="nc" id="L113">    }</span>
+
+    @Override
+    public int getDefaultAccessType() {
+<span class="nc" id="L117">        return AccessCode.UNKNOWN;</span>
+    }
+
+    @Override
+    public int getDefaultIdentityType() {
+<span class="nc" id="L122">        return ClassMetaData.ID_UNKNOWN;</span>
+    }
+
+    @Override
+    public int getCallbackMode() {
+<span class="nc" id="L127">        return CALLBACK_IGNORE;</span>
+    }
+
+    @Override
+    public boolean getCallbacksBeforeListeners(int type) {
+<span class="nc" id="L132">        return false;</span>
+    }
+
+    @Override
+    public void setIgnoreNonPersistent(boolean ignore) {
+<span class="nc" id="L137">    }</span>
+
+    @Override
+    public boolean isDeclaredInterfacePersistent() {
+<span class="nc" id="L141">        return false;</span>
+    }
+
+    @Override
+    public boolean isDataStoreObjectIdFieldUnwrapped() {
+<span class="nc" id="L146">        return false;</span>
+    }
+
+    @Override
+    public void populate(ClassMetaData meta, int access) {
+<span class="nc" id="L151">    }</span>
+
+    @Override
+    public void populate(ClassMetaData meta, int access, boolean ignoreTransient) {
+<span class="nc" id="L155">    }</span>
+
+    @Override
+    public Member getBackingMember(FieldMetaData fmd) {
+<span class="nc" id="L159">        return null;</span>
+    }
+
+    @Override
+    public Member getMemberByProperty(ClassMetaData meta, String property,
+    		int access, boolean scan) {
+<span class="nc" id="L165">    	return null;</span>
+    }
+
+    @Override
+    public Class&lt;? extends Exception&gt; getUnimplementedExceptionType() {
+<span class="nc" id="L170">        return null;</span>
+    }
+
+    @Override
+    public void loadXMLMetaData(Class&lt;?&gt; cls) {
+<span class="nc" id="L175">    }</span>
+
+    @Override
+    public String getMetaModelClassName(String managedClassName) {
+<span class="nc" id="L179">        return null;</span>
+    }
+    @Override
+    public String getManagedClassName(String metamodelClassName) {
+<span class="nc" id="L183">        return null;</span>
+    }
+
+    @Override
+    public boolean isMetaClass(Class&lt;?&gt; c) {
+<span class="nc" id="L188">        return false;</span>
+    }
+
+    @Override
+    public Class&lt;?&gt; getManagedClass(Class&lt;?&gt; c) {
+<span class="nc" id="L193">        return null;</span>
+    }
+
+    @Override
+    public boolean isAbstractMappingUniDirectional(OpenJPAConfiguration conf) {
+<span class="nc" id="L198">        return false;</span>
+    }
+
+    @Override
+    public boolean isNonDefaultMappingAllowed(OpenJPAConfiguration conf) {
+<span class="nc" id="L203">        return false;</span>
+    }
+
+    @Override
+    public Boolean isDefaultCascadePersistEnabled() {
+<span class="nc" id="L208">        return false;</span>
+    }
+
+    @Override
+    public void setDefaultCascadePersistEnabled(Boolean bool) {
+
+<span class="nc" id="L214">    }</span>
+
+    @Override
+<span class="nc" id="L217">    public String getDefaultSchema(){return null;}</span>
+
+    @Override
+<span class="nc" id="L220">    public void setDefaultSchema(String schema){}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

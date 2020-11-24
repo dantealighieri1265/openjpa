@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Specification.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.conf</a> &gt; <span class="el_source">Specification.java</span></div><h1>Specification.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.conf;
+
+import java.util.Locale;
+import java.util.Objects;
+
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.util.UserException;
+
+/**
+ * An immutable representation of a Specification supported by OpenJPA.
+ *
+ * Available via {@linkplain OpenJPAConfiguration#getSpecificationInstance()()}
+ * for configuration that may depend on Specification version.
+ *
+ * @author Pinaki Poddar
+ *
+ */
+public class Specification {
+<span class="nc" id="L37">    private String _name = &quot;&quot;;</span>
+<span class="nc" id="L38">    private int    _major = 1;</span>
+<span class="nc" id="L39">    private String _minor = &quot;0&quot;;</span>
+<span class="nc" id="L40">    private String _description = &quot;&quot;;</span>
+    private Compatibility _compatibility;
+
+<span class="nc" id="L43">    private static Localizer _loc = Localizer.forPackage(Specification.class);</span>
+
+    /**
+     * Construct from a String that encodes name and version fields.
+     *
+     * @param fullName a encoded string in the following prescribed format.
+     * &lt;code&gt;name major.minor&lt;/code&gt; e.g. &lt;code&gt;JPA 2.0-draft&lt;/code&gt;
+     * Only the 'name' field is mandatory.
+     * 'major' version defaults to 1 and must be an integer.
+     * 'minor' version defaults to 0 and can be a String.
+     */
+<span class="nc" id="L54">    public Specification(String fullName) {</span>
+        try {
+<span class="nc" id="L56">            Object[] tokens = parse(fullName);</span>
+<span class="nc" id="L57">            _name = tokens[0].toString();</span>
+<span class="nc bnc" id="L58" title="All 2 branches missed.">            _major = tokens.length &gt; 1 ?</span>
+<span class="nc" id="L59">                Integer.parseInt(tokens[1].toString()) : 1;</span>
+<span class="nc bnc" id="L60" title="All 2 branches missed.">            _minor = tokens.length &gt; 2 ? tokens[2].toString() : &quot;0&quot;;</span>
+<span class="nc" id="L61">        } catch (Exception e) {</span>
+<span class="nc" id="L62">            throw new UserException(_loc.get(&quot;spec-wrong-format&quot;, fullName));</span>
+<span class="nc" id="L63">        }</span>
+<span class="nc" id="L64">    }</span>
+
+    public String getName() {
+<span class="nc" id="L67">        return _name;</span>
+    }
+
+    public int getVersion() {
+<span class="nc" id="L71">        return _major;</span>
+    }
+
+    public String getMinorVersion() {
+<span class="nc" id="L75">        return _minor;</span>
+    }
+
+    public String getDescription() {
+<span class="nc" id="L79">        return _description;</span>
+    }
+
+    public Specification setDescription(String description) {
+<span class="nc" id="L83">        this._description = description;</span>
+<span class="nc" id="L84">        return this;</span>
+    }
+
+    /**
+     * Affirms if the given argument is equal to this receiver.
+     */
+    @Override
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (this == other)</span>
+<span class="nc" id="L93">            return true;</span>
+<span class="nc bnc" id="L94" title="All 4 branches missed.">        if (other == null || !this.getClass().isInstance(other))</span>
+<span class="nc" id="L95">            return false;</span>
+<span class="nc" id="L96">        Specification that = (Specification)other;</span>
+<span class="nc bnc" id="L97" title="All 4 branches missed.">        return Objects.equals(_name, this._name) &amp;&amp; _major == that._major</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">            &amp;&amp; Objects.equals(_minor, this._minor);</span>
+    }
+
+    /**
+     * Affirms if the given specification has the same name of this receiver,
+     * ignoring the case.
+     */
+    public boolean isSame(Specification other) {
+<span class="nc bnc" id="L106" title="All 4 branches missed.">        return this == other</span>
+<span class="nc bnc" id="L107" title="All 2 branches missed.">            || (other != null &amp;&amp; _name.equalsIgnoreCase(other._name));</span>
+    }
+
+    /**
+     * Affirms if the given string equals name of this receiver, ignoring the
+     * case.
+     */
+    public boolean isSame(String other) {
+<span class="nc" id="L115">        return _name.equalsIgnoreCase(other);</span>
+    }
+
+    /**
+     * Compares major version number of the given Specification with this
+     * receiver.
+
+     * @return 0 if they are equal.
+     *       &gt; 0 if this receiver is higher version.
+     *       &lt; 0 if this receiver is lower version.
+     */
+    public int compareVersion(Specification other) {
+<span class="nc bnc" id="L127" title="All 4 branches missed.">        return _major &gt; other._major ? 1 : _major == other._major ? 0 : -1;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L132">        return _name.toUpperCase(Locale.ENGLISH) + &quot; &quot; + _major + &quot;.&quot; + _minor;</span>
+    }
+
+    private Object[] parse(String str) {
+<span class="nc" id="L136">        int space = str.indexOf(' ');</span>
+
+<span class="nc bnc" id="L138" title="All 2 branches missed.">        if (space == -1)</span>
+<span class="nc" id="L139">            return new Object[]{str};</span>
+<span class="nc" id="L140">        String name = str.substring(0,space);</span>
+<span class="nc" id="L141">        String version = str.substring(space+1);</span>
+<span class="nc" id="L142">        int dot = version.indexOf('.');</span>
+<span class="nc bnc" id="L143" title="All 2 branches missed.">        if (dot == -1)</span>
+<span class="nc" id="L144">            return new Object[] {name, version};</span>
+<span class="nc" id="L145">        return new Object[] {name,</span>
+<span class="nc" id="L146">            version.substring(0,dot), version.substring(dot+1)};</span>
+    }
+
+    /**
+     * Associate a compatibility object with this Specification instance
+     * @param compatibility a Compatibility object with flags set in compliance
+     * with this Specification instance.
+     */
+    public void setCompatibility(Compatibility compatibility) {
+<span class="nc" id="L155">        _compatibility = compatibility;</span>
+<span class="nc" id="L156">    }</span>
+
+    /**
+     * Return the compatibility object associated with this Specification instance.
+     */
+    public Compatibility getCompatibility() {
+<span class="nc" id="L162">        return _compatibility;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

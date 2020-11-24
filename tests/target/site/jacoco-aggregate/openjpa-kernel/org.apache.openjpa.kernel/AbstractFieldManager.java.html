@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractFieldManager.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">AbstractFieldManager.java</span></div><h1>AbstractFieldManager.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import org.apache.openjpa.enhance.FieldManager;
+import org.apache.openjpa.util.InternalException;
+
+/**
+ * Abstract {@link FieldManager} for easy subclassing. Throws exceptions
+ * for all methods.
+ *
+ * @author Abe White
+ */
+<span class="nc" id="L30">abstract class AbstractFieldManager</span>
+    implements FieldManager {
+
+    @Override
+    public boolean fetchBooleanField(int field) {
+<span class="nc" id="L35">        throw new InternalException();</span>
+    }
+
+    @Override
+    public byte fetchByteField(int field) {
+<span class="nc" id="L40">        throw new InternalException();</span>
+    }
+
+    @Override
+    public char fetchCharField(int field) {
+<span class="nc" id="L45">        throw new InternalException();</span>
+    }
+
+    @Override
+    public double fetchDoubleField(int field) {
+<span class="nc" id="L50">        throw new InternalException();</span>
+    }
+
+    @Override
+    public float fetchFloatField(int field) {
+<span class="nc" id="L55">        throw new InternalException();</span>
+    }
+
+    @Override
+    public int fetchIntField(int field) {
+<span class="nc" id="L60">        throw new InternalException();</span>
+    }
+
+    @Override
+    public long fetchLongField(int field) {
+<span class="nc" id="L65">        throw new InternalException();</span>
+    }
+
+    @Override
+    public Object fetchObjectField(int field) {
+<span class="nc" id="L70">        throw new InternalException();</span>
+    }
+
+    @Override
+    public short fetchShortField(int field) {
+<span class="nc" id="L75">        throw new InternalException();</span>
+    }
+
+    @Override
+    public String fetchStringField(int field) {
+<span class="nc" id="L80">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void storeBooleanField(int field, boolean curVal) {
+<span class="nc" id="L85">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void storeByteField(int field, byte curVal) {
+<span class="nc" id="L90">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void storeCharField(int field, char curVal) {
+<span class="nc" id="L95">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void storeDoubleField(int field, double curVal) {
+<span class="nc" id="L100">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void storeFloatField(int field, float curVal) {
+<span class="nc" id="L105">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void storeIntField(int field, int curVal) {
+<span class="nc" id="L110">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void storeLongField(int field, long curVal) {
+<span class="nc" id="L115">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void storeObjectField(int field, Object curVal) {
+<span class="nc" id="L120">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void storeShortField(int field, short curVal) {
+<span class="nc" id="L125">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void storeStringField(int field, String curVal) {
+<span class="nc" id="L130">        throw new InternalException();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

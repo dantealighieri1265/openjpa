@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ConcurrentDataCache.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.datacache</a> &gt; <span class="el_source">ConcurrentDataCache.java</span></div><h1>ConcurrentDataCache.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.datacache;
+
+import org.apache.openjpa.event.RemoteCommitListener;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.util.CacheMap;
+
+/**
+ * A {@link DataCache} implementation that is optimized for concurrent
+ * access. When the cache fills up, values to remove from cache are chosen
+ * randomly. Due to race conditions, it is possible that a get call might not
+ * return a cached instance if that instance is being transferred between
+ * internal datastructures.
+ *
+ * @since 0.4.0
+ */
+<span class="nc" id="L34">public class ConcurrentDataCache</span>
+    extends AbstractDataCache
+    implements RemoteCommitListener {
+
+    
+    private static final long serialVersionUID = 1L;
+
+<span class="nc" id="L41">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L42">        (ConcurrentDataCache.class);</span>
+
+    private CacheMap _cache;
+<span class="nc" id="L45">    private int _cacheSize = Integer.MIN_VALUE;</span>
+<span class="nc" id="L46">    private int _softRefs = Integer.MIN_VALUE;</span>
+<span class="nc" id="L47">    protected boolean _lru = false;</span>
+
+    /**
+     * Returns the underlying {@link CacheMap} that this cache is using.
+     * This is not an unmodifiable view on the map, so care should be taken
+     * with this reference. Implementations should probably not modify the
+     * contents of the cache, but should only use this reference to
+     * obtain cache metrics.
+     */
+    public CacheMap getCacheMap() {
+<span class="nc" id="L57">        return _cache;</span>
+    }
+
+    /**
+     * Sets the maximum number of unpinned objects to keep hard
+     * references to. If the map contains more unpinned objects than
+     * &lt;code&gt;size&lt;/code&gt;, then this method will result in the cache
+     * flushing old values.
+     */
+    public void setCacheSize(int size) {
+<span class="nc" id="L67">        _cacheSize = size;</span>
+<span class="nc" id="L68">    }</span>
+
+    /**
+     * Returns the maximum number of unpinned objects to keep hard
+     * references to.
+     */
+    public int getCacheSize() {
+<span class="nc" id="L75">        return _cache.getCacheSize();</span>
+    }
+
+    /**
+     * Sets the maximum number of unpinned objects to keep soft
+     * references to. If the map contains more soft references than
+     * &lt;code&gt;size&lt;/code&gt;, then this method will result in the cache
+     * flushing values.
+     */
+    public void setSoftReferenceSize(int size) {
+<span class="nc" id="L85">        _softRefs = size;</span>
+<span class="nc" id="L86">    }</span>
+
+    /**
+     * Returns the maximum number of unpinned objects to keep soft
+     * references to. Defaults to &lt;code&gt;-1&lt;/code&gt;.
+     */
+    public int getSoftReferenceSize() {
+<span class="nc" id="L93">        return _cache.getSoftReferenceSize();</span>
+    }
+
+    @Override
+    public void initialize(DataCacheManager mgr) {
+<span class="nc" id="L98">        super.initialize(mgr);</span>
+<span class="nc" id="L99">        conf.getRemoteCommitEventManager().addInternalListener(this);</span>
+        // Wait to instantiate _cache so that we know the proper value of _cache
+<span class="nc" id="L101">        _cache = newCacheMap();</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (_cacheSize != Integer.MIN_VALUE) {</span>
+<span class="nc" id="L103">            _cache.setCacheSize(_cacheSize);</span>
+        }
+<span class="nc bnc" id="L105" title="All 2 branches missed.">        if (_softRefs != Integer.MIN_VALUE) {</span>
+<span class="nc" id="L106">            _cache.setSoftReferenceSize(_softRefs);</span>
+        }
+<span class="nc" id="L108">    }</span>
+
+    @Override
+    public void unpinAll(Class&lt;?&gt; cls, boolean subs) {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (log.isWarnEnabled())</span>
+<span class="nc" id="L113">            log.warn(_loc.get(&quot;cache-class-unpin-all&quot;, getName()));</span>
+<span class="nc" id="L114">        unpinAll(_cache.getPinnedKeys());</span>
+<span class="nc" id="L115">    }</span>
+
+    @Override
+    public void writeLock() {
+<span class="nc" id="L119">        _cache.writeLock();</span>
+<span class="nc" id="L120">    }</span>
+
+    @Override
+    public void writeUnlock() {
+<span class="nc" id="L124">        _cache.writeUnlock();</span>
+<span class="nc" id="L125">    }</span>
+
+    /**
+     * Return the map to use as an internal cache; entry expirations must
+     * invoke {@link AbstractDataCache#keyRemoved}.
+     */
+    protected CacheMap newCacheMap() {
+<span class="nc" id="L132">        CacheMap res = new CacheMap(_lru) {</span>
+            @Override
+            protected void entryRemoved(Object key, Object value, boolean expired) {
+<span class="nc" id="L135">                keyRemoved(key, expired);</span>
+<span class="nc" id="L136">            }</span>
+        };
+
+<span class="nc" id="L139">        return res;</span>
+    }
+
+    @Override
+    protected DataCachePCData getInternal(Object key) {
+<span class="nc" id="L144">        return (DataCachePCData) _cache.get(key);</span>
+    }
+
+    @Override
+    protected DataCachePCData putInternal(Object key, DataCachePCData pc) {
+<span class="nc" id="L149">        return (DataCachePCData) _cache.put(key, pc);</span>
+    }
+
+    @Override
+    protected DataCachePCData removeInternal(Object key) {
+<span class="nc" id="L154">        return (DataCachePCData) _cache.remove(key);</span>
+    }
+
+    @Override
+    protected void removeAllInternal(Class&lt;?&gt; cls, boolean subs) {
+        // The performance in this area can be improved upon, however it seems
+        // unlikely that this method will be called in a performance intensive
+        // environment. In any event applications can revert to the old behavior
+        // by simply calling removeAll().
+<span class="nc" id="L163">        _cache.clear();</span>
+<span class="nc" id="L164">    }</span>
+
+    @Override
+    protected void clearInternal() {
+<span class="nc" id="L168">        _cache.clear();</span>
+<span class="nc" id="L169">    }</span>
+
+    @Override
+    protected boolean pinInternal(Object key) {
+<span class="nc" id="L173">        return _cache.pin(key);</span>
+    }
+
+    @Override
+    protected boolean unpinInternal(Object key) {
+<span class="nc" id="L178">        return _cache.unpin (key);</span>
+	}
+
+    @Override
+    protected boolean recacheUpdates() {
+<span class="nc" id="L183">        return true;</span>
+    }
+
+    public void setLru(boolean l) {
+<span class="nc" id="L187">        _lru = l;</span>
+<span class="nc" id="L188">    }</span>
+
+    public boolean getLru() {
+<span class="nc" id="L191">        return _lru;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

@@ -1,0 +1,265 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>RemoteCommitEventManager.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.event</a> &gt; <span class="el_source">RemoteCommitEventManager.java</span></div><h1>RemoteCommitEventManager.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.event;
+
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.kernel.Broker;
+import org.apache.openjpa.kernel.OpenJPAStateManager;
+import org.apache.openjpa.lib.util.Closeable;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.concurrent.AbstractConcurrentEventManager;
+import org.apache.openjpa.util.UserException;
+
+/**
+ * Manager that can be used to track and notify
+ * {@link RemoteCommitListener}s on remote commit events. If remote events
+ * are enabled, this manager should be installed as a transaction listener on
+ * all brokers so that it knows when commits are made.
+ *
+ * @author Patrick Linskey
+ * @author Abe White
+ * @since 0.3.0
+ */
+public class RemoteCommitEventManager
+    extends AbstractConcurrentEventManager
+    implements EndTransactionListener, Closeable {
+
+    
+    private static final long serialVersionUID = 1L;
+
+<span class="nc" id="L53">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L54">        (RemoteCommitEventManager.class);</span>
+
+    private final RemoteCommitProvider _provider;
+<span class="nc" id="L57">    private boolean _transmitPersIds = false;</span>
+
+    /**
+     * Constructor. Supply configuration.
+     */
+<span class="nc" id="L62">    public RemoteCommitEventManager(OpenJPAConfiguration conf) {</span>
+<span class="nc" id="L63">        _provider = conf.newRemoteCommitProviderInstance();</span>
+<span class="nc bnc" id="L64" title="All 2 branches missed.">        if (_provider != null) {</span>
+<span class="nc" id="L65">            _provider.setRemoteCommitEventManager(this);</span>
+        }
+<span class="nc" id="L67">    }</span>
+
+    /**
+     * Return true if remote events are enabled.
+     */
+    public boolean areRemoteEventsEnabled() {
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        return _provider != null;</span>
+    }
+
+    /**
+     * Return the {@link RemoteCommitProvider} that this manager uses.
+     *
+     * @since 0.3.1
+     */
+    public RemoteCommitProvider getRemoteCommitProvider() {
+<span class="nc" id="L82">        return _provider;</span>
+    }
+
+    /**
+     * Whether the oids of added instances will be transmitted.
+     */
+    public boolean getTransmitPersistedObjectIds() {
+<span class="nc" id="L89">        return _transmitPersIds;</span>
+    }
+
+    /**
+     * Whether the oids of added instances will be transmitted.
+     */
+    public void setTransmitPersistedObjectIds(boolean transmit) {
+<span class="nc" id="L96">        _transmitPersIds = transmit;</span>
+<span class="nc" id="L97">    }</span>
+
+    /**
+     * Adds an OpenJPA-internal listener to this RemoteCommitEventManager.
+     * Listeners so registered will be fired before any that are registered
+     * via {@link #addListener}. This means that the external listeners can
+     * rely on internal caches and data structures being up-to-date by the
+     * time that they are invoked.
+     *
+     * @since 1.0.0
+     */
+    public void addInternalListener(RemoteCommitListener listen) {
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        if (_provider == null)</span>
+<span class="nc" id="L110">            throw new UserException(_loc.get(&quot;no-provider&quot;));</span>
+<span class="nc" id="L111">        ((List) _listeners).add(0, listen);</span>
+<span class="nc" id="L112">    }</span>
+
+    public void addListener(RemoteCommitListener listen) {
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (_provider == null)</span>
+<span class="nc" id="L116">            throw new UserException(_loc.get(&quot;no-provider&quot;));</span>
+<span class="nc" id="L117">        super.addListener(listen);</span>
+<span class="nc" id="L118">    }</span>
+
+    /**
+     * Close this manager and all registered listeners.
+     */
+    @Override
+    public void close() {
+<span class="nc bnc" id="L125" title="All 2 branches missed.">        if (_provider != null) {</span>
+<span class="nc" id="L126">            _provider.close();</span>
+<span class="nc" id="L127">            Collection listeners = getListeners();</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">            for (Iterator itr = listeners.iterator(); itr.hasNext();)</span>
+<span class="nc" id="L129">                ((RemoteCommitListener) itr.next()).close();</span>
+        }
+<span class="nc" id="L131">    }</span>
+
+    @Override
+    protected void fireEvent(Object event, Object listener) {
+<span class="nc" id="L135">        RemoteCommitListener listen = (RemoteCommitListener) listener;</span>
+<span class="nc" id="L136">        RemoteCommitEvent ev = (RemoteCommitEvent) event;</span>
+<span class="nc" id="L137">        listen.afterCommit(ev);</span>
+<span class="nc" id="L138">    }</span>
+
+    /**
+     * Fire an event to local listeners only notifying them of a detected
+     * stale record.
+     *
+     * @since 1.0.0
+     */
+    public void fireLocalStaleNotification(Object oid) {
+<span class="nc" id="L147">        RemoteCommitEvent ev = new RemoteCommitEvent(</span>
+            RemoteCommitEvent.PAYLOAD_LOCAL_STALE_DETECTION,
+<span class="nc" id="L149">            null, null, Collections.singleton(oid), null);</span>
+<span class="nc" id="L150">        fireEvent(ev);</span>
+<span class="nc" id="L151">    }</span>
+
+    //////////////////////////////////////
+    // TransactionListener implementation
+    //////////////////////////////////////
+
+    @Override
+    public void afterCommit(TransactionEvent event) {
+<span class="nc bnc" id="L159" title="All 2 branches missed.">        if (_provider != null) {</span>
+<span class="nc" id="L160">            RemoteCommitEvent rce = createRemoteCommitEvent(event);</span>
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            if (rce != null)</span>
+<span class="nc" id="L162">                _provider.broadcast(rce);</span>
+        }
+<span class="nc" id="L164">    }</span>
+
+    /**
+     * Create a remote commit event from the given transaction event.
+     */
+    private RemoteCommitEvent createRemoteCommitEvent(TransactionEvent event) {
+<span class="nc" id="L170">        Broker broker = (Broker) event.getSource();</span>
+        int payload;
+<span class="nc" id="L172">        Collection persIds = null;</span>
+<span class="nc" id="L173">        Collection addClassNames = null;</span>
+<span class="nc" id="L174">        Collection updates = null;</span>
+<span class="nc" id="L175">        Collection deletes = null;</span>
+
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (broker.isTrackChangesByType()) {</span>
+<span class="nc" id="L178">            payload = RemoteCommitEvent.PAYLOAD_EXTENTS;</span>
+<span class="nc" id="L179">            addClassNames = toClassNames(event.getPersistedTypes());</span>
+<span class="nc" id="L180">            updates = toClassNames(event.getUpdatedTypes());</span>
+<span class="nc" id="L181">            deletes = toClassNames(event.getDeletedTypes());</span>
+<span class="nc bnc" id="L182" title="All 6 branches missed.">            if (addClassNames == null &amp;&amp; updates == null &amp;&amp; deletes == null)</span>
+<span class="nc" id="L183">                return null;</span>
+        } else {
+<span class="nc" id="L185">            Collection trans = event.getTransactionalObjects();</span>
+<span class="nc bnc" id="L186" title="All 2 branches missed.">            if (trans.isEmpty())</span>
+<span class="nc" id="L187">                return null;</span>
+
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            payload = (_transmitPersIds)</span>
+<span class="nc" id="L190">                ? RemoteCommitEvent.PAYLOAD_OIDS_WITH_ADDS</span>
+<span class="nc" id="L191">                : RemoteCommitEvent.PAYLOAD_OIDS;</span>
+            Object oid;
+            Object obj;
+            OpenJPAStateManager sm;
+<span class="nc bnc" id="L195" title="All 2 branches missed.">            for (Iterator itr = trans.iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L196">                obj = itr.next();</span>
+<span class="nc" id="L197">                sm = broker.getStateManager(obj);</span>
+
+<span class="nc bnc" id="L199" title="All 6 branches missed.">                if (sm == null || !sm.isPersistent() || !sm.isDirty())</span>
+<span class="nc" id="L200">                    continue;</span>
+<span class="nc bnc" id="L201" title="All 4 branches missed.">                if (sm.isNew() &amp;&amp; sm.isDeleted())</span>
+<span class="nc" id="L202">                    continue;</span>
+
+<span class="nc" id="L204">                oid = sm.fetchObjectId();</span>
+<span class="nc bnc" id="L205" title="All 2 branches missed.">                if (sm.isNew()) {</span>
+<span class="nc bnc" id="L206" title="All 2 branches missed.">                    if (_transmitPersIds) {</span>
+<span class="nc bnc" id="L207" title="All 2 branches missed.">                        if (persIds == null)</span>
+<span class="nc" id="L208">                            persIds = new ArrayList();</span>
+<span class="nc" id="L209">                        persIds.add(oid);</span>
+                    }
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                    if (addClassNames == null)</span>
+<span class="nc" id="L212">                        addClassNames = new HashSet();</span>
+<span class="nc" id="L213">                    addClassNames.add(obj.getClass().getName());</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">                } else if (sm.isDeleted()) {</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                    if (deletes == null)</span>
+<span class="nc" id="L216">                        deletes = new ArrayList();</span>
+<span class="nc" id="L217">                    deletes.add(oid);</span>
+                } else {
+<span class="nc bnc" id="L219" title="All 2 branches missed.">                    if (updates == null)</span>
+<span class="nc" id="L220">                        updates = new ArrayList();</span>
+<span class="nc" id="L221">                    updates.add(oid);</span>
+                }
+            }
+<span class="nc bnc" id="L224" title="All 6 branches missed.">            if (addClassNames == null &amp;&amp; updates == null &amp;&amp; deletes == null)</span>
+<span class="nc" id="L225">                return null;</span>
+        }
+<span class="nc" id="L227">        return new RemoteCommitEvent(payload, persIds, addClassNames, updates,</span>
+            deletes);
+    }
+
+    /**
+     * Transform a collection of classes to class names.
+     */
+    private static Collection toClassNames(Collection clss) {
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (clss.isEmpty())</span>
+<span class="nc" id="L236">            return null;</span>
+
+<span class="nc" id="L238">        List names = new ArrayList(clss);</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        for (int i = 0; i &lt; names.size(); i++)</span>
+<span class="nc" id="L240">            names.set(i, ((Class) names.get(i)).getName());</span>
+<span class="nc" id="L241">        return names;</span>
+    }
+
+    @Override
+    public void beforeCommit(TransactionEvent event) {
+<span class="nc" id="L246">    }</span>
+
+    @Override
+    public void afterRollback(TransactionEvent event) {
+<span class="nc" id="L250">    }</span>
+
+    @Override
+    public void afterCommitComplete(TransactionEvent event) {
+<span class="nc" id="L254">    }</span>
+
+    @Override
+    public void afterRollbackComplete(TransactionEvent event) {
+<span class="nc" id="L258">    }</span>
+
+    @Override
+    public void afterStateTransitions(TransactionEvent event)
+	{
+<span class="nc" id="L263">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

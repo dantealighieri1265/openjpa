@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractPCResultObjectProvider.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">AbstractPCResultObjectProvider.java</span></div><h1>AbstractPCResultObjectProvider.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import org.apache.openjpa.lib.rop.ResultObjectProvider;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.MetaDataRepository;
+import org.apache.openjpa.util.ObjectNotFoundException;
+import org.apache.openjpa.util.StoreException;
+
+/**
+ * Abstract implementation of {@link PCResultObjectProvider}
+ * that implements {@link ResultObjectProvider#getResultObject}
+ * by assembling the necessary information about the object to be loaded.
+ *
+ * @author Patrick Linskey
+ */
+public abstract class AbstractPCResultObjectProvider
+    implements PCResultObjectProvider {
+
+    /**
+     * The {@link StoreContext} that this result object
+     * provider will load objects into.
+     */
+    protected final StoreContext ctx;
+
+    /**
+     * Create a new provider for loading PC objects from the input
+     * into &lt;code&gt;ctx&lt;/code&gt;.
+     */
+<span class="nc" id="L47">    public AbstractPCResultObjectProvider(StoreContext ctx) {</span>
+<span class="nc" id="L48">        this.ctx = ctx;</span>
+<span class="nc" id="L49">    }</span>
+
+    /**
+     * Return the context this provider was constructed with.
+     */
+    public StoreContext getContext() {
+<span class="nc" id="L55">        return ctx;</span>
+    }
+
+    @Override
+    public void initialize(OpenJPAStateManager sm, PCState state,
+        FetchConfiguration fetch)
+        throws Exception {
+<span class="nc" id="L62">        sm.initialize(getPCType(), state);</span>
+<span class="nc" id="L63">        load(sm, fetch);</span>
+<span class="nc" id="L64">    }</span>
+
+    @Override
+    public Object getResultObject()
+        throws Exception {
+<span class="nc" id="L69">        Class type = getPCType();</span>
+<span class="nc" id="L70">        MetaDataRepository repos = ctx.getConfiguration().</span>
+<span class="nc" id="L71">            getMetaDataRepositoryInstance();</span>
+<span class="nc" id="L72">        ClassMetaData meta = repos.getMetaData</span>
+<span class="nc" id="L73">            (type, ctx.getClassLoader(), true);</span>
+
+<span class="nc" id="L75">        Object oid = getObjectId(meta);</span>
+<span class="nc" id="L76">        Object res = ctx.find(oid, null, null, this, 0);</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">        if (res == null)</span>
+<span class="nc" id="L78">            throw new ObjectNotFoundException(oid);</span>
+<span class="nc" id="L79">        return res;</span>
+    }
+
+    /**
+     * Implement this method to extract the object id value from the
+     * current record of the input.
+     */
+    protected abstract Object getObjectId(ClassMetaData meta)
+        throws Exception;
+
+    /**
+     * Implement this method to extract the type of the pc stored
+     * in the current record of the input.
+     */
+    protected abstract Class getPCType()
+        throws Exception;
+
+    /**
+     * Load data from the current input record into the given state
+     * manager. Remember to call {@link OpenJPAStateManager#setVersion} to set
+     * the optimistic versioning information, if it has any.
+     */
+    protected abstract void load(OpenJPAStateManager sm,
+        FetchConfiguration fetch)
+        throws Exception;
+
+    /**
+     * Override if desired. Does nothing by default.
+     */
+    @Override
+    public void open()
+        throws Exception {
+<span class="nc" id="L111">    }</span>
+
+    /**
+     * Override if desired. Returns false by default.
+     *
+     * @see ResultObjectProvider#supportsRandomAccess
+     */
+    @Override
+    public boolean supportsRandomAccess() {
+<span class="nc" id="L120">        return false;</span>
+    }
+
+    /**
+     * Implement this method to advance the input.
+     *
+     * @see ResultObjectProvider#next
+     */
+    @Override
+    public abstract boolean next()
+        throws Exception;
+
+    /**
+     * Override if desired. Throws an exception by default.
+     *
+     * @see ResultObjectProvider#absolute
+     */
+    @Override
+    public boolean absolute(int pos)
+        throws Exception {
+<span class="nc" id="L140">        throw new UnsupportedOperationException();</span>
+    }
+
+    /**
+     * Override if desired. Returns {@link Integer#MAX_VALUE} by default.
+     *
+     * @see ResultObjectProvider#size
+     */
+    @Override
+    public int size()
+        throws Exception {
+<span class="nc" id="L151">        return Integer.MAX_VALUE;</span>
+    }
+
+    /**
+     * Override if desired. Throws an exception by default.
+     *
+     * @see ResultObjectProvider#reset
+     */
+    @Override
+    public void reset()
+        throws Exception {
+<span class="nc" id="L162">        throw new UnsupportedOperationException();</span>
+    }
+
+    /**
+     * Override if desired. Does nothing by default.
+     *
+     * @see ResultObjectProvider#close
+     */
+    @Override
+    public void close()
+        throws Exception {
+<span class="nc" id="L173">    }</span>
+
+    /**
+     * Throws a {@link StoreException} by default.
+     */
+    @Override
+    public void handleCheckedException(Exception e) {
+<span class="nc" id="L180">        throw new StoreException (e);</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

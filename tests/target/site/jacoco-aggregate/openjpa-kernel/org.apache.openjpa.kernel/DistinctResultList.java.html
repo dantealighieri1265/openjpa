@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DistinctResultList.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">DistinctResultList.java</span></div><h1>DistinctResultList.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.io.ObjectStreamException;
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
+import java.util.ListIterator;
+
+import org.apache.openjpa.lib.rop.ResultList;
+import org.apache.openjpa.util.RuntimeExceptionTranslator;
+
+/**
+ * An immutable list that imposes uniqueness on its member. This implementation
+ * traverses the entire result list on construction. So it is not suitable or
+ * efficient for large results. All mutation operations (except clear()) throw
+ * {@link UnsupportedOperationException}.
+ *
+ * @author Pinaki Poddar
+ * @since 2.0.0
+ *
+ * @param &lt;E&gt;
+ *            element type
+ */
+public class DistinctResultList&lt;E&gt; implements List&lt;E&gt;, Serializable {
+    private static final long serialVersionUID = -6140119764940777922L;
+
+    private final ArrayList&lt;E&gt; _del;
+    private final RuntimeExceptionTranslator _trans;
+
+<span class="nc" id="L50">    public DistinctResultList(ResultList&lt;E&gt; list, RuntimeExceptionTranslator trans) {</span>
+<span class="nc" id="L51">        _del = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L52">        _trans = trans;</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">        for (E e : list) {</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">            if (!_del.contains(e))</span>
+<span class="nc" id="L55">                _del.add(e);</span>
+<span class="nc" id="L56">        }</span>
+<span class="nc" id="L57">    }</span>
+
+    @Override
+    public boolean add(E o) {
+<span class="nc" id="L61">        throw new UnsupportedOperationException();</span>
+    }
+
+    @Override
+    public void add(int index, E element) {
+<span class="nc" id="L66">        throw new UnsupportedOperationException();</span>
+    }
+
+    @Override
+    public boolean addAll(Collection&lt;? extends E&gt; c) {
+<span class="nc" id="L71">        throw new UnsupportedOperationException();</span>
+    }
+
+    @Override
+    public boolean addAll(int index, Collection&lt;? extends E&gt; c) {
+<span class="nc" id="L76">        throw new UnsupportedOperationException();</span>
+    }
+
+    @Override
+    public void clear() {
+        try {
+<span class="nc" id="L82">            _del.clear();</span>
+<span class="nc" id="L83">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L84">            throw translate(re);</span>
+<span class="nc" id="L85">        }</span>
+<span class="nc" id="L86">    }</span>
+
+    @Override
+    public boolean contains(Object o) {
+        try {
+<span class="nc" id="L91">            return _del.contains(o);</span>
+<span class="nc" id="L92">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L93">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean containsAll(Collection&lt;?&gt; c) {
+        try {
+<span class="nc" id="L100">            return _del.containsAll(c);</span>
+<span class="nc" id="L101">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L102">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public E get(int index) {
+        try {
+<span class="nc" id="L109">            return _del.get(index);</span>
+<span class="nc" id="L110">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L111">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public int indexOf(Object o) {
+        try {
+<span class="nc" id="L118">            return _del.indexOf(o);</span>
+<span class="nc" id="L119">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L120">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean isEmpty() {
+        try {
+<span class="nc" id="L127">            return _del.isEmpty();</span>
+<span class="nc" id="L128">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L129">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Iterator&lt;E&gt; iterator() {
+        try {
+<span class="nc" id="L136">            return _del.iterator();</span>
+<span class="nc" id="L137">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L138">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public int lastIndexOf(Object o) {
+        try {
+<span class="nc" id="L145">            return _del.indexOf(o);</span>
+<span class="nc" id="L146">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L147">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public ListIterator&lt;E&gt; listIterator() {
+        try {
+<span class="nc" id="L154">            return _del.listIterator();</span>
+<span class="nc" id="L155">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L156">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public ListIterator&lt;E&gt; listIterator(int index) {
+        try {
+<span class="nc" id="L163">            return _del.listIterator(index);</span>
+<span class="nc" id="L164">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L165">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public boolean remove(Object o) {
+<span class="nc" id="L171">        throw new UnsupportedOperationException();</span>
+    }
+
+    @Override
+    public E remove(int index) {
+<span class="nc" id="L176">        throw new UnsupportedOperationException();</span>
+    }
+
+    @Override
+    public boolean removeAll(Collection&lt;?&gt; c) {
+<span class="nc" id="L181">        throw new UnsupportedOperationException();</span>
+    }
+
+    @Override
+    public boolean retainAll(Collection&lt;?&gt; c) {
+<span class="nc" id="L186">        throw new UnsupportedOperationException();</span>
+    }
+
+    @Override
+    public E set(int index, E element) {
+<span class="nc" id="L191">        throw new UnsupportedOperationException();</span>
+    }
+
+    @Override
+    public int size() {
+        try {
+<span class="nc" id="L197">            return _del.size();</span>
+<span class="nc" id="L198">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L199">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public List&lt;E&gt; subList(int fromIndex, int toIndex) {
+        try {
+<span class="nc" id="L206">            return _del.subList(fromIndex, toIndex);</span>
+<span class="nc" id="L207">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L208">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Object[] toArray() {
+        try {
+<span class="nc" id="L215">            return _del.toArray();</span>
+<span class="nc" id="L216">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L217">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public &lt;T&gt; T[] toArray(T[] a) {
+        try {
+<span class="nc" id="L224">            return _del.toArray(a);</span>
+<span class="nc" id="L225">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L226">            throw translate(re);</span>
+        }
+    }
+
+    protected RuntimeException translate(RuntimeException re) {
+<span class="nc bnc" id="L231" title="All 2 branches missed.">        return (_trans == null) ? re : _trans.translate(re);</span>
+    }
+
+    public Object writeReplace()
+        throws ObjectStreamException {
+<span class="nc" id="L236">        return _del;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

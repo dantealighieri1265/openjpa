@@ -1,0 +1,422 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractMetaDataDefaults.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.meta</a> &gt; <span class="el_source">AbstractMetaDataDefaults.java</span></div><h1>AbstractMetaDataDefaults.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.meta;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.Member;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.security.PrivilegedActionException;
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.openjpa.enhance.PCRegistry;
+import org.apache.openjpa.lib.log.Log;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.util.OpenJPAException;
+import org.apache.openjpa.util.UserException;
+
+/**
+ * Abstract implementation provides a set of generic utilities for detecting
+ * persistence meta-data of Field/Member. Also provides bean-style properties
+ * such as access style or identity type to be used by default when such
+ * information is not derivable from available meta-data.
+ *
+ * @author Abe White
+ * @author Pinaki Poddar
+ */
+<span class="nc" id="L44">public abstract class AbstractMetaDataDefaults</span>
+    implements MetaDataDefaults {
+
+<span class="nc" id="L47">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L48">        (AbstractMetaDataDefaults.class);</span>
+
+<span class="nc" id="L50">    private int _access = AccessCode.FIELD;</span>
+<span class="nc" id="L51">    private int _identity = ClassMetaData.ID_UNKNOWN;</span>
+<span class="nc" id="L52">    private boolean _ignore = true;</span>
+<span class="nc" id="L53">    private boolean _interface = true;</span>
+<span class="nc" id="L54">    private boolean _pcRegistry = true;</span>
+<span class="nc" id="L55">    private int _callback = CALLBACK_RETHROW;</span>
+<span class="nc" id="L56">    private boolean _unwrapped = false;</span>
+
+    /**
+     * Whether to attempt to use the information from registered classes
+     * to populate metadata defaults. Defaults to true.
+     */
+    public boolean getUsePCRegistry() {
+<span class="nc" id="L63">        return _pcRegistry;</span>
+    }
+
+    /**
+     * Whether to attempt to use the information from registered classes
+     * to populate metadata defaults. Defaults to true.
+     */
+    public void setUsePCRegistry(boolean pcRegistry) {
+<span class="nc" id="L71">        _pcRegistry = pcRegistry;</span>
+<span class="nc" id="L72">    }</span>
+
+    /**
+     * The default access type for base classes with ACCESS_UNKNOWN.
+     * ACCESS_FIELD by default.
+     */
+    @Override
+    public int getDefaultAccessType() {
+<span class="nc" id="L80">        return _access;</span>
+    }
+
+    /**
+     * The default access type for base classes with ACCESS_UNKNOWN.
+     * ACCESS_FIELD by default.
+     */
+    public void setDefaultAccessType(int access) {
+<span class="nc" id="L88">        _access = access;</span>
+<span class="nc" id="L89">    }</span>
+
+    /**
+     * The default identity type for unmapped classes without primary
+     * key fields. ID_UNKNOWN by default.
+     */
+    @Override
+    public int getDefaultIdentityType() {
+<span class="nc" id="L97">        return _identity;</span>
+    }
+
+    /**
+     * The default identity type for unmapped classes without primary
+     * key fields. ID_UNKNOWN by default.
+     */
+    public void setDefaultIdentityType(int identity) {
+<span class="nc" id="L105">        _identity = identity;</span>
+<span class="nc" id="L106">    }</span>
+
+    @Override
+    public int getCallbackMode() {
+<span class="nc" id="L110">        return _callback;</span>
+    }
+
+    public void setCallbackMode(int mode) {
+<span class="nc" id="L114">        _callback = mode;</span>
+<span class="nc" id="L115">    }</span>
+
+    public void setCallbackMode(int mode, boolean on) {
+<span class="nc bnc" id="L118" title="All 2 branches missed.">        if (on)</span>
+<span class="nc" id="L119">            _callback |= mode;</span>
+        else
+<span class="nc" id="L121">            _callback &amp;= ~mode;</span>
+<span class="nc" id="L122">    }</span>
+
+    @Override
+    public boolean getCallbacksBeforeListeners(int type) {
+<span class="nc" id="L126">        return false;</span>
+    }
+
+    @Override
+    public boolean isDeclaredInterfacePersistent() {
+<span class="nc" id="L131">        return _interface;</span>
+    }
+
+    public void setDeclaredInterfacePersistent(boolean pers) {
+<span class="nc" id="L135">        _interface = pers;</span>
+<span class="nc" id="L136">    }</span>
+
+    @Override
+    public boolean isDataStoreObjectIdFieldUnwrapped() {
+<span class="nc" id="L140">        return _unwrapped;</span>
+    }
+
+    public void setDataStoreObjectIdFieldUnwrapped(boolean unwrapped) {
+<span class="nc" id="L144">        _unwrapped = unwrapped;</span>
+<span class="nc" id="L145">    }</span>
+
+    public boolean getIgnoreNonPersistent() {
+<span class="nc" id="L148">        return _ignore;</span>
+    }
+
+    @Override
+    public void setIgnoreNonPersistent(boolean ignore) {
+<span class="nc" id="L153">        _ignore = ignore;</span>
+<span class="nc" id="L154">    }</span>
+
+    @Override
+    public void populate(ClassMetaData meta, int access) {
+<span class="nc" id="L158">        populate(meta, access, false);</span>
+<span class="nc" id="L159">    }</span>
+
+    @Override
+    public void populate(ClassMetaData meta, int access, boolean ignoreTransient) {
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (meta.getDescribedType() == Object.class)</span>
+<span class="nc" id="L164">            return;</span>
+<span class="nc" id="L165">        meta.setAccessType(access);</span>
+
+<span class="nc" id="L167">        Log log = meta.getRepository().getLog();</span>
+<span class="nc bnc" id="L168" title="All 2 branches missed.">        if (log.isTraceEnabled())</span>
+<span class="nc" id="L169">            log.trace(_loc.get(&quot;gen-meta&quot;, meta));</span>
+<span class="nc bnc" id="L170" title="All 4 branches missed.">        if (!_pcRegistry || !populateFromPCRegistry(meta)) {</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">            if (log.isTraceEnabled())</span>
+<span class="nc" id="L172">                log.trace(_loc.get(&quot;meta-reflect&quot;));</span>
+<span class="nc" id="L173">            populateFromReflection(meta, ignoreTransient);</span>
+        }
+<span class="nc" id="L175">    }</span>
+
+    /**
+     * Populate the given metadata using the {@link PCRegistry}.
+     */
+    private boolean populateFromPCRegistry(ClassMetaData meta) {
+<span class="nc" id="L181">        Class&lt;?&gt; cls = meta.getDescribedType();</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (!PCRegistry.isRegistered(cls))</span>
+<span class="nc" id="L183">            return false;</span>
+        try {
+<span class="nc" id="L185">            String[] fieldNames = PCRegistry.getFieldNames(cls);</span>
+<span class="nc" id="L186">            Class&lt;?&gt;[] fieldTypes = PCRegistry.getFieldTypes(cls);</span>
+            Member member;
+            FieldMetaData fmd;
+<span class="nc bnc" id="L189" title="All 2 branches missed.">            for (int i = 0; i &lt; fieldNames.length; i ++) {</span>
+<span class="nc" id="L190">            	String property = fieldNames[i];</span>
+<span class="nc" id="L191">                member = getMemberByProperty(meta, property,</span>
+                	AccessCode.UNKNOWN, true);
+<span class="nc bnc" id="L193" title="All 2 branches missed.">                if (member == null) // transient or indeterminable access</span>
+<span class="nc" id="L194">                	continue;</span>
+<span class="nc" id="L195">                fmd = meta.addDeclaredField(property, fieldTypes[i]);</span>
+<span class="nc" id="L196">                fmd.backingMember(member);</span>
+<span class="nc" id="L197">                populate(fmd);</span>
+            }
+<span class="nc" id="L199">            return true;</span>
+<span class="nc" id="L200">        } catch (OpenJPAException ke) {</span>
+<span class="nc" id="L201">            throw ke;</span>
+<span class="nc" id="L202">        } catch (Exception e) {</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">            if (e instanceof PrivilegedActionException)</span>
+<span class="nc" id="L204">                e = ((PrivilegedActionException) e).getException();</span>
+<span class="nc" id="L205">            throw new UserException(e);</span>
+        }
+    }
+
+    protected abstract List&lt;Member&gt; getPersistentMembers(ClassMetaData meta, boolean ignoreTransient);
+    /**
+     * Generate the given meta-data using reflection.
+     * Adds FieldMetaData for each persistent state.
+     * Delegate to concrete implementation to determine the persistent
+     * members.
+     */
+    private void populateFromReflection(ClassMetaData meta, boolean ignoreTransient) {
+<span class="nc" id="L217">        List&lt;Member&gt; members = getPersistentMembers(meta, ignoreTransient);</span>
+<span class="nc" id="L218">        boolean iface = meta.getDescribedType().isInterface();</span>
+        // If access is mixed or if the default is currently unknown,
+        // process all fields, otherwise only process members of the class
+        // level default access type.
+
+        String name;
+        boolean def;
+        FieldMetaData fmd;
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        for (int i = 0; i &lt; members.size(); i++) {</span>
+<span class="nc" id="L227">            Member member = members.get(i);</span>
+<span class="nc" id="L228">            name = getFieldName(member);</span>
+<span class="nc bnc" id="L229" title="All 4 branches missed.">            if (name == null || isReservedFieldName(name))</span>
+<span class="nc" id="L230">                continue;</span>
+
+<span class="nc" id="L232">            def = isDefaultPersistent(meta, member, name, ignoreTransient);</span>
+<span class="nc bnc" id="L233" title="All 4 branches missed.">            if (!def &amp;&amp; _ignore)</span>
+<span class="nc" id="L234">                continue;</span>
+
+            // passed the tests; persistent type -- we construct with
+            // Object.class because setting backing member will set proper
+            // type anyway
+<span class="nc" id="L239">            fmd = meta.addDeclaredField(name, Object.class);</span>
+<span class="nc" id="L240">            fmd.backingMember(member);</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            if (!def) {</span>
+<span class="nc" id="L242">                fmd.setExplicit(true);</span>
+<span class="nc" id="L243">                fmd.setManagement(FieldMetaData.MANAGE_NONE);</span>
+            }
+<span class="nc" id="L245">            populate(fmd);</span>
+        }
+<span class="nc" id="L247">    }</span>
+
+    protected void populate(FieldMetaData fmd) {
+
+<span class="nc" id="L251">    }</span>
+
+    /**
+     * Return the list of fields in &lt;code&gt;meta&lt;/code&gt; that use field access,
+     * or &lt;code&gt;null&lt;/code&gt; if a list of fields is unobtainable. An empty list
+     * should be returned if the list of fields is obtainable, but there
+     * happens to be no field access in &lt;code&gt;meta&lt;/code&gt;.
+     *
+     * This is used for error reporting purposes only, so need not be efficient.
+     *
+     * This implementation returns &lt;code&gt;null&lt;/code&gt;.
+     */
+    protected List&lt;String&gt; getFieldAccessNames(ClassMetaData meta) {
+<span class="nc" id="L264">        return null;</span>
+    }
+
+    /**
+     * Return the list of methods in &lt;code&gt;meta&lt;/code&gt; that use property access,
+     * or &lt;code&gt;null&lt;/code&gt; if a list of methods is unobtainable. An empty list
+     * should be returned if the list of methods is obtainable, but there
+     * happens to be no property access in &lt;code&gt;meta&lt;/code&gt;.
+     *
+     * This is used for error reporting purposes only, so need not be efficient.
+     *
+     * This implementation returns &lt;code&gt;null&lt;/code&gt;.
+     */
+    protected List&lt;String&gt; getPropertyAccessNames(ClassMetaData meta) {
+<span class="nc" id="L278">        return null;</span>
+    }
+
+    /**
+     * Return the field name for the given member. This will only be invoked
+     * on members of the right type (field vs. method). Return null if the
+     * member cannot be managed. Default behavior: For fields, returns the
+     * field name. For getter methods, returns the minus &quot;get&quot; or &quot;is&quot; with
+     * the next letter lower-cased. For other methods, returns null.
+     */
+    public static String getFieldName(Member member) {
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if (member instanceof Field)</span>
+<span class="nc" id="L290">            return member.getName();</span>
+<span class="nc bnc" id="L291" title="All 2 branches missed.">        if (member instanceof Method == false)</span>
+<span class="nc" id="L292">        	return null;</span>
+<span class="nc" id="L293">        Method method = (Method) member;</span>
+<span class="nc" id="L294">        String name = method.getName();</span>
+<span class="nc bnc" id="L295" title="All 2 branches missed.">        if (isNormalGetter(method))</span>
+<span class="nc" id="L296">        	name = name.substring(&quot;get&quot;.length());</span>
+<span class="nc bnc" id="L297" title="All 2 branches missed.">        else if (isBooleanGetter(method))</span>
+<span class="nc" id="L298">        	name = name.substring(&quot;is&quot;.length());</span>
+        else
+<span class="nc" id="L300">            return null;</span>
+
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        if (name.length() == 1)</span>
+<span class="nc" id="L303">            return name.toLowerCase();</span>
+<span class="nc" id="L304">        return Character.toLowerCase(name.charAt(0)) + name.substring(1);</span>
+    }
+
+    /**
+     * Returns true if the given field name is reserved for unmanaged fields.
+     */
+    protected boolean isReservedFieldName(String name) {
+        // names used by enhancers
+<span class="nc bnc" id="L312" title="All 4 branches missed.">        return name.startsWith(&quot;openjpa&quot;) || name.startsWith(&quot;jdo&quot;);</span>
+    }
+
+    /**
+     * Return true if the given member is persistent by default. This will
+     * only be invoked on members of the right type (field vs. method).
+     * Returns false if member is static or final by default.
+     *
+     * @param name the field name from {@link #getFieldName}
+     */
+    protected abstract boolean isDefaultPersistent(ClassMetaData meta,
+        Member member, String name, boolean ignoreTransient);
+
+    /**
+     * Gets the backing member of the given field. If the field has not been
+     * assigned a backing member then get either the instance field or the
+     * getter method depending upon the access style of the defining class.
+     * &lt;br&gt;
+     * Defining class is used instead of declaring class because this method
+     * may be invoked during parsing phase when declaring metadata may not be
+     * available.
+     */
+    @Override
+    public Member getBackingMember(FieldMetaData fmd) {
+<span class="nc bnc" id="L336" title="All 2 branches missed.">        if (fmd == null)</span>
+<span class="nc" id="L337">            return null;</span>
+<span class="nc bnc" id="L338" title="All 2 branches missed.">        if (fmd.getBackingMember() != null)</span>
+<span class="nc" id="L339">        	return fmd.getBackingMember();</span>
+<span class="nc" id="L340">        return getMemberByProperty(fmd.getDeclaringMetaData(), fmd.getName(),</span>
+<span class="nc" id="L341">            fmd.getAccessType(), true);</span>
+    }
+
+    @Override
+    public Class&lt;?&gt; getUnimplementedExceptionType() {
+<span class="nc" id="L346">        return UnsupportedOperationException.class;</span>
+    }
+
+    /**
+     * Helper method; returns true if the given class appears to be
+     * user-defined.
+     */
+    protected static boolean isUserDefined(Class&lt;?&gt; cls) {
+<span class="nc bnc" id="L354" title="All 4 branches missed.">        return cls != null &amp;&amp; !cls.getName().startsWith(&quot;java.&quot;)</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">            &amp;&amp; !cls.getName().startsWith (&quot;javax.&quot;);</span>
+	}
+
+    /**
+     * Affirms if the given method matches the following signature
+     * &lt;code&gt; public T getXXX() &lt;/code&gt;
+     * where T is any non-void type.
+     */
+    public static boolean isNormalGetter(Method method) {
+<span class="nc" id="L364">    	String methodName = method.getName();</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">    	return startsWith(methodName, &quot;get&quot;)</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">    	    &amp;&amp; method.getParameterTypes().length == 0</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">    	    &amp;&amp; method.getReturnType() != void.class;</span>
+    }
+
+    /**
+     * Affirms if the given method matches the following signature
+     * &lt;code&gt; public boolean isXXX() &lt;/code&gt;
+     * &lt;code&gt; public Boolean isXXX() &lt;/code&gt;
+     */
+    public static boolean isBooleanGetter(Method method) {
+<span class="nc" id="L376">    	String methodName = method.getName();</span>
+<span class="nc bnc" id="L377" title="All 2 branches missed.">    	return startsWith(methodName, &quot;is&quot;)</span>
+<span class="nc bnc" id="L378" title="All 2 branches missed.">    	    &amp;&amp; method.getParameterTypes().length == 0</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">    	    &amp;&amp; isBoolean(method.getReturnType());</span>
+    }
+
+    /**
+     * Affirms if the given method signature matches bean-style getter method
+     * signature.&lt;br&gt;
+     * &lt;code&gt; public T getXXX()&lt;/code&gt; where T is any non-void type.&lt;br&gt;
+     * or&lt;br&gt;
+     * &lt;code&gt; public T isXXX()&lt;/code&gt; where T is boolean or Boolean.&lt;br&gt;
+     */
+    public static boolean isGetter(Method method, boolean includePrivate) {
+<span class="nc bnc" id="L390" title="All 2 branches missed.">    	if (method == null)</span>
+<span class="nc" id="L391">    		return false;</span>
+<span class="nc" id="L392">    	int mods = method.getModifiers();</span>
+<span class="nc bnc" id="L393" title="All 2 branches missed.">    	if (!(Modifier.isPublic(mods)</span>
+<span class="nc bnc" id="L394" title="All 2 branches missed.">    	      || Modifier.isProtected(mods)</span>
+<span class="nc bnc" id="L395" title="All 4 branches missed.">    	      || (Modifier.isPrivate(mods) &amp;&amp; includePrivate))</span>
+<span class="nc bnc" id="L396" title="All 2 branches missed.">    	 || Modifier.isNative(mods)</span>
+<span class="nc bnc" id="L397" title="All 2 branches missed.">    	 || Modifier.isStatic(mods))</span>
+<span class="nc" id="L398">    		return false;</span>
+<span class="nc bnc" id="L399" title="All 4 branches missed.">    	return isNormalGetter(method) || isBooleanGetter(method);</span>
+    }
+
+    /**
+     * Affirms if the given full string starts with the given head.
+     */
+    public static boolean startsWith(String full, String head) {
+<span class="nc bnc" id="L406" title="All 6 branches missed.">        return full != null &amp;&amp; head != null &amp;&amp; full.startsWith(head)</span>
+<span class="nc bnc" id="L407" title="All 2 branches missed.">            &amp;&amp; full.length() &gt; head.length();</span>
+    }
+
+    public static boolean isBoolean(Class&lt;?&gt; cls) {
+<span class="nc bnc" id="L411" title="All 4 branches missed.">    	return cls == boolean.class || cls == Boolean.class;</span>
+    }
+
+    public static List&lt;String&gt; toNames(List&lt;? extends Member&gt; members) {
+<span class="nc" id="L415">    	List&lt;String&gt; result = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L416" title="All 2 branches missed.">    	for (Member m : members)</span>
+<span class="nc" id="L417">    		result.add(m.getName());</span>
+<span class="nc" id="L418">    	return result;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

@@ -1,0 +1,917 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ExpressionStoreQuery.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">ExpressionStoreQuery.java</span></div><h1>ExpressionStoreQuery.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.io.Serializable;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.datacache.DataCache;
+import org.apache.openjpa.kernel.exps.AbstractExpressionVisitor;
+import org.apache.openjpa.kernel.exps.AggregateListener;
+import org.apache.openjpa.kernel.exps.Constant;
+import org.apache.openjpa.kernel.exps.ExpressionFactory;
+import org.apache.openjpa.kernel.exps.ExpressionParser;
+import org.apache.openjpa.kernel.exps.FilterListener;
+import org.apache.openjpa.kernel.exps.InMemoryExpressionFactory;
+import org.apache.openjpa.kernel.exps.Path;
+import org.apache.openjpa.kernel.exps.QueryExpressions;
+import org.apache.openjpa.kernel.exps.Resolver;
+import org.apache.openjpa.kernel.exps.StringContains;
+import org.apache.openjpa.kernel.exps.Subquery;
+import org.apache.openjpa.kernel.exps.Val;
+import org.apache.openjpa.kernel.exps.Value;
+import org.apache.openjpa.kernel.exps.WildcardMatch;
+import org.apache.openjpa.lib.rop.ListResultObjectProvider;
+import org.apache.openjpa.lib.rop.RangeResultObjectProvider;
+import org.apache.openjpa.lib.rop.ResultObjectProvider;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.OrderedMap;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.FieldMetaData;
+import org.apache.openjpa.meta.JavaTypes;
+import org.apache.openjpa.util.ImplHelper;
+import org.apache.openjpa.util.InvalidStateException;
+import org.apache.openjpa.util.UnsupportedException;
+import org.apache.openjpa.util.UserException;
+
+/**
+ * Implementation of an expression-based query, which can handle
+ * String-based query expressions such as JPQL and JDOQL.
+ * This implementation is suitable for in-memory operation.
+ * Override the following methods to also support datastore operation:
+ * &lt;ul&gt;
+ * &lt;li&gt;Override {@link #supportsDataStoreExecution} to return
+ * &lt;code&gt;true&lt;/code&gt;.&lt;/li&gt;
+ * &lt;li&gt;Override {@link #executeQuery}, {@link #executeDelete}, and
+ * {@link #executeUpdate} to execute the query against the data store.
+ * Keep in mind that the parameters passed to this method might be in use
+ * by several threads in different query instances. Thus components like
+ * the expression factory must either be thread safe, or this method must
+ * synchronize on them.&lt;/li&gt;
+ * &lt;li&gt;Override {@link #getDataStoreActions} to return a representation of
+ * the actions that will be taken on the data store. For use in visual
+ * tools.&lt;/li&gt;
+ * &lt;li&gt;Override {@link #getExpressionFactory} to return a factory for creating
+ * expressions in the datastore's language. The factory must be cachable.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * @author Abe White
+ */
+public class ExpressionStoreQuery
+    extends AbstractStoreQuery {
+
+    
+    private static final long serialVersionUID = 1L;
+
+<span class="nc" id="L92">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L93">        (ExpressionStoreQuery.class);</span>
+
+    // maintain support for a couple of deprecated extensions
+<span class="nc" id="L96">    private static final FilterListener[] _listeners = new FilterListener[]{</span>
+        new StringContains(), new WildcardMatch(),
+    };
+
+    protected final ExpressionParser _parser;
+    protected transient Object _parsed;
+
+    /**
+     * Construct a query with a parser for the language.
+     */
+<span class="nc" id="L106">    public ExpressionStoreQuery(ExpressionParser parser) {</span>
+<span class="nc" id="L107">        _parser = parser;</span>
+<span class="nc" id="L108">    }</span>
+
+    /**
+     * Resolver used in parsing.
+     */
+    public Resolver getResolver() {
+<span class="nc" id="L114">        return new Resolver() {</span>
+            @Override
+            public Class classForName(String name, String[] imports) {
+<span class="nc" id="L117">                return ctx.classForName(name, imports);</span>
+            }
+
+            @Override
+            public FilterListener getFilterListener(String tag) {
+<span class="nc" id="L122">                return ctx.getFilterListener(tag);</span>
+            }
+
+            @Override
+            public AggregateListener getAggregateListener(String tag) {
+<span class="nc" id="L127">                return ctx.getAggregateListener(tag);</span>
+            }
+
+            @Override
+            public OpenJPAConfiguration getConfiguration() {
+<span class="nc" id="L132">                return ctx.getStoreContext().getConfiguration();</span>
+            }
+
+            @Override
+            public QueryContext getQueryContext() {
+<span class="nc" id="L137">                return ctx;</span>
+            }
+        };
+    }
+
+    /**
+     * Allow direct setting of parsed state for facades that do parsing.
+     * The facade should call this method twice: once with the query string,
+     * and again with the parsed state.
+     */
+    @Override
+    public boolean setQuery(Object query) {
+<span class="nc" id="L149">        _parsed = query;</span>
+<span class="nc" id="L150">        return true;</span>
+    }
+
+    @Override
+    public FilterListener getFilterListener(String tag) {
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        for (int i = 0; i &lt; _listeners.length; i++)</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">            if (_listeners[i].getTag().equals(tag))</span>
+<span class="nc" id="L157">                return _listeners[i];</span>
+<span class="nc" id="L158">        return null;</span>
+    }
+
+    @Override
+    public Object newCompilation() {
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (_parsed != null)</span>
+<span class="nc" id="L164">            return _parsed;</span>
+<span class="nc" id="L165">        return _parser.parse(ctx.getQueryString(), this);</span>
+    }
+
+    @Override
+    public Object getCompilation() {
+<span class="nc" id="L170">        return _parsed;</span>
+    }
+
+    @Override
+    public void populateFromCompilation(Object comp) {
+<span class="nc" id="L175">        _parser.populate(comp, this);</span>
+<span class="nc" id="L176">    }</span>
+
+    @Override
+    public void invalidateCompilation() {
+<span class="nc" id="L180">        _parsed = null;</span>
+<span class="nc" id="L181">    }</span>
+
+    @Override
+    public boolean supportsInMemoryExecution() {
+<span class="nc" id="L185">        return true;</span>
+    }
+
+    @Override
+    public Executor newInMemoryExecutor(ClassMetaData meta, boolean subs) {
+<span class="nc" id="L190">        return new InMemoryExecutor(this, meta, subs, _parser,</span>
+<span class="nc" id="L191">        		ctx.getCompilation(), new InMemoryExpressionFactory());</span>
+    }
+
+    @Override
+    public Executor newDataStoreExecutor(ClassMetaData meta, boolean subs) {
+<span class="nc" id="L196">        return new DataStoreExecutor(this, meta, subs, _parser,</span>
+<span class="nc" id="L197">            ctx.getCompilation());</span>
+    }
+
+    ////////////////////////
+    // Methods for Override
+    ////////////////////////
+
+    /**
+     * Execute the given expression against the given candidate extent.
+     *
+     * @param ex current executor
+     * @param base the base type the query should match
+     * @param types the independent candidate types
+     * @param subclasses true if subclasses should be included in the results
+     * @param facts the expression factory used to build the query for
+     * each base type
+     * @param parsed the parsed query values
+     * @param params parameter values, or empty array
+     * @param range result range
+     * @return a provider for matching objects
+     */
+    protected ResultObjectProvider executeQuery(Executor ex,
+        ClassMetaData base, ClassMetaData[] types, boolean subclasses,
+        ExpressionFactory[] facts, QueryExpressions[] parsed, Object[] params,
+        Range range) {
+<span class="nc" id="L222">        throw new UnsupportedException();</span>
+    }
+
+    /**
+     * Execute the given expression against the given candidate extent
+     * and delete the instances.
+     *
+     * @param ex current executor
+     * @param base the base type the query should match
+     * @param types the independent candidate types
+     * @param subclasses true if subclasses should be included in the results
+     * @param facts the expression factory used to build the query for
+     * each base type
+     * @param parsed the parsed query values
+     * @param params parameter values, or empty array
+     * @return a number indicating the number of instances deleted,
+     * or null to execute the delete in memory
+     */
+    protected Number executeDelete(Executor ex, ClassMetaData base,
+        ClassMetaData[] types, boolean subclasses, ExpressionFactory[] facts,
+        QueryExpressions[] parsed, Object[] params) {
+<span class="nc" id="L243">        return null;</span>
+    }
+
+    /**
+     * Execute the given expression against the given candidate extent
+     * and updates the instances.
+     *
+     * @param ex current executor
+     * @param base the base type the query should match
+     * @param types the independent candidate types
+     * @param subclasses true if subclasses should be included in the results
+     * @param facts the expression factory used to build the query for
+     * each base type
+     * @param parsed the parsed query values
+     * @param params parameter values, or empty array
+     * @return a number indicating the number of instances updated,
+     * or null to execute the update in memory.
+     */
+    protected Number executeUpdate(Executor ex, ClassMetaData base,
+        ClassMetaData[] types, boolean subclasses, ExpressionFactory[] facts,
+        QueryExpressions[] parsed, Object[] params) {
+<span class="nc" id="L264">        return null;</span>
+    }
+
+    /**
+     * Return the commands that will be sent to the datastore in order
+     * to execute the query, typically in the database's native language.
+     *
+     * @param base the base type the query should match
+     * @param types the independent candidate types
+     * @param subclasses true if subclasses should be included in the results
+     * @param facts the expression factory used to build the query for
+     * each base type
+     * @param parsed the parsed query values
+     * @param params parameter values, or empty array
+     * @param range result range
+     * @return a textual description of the query to execute
+     */
+    protected String[] getDataStoreActions(ClassMetaData base,
+        ClassMetaData[] types, boolean subclasses, ExpressionFactory[] facts,
+        QueryExpressions[] parsed, Object[] params, Range range) {
+<span class="nc" id="L284">        return StoreQuery.EMPTY_STRINGS;</span>
+    }
+
+    /**
+     * Return the assignable types for the given metadata whose expression
+     * trees must be compiled independently.
+     */
+    protected ClassMetaData[] getIndependentExpressionCandidates
+        (ClassMetaData type, boolean subclasses) {
+<span class="nc" id="L293">        return new ClassMetaData[]{ type };</span>
+    }
+
+    /**
+     * Return an {@link ExpressionFactory} to use to create an expression to
+     * be executed against an extent. Each factory will be used to compile
+     * one filter only. The factory must be cachable.
+     */
+    protected ExpressionFactory getExpressionFactory(ClassMetaData type) {
+<span class="nc" id="L302">        throw new UnsupportedException();</span>
+    }
+
+    /**
+     * Provides support for queries that hold query information
+     * in a {@link QueryExpressions} instance.
+     *
+     * @author Marc Prud'hommeaux
+     */
+<span class="nc" id="L311">    public static abstract class AbstractExpressionExecutor</span>
+        extends AbstractExecutor
+        implements Executor {
+
+        /**
+         * Return the query expressions for one candidate type, or die if none.
+         */
+        private QueryExpressions assertQueryExpression() {
+<span class="nc" id="L319">            QueryExpressions[] exp = getQueryExpressions();</span>
+<span class="nc bnc" id="L320" title="All 4 branches missed.">            if (exp == null || exp.length &lt; 1)</span>
+<span class="nc" id="L321">                throw new InvalidStateException(_loc.get(&quot;no-expressions&quot;));</span>
+
+<span class="nc" id="L323">            return exp[0];</span>
+        }
+
+        /**
+         * Throw proper exception if given value is a collection/map/array.
+         */
+        protected void assertNotContainer(Value val, StoreQuery q) {
+            // variables represent container elements, not the container itself
+<span class="nc bnc" id="L331" title="All 2 branches missed.">            if (val.isVariable())</span>
+<span class="nc" id="L332">                return;</span>
+
+            Class&lt;?&gt; type;
+<span class="nc bnc" id="L335" title="All 2 branches missed.">            if (val instanceof Path) {</span>
+<span class="nc" id="L336">                FieldMetaData fmd = ((Path) val).last();</span>
+<span class="nc bnc" id="L337" title="All 2 branches missed.">                type = (fmd == null) ? val.getType() : fmd.getDeclaredType();</span>
+<span class="nc" id="L338">            } else</span>
+<span class="nc" id="L339">                type = val.getType();</span>
+
+<span class="nc bnc" id="L341" title="All 2 branches missed.">            switch (JavaTypes.getTypeCode(type)) {</span>
+                case JavaTypes.ARRAY:
+                case JavaTypes.COLLECTION:
+                case JavaTypes.MAP:
+<span class="nc" id="L345">                    throw new UserException(_loc.get(&quot;container-projection&quot;,</span>
+<span class="nc" id="L346">                        q.getContext().getQueryString()));</span>
+            }
+<span class="nc" id="L348">        }</span>
+
+        @Override
+        public final void validate(StoreQuery q) {
+<span class="nc" id="L352">            QueryExpressions exps = assertQueryExpression();</span>
+<span class="nc" id="L353">            ValidateGroupingExpressionVisitor.validate(q.getContext(), exps);</span>
+<span class="nc" id="L354">        }</span>
+
+
+        @Override
+        public void getRange(StoreQuery q, Object[] params, Range range) {
+<span class="nc" id="L359">            QueryExpressions exps = assertQueryExpression();</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">            if (exps.range.length == 0)</span>
+<span class="nc" id="L361">                return;</span>
+
+<span class="nc bnc" id="L363" title="All 6 branches missed.">            if (exps.range.length == 2</span>
+                &amp;&amp; exps.range[0] instanceof Constant
+                &amp;&amp; exps.range[1] instanceof Constant) {
+                try {
+<span class="nc" id="L367">                    range.start = ((Number) ((Constant) exps.range[0]).</span>
+<span class="nc" id="L368">                        getValue(params)).longValue();</span>
+<span class="nc" id="L369">                    range.end = ((Number) ((Constant) exps.range[1]).</span>
+<span class="nc" id="L370">                        getValue(params)).longValue();</span>
+<span class="nc" id="L371">                    return;</span>
+<span class="nc" id="L372">                } catch (ClassCastException cce) {</span>
+                    // fall through to exception below
+<span class="nc" id="L374">                } catch (NullPointerException npe) {</span>
+                    // fall through to exception below
+<span class="nc" id="L376">                }</span>
+            }
+<span class="nc" id="L378">            throw new UserException(_loc.get(&quot;only-range-constants&quot;,</span>
+<span class="nc" id="L379">                q.getContext().getQueryString()));</span>
+        }
+
+        @Override
+        public final Class&lt;?&gt; getResultClass(StoreQuery q) {
+<span class="nc" id="L384">            return assertQueryExpression().resultClass;</span>
+        }
+
+        @Override
+        public final ResultShape&lt;?&gt; getResultShape(StoreQuery q) {
+<span class="nc" id="L389">            return assertQueryExpression().shape;</span>
+        }
+
+        @Override
+        public final boolean[] getAscending(StoreQuery q) {
+<span class="nc" id="L394">            return assertQueryExpression().ascending;</span>
+        }
+
+        @Override
+        public final String getAlias(StoreQuery q) {
+<span class="nc" id="L399">            return assertQueryExpression().alias;</span>
+        }
+
+        @Override
+        public final String[] getProjectionAliases(StoreQuery q) {
+<span class="nc" id="L404">            return assertQueryExpression().projectionAliases;</span>
+        }
+
+        @Override
+        public Class&lt;?&gt;[] getProjectionTypes(StoreQuery q) {
+<span class="nc" id="L409">            return null;</span>
+        }
+
+        @Override
+        public final int getOperation(StoreQuery q) {
+<span class="nc" id="L414">            return assertQueryExpression().operation;</span>
+        }
+
+        @Override
+        public final boolean isAggregate(StoreQuery q) {
+<span class="nc" id="L419">            return assertQueryExpression().isAggregate();</span>
+        }
+
+        @Override
+        public final boolean isDistinct(StoreQuery q) {
+<span class="nc" id="L424">            return assertQueryExpression().isDistinct();</span>
+        }
+
+        @Override
+        public final boolean hasGrouping(StoreQuery q) {
+<span class="nc bnc" id="L429" title="All 2 branches missed.">            return assertQueryExpression().grouping.length &gt; 0;</span>
+        }
+
+        @Override
+        public final OrderedMap&lt;Object,Class&lt;?&gt;&gt; getOrderedParameterTypes(StoreQuery q) {
+<span class="nc" id="L434">            return assertQueryExpression().parameterTypes;</span>
+        }
+
+        /**
+         * Creates a Object[] from the values of the given user parameters.
+         */
+        @Override
+        public Object[] toParameterArray(StoreQuery q, Map&lt;?,?&gt; userParams) {
+<span class="nc bnc" id="L442" title="All 4 branches missed.">            if (userParams == null || userParams.isEmpty())</span>
+<span class="nc" id="L443">                return StoreQuery.EMPTY_OBJECTS;</span>
+
+<span class="nc" id="L445">            OrderedMap&lt;?,Class&lt;?&gt;&gt; paramTypes = getOrderedParameterTypes(q);</span>
+<span class="nc" id="L446">            Object[] arr = new Object[userParams.size()];</span>
+<span class="nc" id="L447">            int base = positionalParameterBase(userParams.keySet());</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">            for(Entry&lt;?, Class&lt;?&gt;&gt; entry : paramTypes.entrySet()){</span>
+<span class="nc" id="L449">                Object key = entry.getKey();</span>
+<span class="nc bnc" id="L450" title="All 2 branches missed.">                int idx = (key instanceof Integer)</span>
+<span class="nc" id="L451">                    ? ((Integer)key).intValue() - base</span>
+<span class="nc" id="L452">                    : paramTypes.indexOf(key);</span>
+<span class="nc bnc" id="L453" title="All 4 branches missed.">                if (idx &gt;= arr.length || idx &lt; 0)</span>
+<span class="nc" id="L454">                        throw new UserException(_loc.get(&quot;gap-query-param&quot;,</span>
+<span class="nc" id="L455">                            new Object[]{q.getContext().getQueryString(), key,</span>
+<span class="nc" id="L456">                            userParams.size(), userParams}));</span>
+<span class="nc" id="L457">                Object value = userParams.get(key);</span>
+<span class="nc" id="L458">                validateParameterValue(key, value, (Class)entry.getValue());</span>
+<span class="nc" id="L459">                arr[idx] = value;</span>
+<span class="nc" id="L460">            }</span>
+<span class="nc" id="L461">            return arr;</span>
+        }
+
+        /**
+         * Return the base (generally 0 or 1) to use for positional parameters.
+         */
+        private static int positionalParameterBase(Collection params) {
+<span class="nc" id="L468">            int low = Integer.MAX_VALUE;</span>
+            Object obj;
+            int val;
+<span class="nc bnc" id="L471" title="All 2 branches missed.">            for (Iterator itr = params.iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L472">                obj = itr.next();</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">                if (!(obj instanceof Number))</span>
+<span class="nc" id="L474">                    return 0; // use 0 base when params are mixed types</span>
+
+<span class="nc" id="L476">                val = ((Number) obj).intValue();</span>
+<span class="nc bnc" id="L477" title="All 2 branches missed.">                if (val == 0)</span>
+<span class="nc" id="L478">                    return val;</span>
+<span class="nc bnc" id="L479" title="All 2 branches missed.">                if (val &lt; low)</span>
+<span class="nc" id="L480">                    low = val;</span>
+            }
+<span class="nc" id="L482">            return low;</span>
+        }
+
+        private static void validateParameterValue(Object key, Object value,
+            Class expected) {
+<span class="nc bnc" id="L487" title="All 2 branches missed.">            if (expected == null)</span>
+<span class="nc" id="L488">                return;</span>
+
+<span class="nc bnc" id="L490" title="All 2 branches missed.">            if (value == null) {</span>
+<span class="nc bnc" id="L491" title="All 2 branches missed.">                if (expected.isPrimitive())</span>
+<span class="nc" id="L492">                    throw new UserException(_loc.get(&quot;null-primitive-param&quot;,</span>
+                        key, expected));
+            } else {
+<span class="nc" id="L495">                Class actual = value.getClass();</span>
+<span class="nc" id="L496">                boolean strict = true;</span>
+<span class="nc bnc" id="L497" title="All 2 branches missed.">                if (!Filters.canConvert(actual, expected, strict))</span>
+<span class="nc" id="L498">                    throw new UserException(_loc.get(&quot;param-value-mismatch&quot;,</span>
+                        new Object[]{key, expected, value, actual}));
+            }
+<span class="nc" id="L501">        }</span>
+
+        @Override
+        public final Map getUpdates(StoreQuery q) {
+<span class="nc" id="L505">            return assertQueryExpression().updates;</span>
+        }
+
+        @Override
+        public final ClassMetaData[] getAccessPathMetaDatas(StoreQuery q) {
+<span class="nc" id="L510">            QueryExpressions[] exps = getQueryExpressions();</span>
+<span class="nc bnc" id="L511" title="All 2 branches missed.">            if (exps.length == 1)</span>
+<span class="nc" id="L512">                return exps[0].accessPath;</span>
+
+<span class="nc" id="L514">            List&lt;ClassMetaData&gt; metas = null;</span>
+<span class="nc bnc" id="L515" title="All 2 branches missed.">            for (int i = 0; i &lt; exps.length; i++)</span>
+<span class="nc" id="L516">                metas = Filters.addAccessPathMetaDatas(metas,</span>
+                    exps[i].accessPath);
+<span class="nc bnc" id="L518" title="All 2 branches missed.">            if (metas == null)</span>
+<span class="nc" id="L519">                return StoreQuery.EMPTY_METAS;</span>
+<span class="nc" id="L520">            return (ClassMetaData[]) metas.toArray</span>
+<span class="nc" id="L521">                (new ClassMetaData[metas.size()]);</span>
+        }
+
+        @Override
+        public boolean isPacking(StoreQuery q) {
+<span class="nc" id="L526">            return false;</span>
+        }
+
+        /**
+         * Throws an exception if select or having clauses contain
+         * non-aggregate, non-grouped paths.
+         */
+        private static class ValidateGroupingExpressionVisitor
+            extends AbstractExpressionVisitor {
+
+            private final QueryContext _ctx;
+<span class="nc" id="L537">            private boolean _grouping = false;</span>
+<span class="nc" id="L538">            private Set _grouped = null;</span>
+<span class="nc" id="L539">            private Value _agg = null;</span>
+
+            /**
+             * Throw proper exception if query does not meet validation.
+             */
+            public static void validate(QueryContext ctx,
+                QueryExpressions exps) {
+<span class="nc bnc" id="L546" title="All 2 branches missed.">                if (exps.grouping.length == 0)</span>
+<span class="nc" id="L547">                    return;</span>
+
+<span class="nc" id="L549">                ValidateGroupingExpressionVisitor visitor =</span>
+                    new ValidateGroupingExpressionVisitor(ctx);
+<span class="nc" id="L551">                visitor._grouping = true;</span>
+<span class="nc bnc" id="L552" title="All 2 branches missed.">                for (int i = 0; i &lt; exps.grouping.length; i++)</span>
+<span class="nc" id="L553">                    exps.grouping[i].acceptVisit(visitor);</span>
+<span class="nc" id="L554">                visitor._grouping = false;</span>
+<span class="nc bnc" id="L555" title="All 2 branches missed.">                if (exps.having != null) {</span>
+<span class="nc" id="L556">                    Class cls = exps.having.getClass();</span>
+<span class="nc bnc" id="L557" title="All 2 branches missed.">                    if (cls.getName().endsWith(&quot;Expression&quot;))</span>
+<span class="nc" id="L558">                        cls = cls.getSuperclass();</span>
+<span class="nc" id="L559">                    Object value2 = null;</span>
+<span class="nc" id="L560">                    Method getValue2 = null;</span>
+                    try {
+<span class="nc" id="L562">                        getValue2 = cls.getMethod(&quot;getValue2&quot;);</span>
+<span class="nc" id="L563">                        getValue2.setAccessible(true);</span>
+<span class="nc" id="L564">                        value2 = getValue2.invoke(exps.having, (Object[]) null);</span>
+<span class="nc" id="L565">                    } catch (NoSuchMethodException name) {</span>
+                        // skip
+<span class="nc" id="L567">                    } catch (IllegalAccessException iae) {</span>
+                        // skip
+<span class="nc" id="L569">                    } catch (InvocationTargetException ite) {</span>
+                        // skip
+<span class="nc" id="L571">                    }</span>
+<span class="nc bnc" id="L572" title="All 4 branches missed.">                    if (value2 != null &amp;&amp; value2 instanceof Subquery)</span>
+<span class="nc" id="L573">                        ;  // complex having with subquery, validation is performed by DBMS</span>
+                    else
+<span class="nc" id="L575">                        exps.having.acceptVisit(visitor);</span>
+                }
+<span class="nc bnc" id="L577" title="All 2 branches missed.">                for (int i = 0; i &lt; exps.projections.length; i++)</span>
+<span class="nc" id="L578">                    exps.projections[i].acceptVisit(visitor);</span>
+<span class="nc" id="L579">            }</span>
+
+<span class="nc" id="L581">            public ValidateGroupingExpressionVisitor(QueryContext ctx) {</span>
+<span class="nc" id="L582">                _ctx = ctx;</span>
+<span class="nc" id="L583">            }</span>
+
+            @Override
+            public void enter(Value val) {
+<span class="nc bnc" id="L587" title="All 2 branches missed.">                if (_grouping) {</span>
+<span class="nc bnc" id="L588" title="All 2 branches missed.">                    if (val instanceof Path) {</span>
+<span class="nc bnc" id="L589" title="All 2 branches missed.">                        if (_grouped == null)</span>
+<span class="nc" id="L590">                            _grouped = new HashSet();</span>
+<span class="nc" id="L591">                        _grouped.add(val);</span>
+                    }
+<span class="nc bnc" id="L593" title="All 2 branches missed.">                } else if (_agg == null) {</span>
+<span class="nc bnc" id="L594" title="All 2 branches missed.">                    if (val.isAggregate())</span>
+<span class="nc" id="L595">                        _agg = val;</span>
+<span class="nc bnc" id="L596" title="All 4 branches missed.">                    else if (val instanceof Path</span>
+<span class="nc bnc" id="L597" title="All 2 branches missed.">                        &amp;&amp; (_grouped == null || !_grouped.contains(val))) {</span>
+<span class="nc" id="L598">                        throw new UserException(_loc.get(&quot;bad-grouping&quot;,</span>
+<span class="nc" id="L599">                            _ctx.getCandidateType(), _ctx.getQueryString()));</span>
+                    }
+                }
+<span class="nc" id="L602">            }</span>
+
+            @Override
+            public void exit(Value val) {
+<span class="nc bnc" id="L606" title="All 2 branches missed.">                if (val == _agg)</span>
+<span class="nc" id="L607">                    _agg = null;</span>
+<span class="nc" id="L608">            }</span>
+        }
+    }
+
+    /**
+     * Runs the expression query in memory.
+     */
+    public static class InMemoryExecutor
+        extends AbstractExpressionExecutor
+        implements Executor, Serializable {
+
+        
+        private static final long serialVersionUID = 1L;
+        private final ClassMetaData _meta;
+        private final boolean _subs;
+        private final InMemoryExpressionFactory _factory;
+        private final QueryExpressions[] _exps;
+        private final Class[] _projTypes;
+
+        public InMemoryExecutor(ExpressionStoreQuery q,
+            ClassMetaData candidate, boolean subclasses,
+<span class="nc" id="L629">            ExpressionParser parser, Object parsed, InMemoryExpressionFactory factory) {</span>
+<span class="nc" id="L630">            _meta = candidate;</span>
+<span class="nc" id="L631">            _subs = subclasses;</span>
+<span class="nc" id="L632">            _factory = factory;</span>
+
+<span class="nc" id="L634">            _exps = new QueryExpressions[] {</span>
+<span class="nc" id="L635">                parser.eval(parsed, q, _factory, _meta)</span>
+            };
+<span class="nc bnc" id="L637" title="All 2 branches missed.">            if (_exps[0].projections.length == 0)</span>
+<span class="nc" id="L638">                _projTypes = StoreQuery.EMPTY_CLASSES;</span>
+            else {
+<span class="nc" id="L640">                AssertNoVariablesExpressionVisitor novars = new</span>
+<span class="nc" id="L641">                    AssertNoVariablesExpressionVisitor(q.getContext());</span>
+<span class="nc" id="L642">                _projTypes = new Class[_exps[0].projections.length];</span>
+<span class="nc bnc" id="L643" title="All 2 branches missed.">                for (int i = 0; i &lt; _exps[0].projections.length; i++) {</span>
+<span class="nc" id="L644">                    _projTypes[i] = _exps[0].projections[i].getType();</span>
+<span class="nc" id="L645">                    assertNotContainer(_exps[0].projections[i], q);</span>
+<span class="nc" id="L646">                    _exps[0].projections[i].acceptVisit(novars);</span>
+                }
+<span class="nc bnc" id="L648" title="All 2 branches missed.">                for (int i = 0; i &lt; _exps[0].grouping.length; i++)</span>
+<span class="nc" id="L649">                    _exps[0].grouping[i].acceptVisit(novars);</span>
+            }
+<span class="nc" id="L651">        }</span>
+
+        @Override
+        public QueryExpressions[] getQueryExpressions() {
+<span class="nc" id="L655">            return _exps;</span>
+        }
+
+        @Override
+        public ResultObjectProvider executeQuery(StoreQuery q,
+            Object[] params, Range range) {
+            // execute in memory for candidate collection;
+            // also execute in memory for transactional extents
+<span class="nc" id="L663">            Collection coll = q.getContext().getCandidateCollection();</span>
+            Iterator itr;
+<span class="nc bnc" id="L665" title="All 2 branches missed.">            if (coll != null)</span>
+<span class="nc" id="L666">                itr = coll.iterator();</span>
+            else
+<span class="nc" id="L668">                itr = q.getContext().getStoreContext().</span>
+<span class="nc" id="L669">                    extentIterator(_meta.getDescribedType(), _subs,</span>
+<span class="nc" id="L670">                        q.getContext().getFetchConfiguration(),</span>
+<span class="nc" id="L671">                        q.getContext().getIgnoreChanges());</span>
+
+            // find matching objects
+<span class="nc" id="L674">            List results = new ArrayList();</span>
+<span class="nc" id="L675">            StoreContext ctx = q.getContext().getStoreContext();</span>
+            try {
+                Object obj;
+<span class="nc bnc" id="L678" title="All 2 branches missed.">                while (itr.hasNext()) {</span>
+<span class="nc" id="L679">                    obj = itr.next();</span>
+<span class="nc bnc" id="L680" title="All 2 branches missed.">                    if (_factory.matches(_exps[0], _meta, _subs, obj, ctx,</span>
+                        params))
+<span class="nc" id="L682">                        results.add(obj);</span>
+                }
+            }
+            finally {
+<span class="nc" id="L686">                ImplHelper.close(itr);</span>
+            }
+
+            // group results
+<span class="nc" id="L690">            results = _factory.group(_exps[0], results, ctx, params);</span>
+
+            // apply having to filter groups
+<span class="nc bnc" id="L693" title="All 2 branches missed.">            if (_exps[0].having != null) {</span>
+<span class="nc" id="L694">                List matches = new ArrayList(results.size());</span>
+                Collection c;
+<span class="nc" id="L696">                itr = results.iterator();</span>
+<span class="nc bnc" id="L697" title="All 2 branches missed.">                while (itr.hasNext()) {</span>
+<span class="nc" id="L698">                    c = (Collection) itr.next();</span>
+<span class="nc bnc" id="L699" title="All 2 branches missed.">                    if (_factory.matches(_exps[0], c, ctx, params))</span>
+<span class="nc" id="L700">                        matches.add(c);</span>
+                }
+<span class="nc" id="L702">                results = matches;</span>
+            }
+
+            // apply projections, order results, and filter duplicates
+<span class="nc" id="L706">            results = _factory.project(_exps[0], results, ctx, params);</span>
+<span class="nc" id="L707">            results = _factory.order(_exps[0], results, ctx, params);</span>
+<span class="nc bnc" id="L708" title="All 2 branches missed.">            results = _factory.distinct(_exps[0], coll == null, results);</span>
+
+<span class="nc" id="L710">            ResultObjectProvider rop = new ListResultObjectProvider(results);</span>
+<span class="nc bnc" id="L711" title="All 4 branches missed.">            if (range.start != 0 || range.end != Long.MAX_VALUE)</span>
+<span class="nc" id="L712">                rop = new RangeResultObjectProvider(rop, range.start,range.end);</span>
+<span class="nc" id="L713">            return rop;</span>
+        }
+
+        @Override
+        public String[] getDataStoreActions(StoreQuery q, Object[] params,
+            Range range) {
+            // in memory queries have no datastore actions to perform
+<span class="nc" id="L720">            return StoreQuery.EMPTY_STRINGS;</span>
+        }
+
+        @Override
+        public Object getOrderingValue(StoreQuery q, Object[] params,
+            Object resultObject, int orderIndex) {
+            // if this is a projection, then we have to order on something
+            // we selected
+<span class="nc bnc" id="L728" title="All 2 branches missed.">            if (_exps[0].projections.length &gt; 0) {</span>
+<span class="nc" id="L729">                String ordering = _exps[0].orderingClauses[orderIndex];</span>
+<span class="nc bnc" id="L730" title="All 2 branches missed.">                for (int i = 0; i &lt; _exps[0].projectionClauses.length; i++)</span>
+<span class="nc bnc" id="L731" title="All 2 branches missed.">                    if (ordering.equals(_exps[0].projectionClauses[i]))</span>
+<span class="nc" id="L732">                        return ((Object[]) resultObject)[i];</span>
+
+<span class="nc" id="L734">                throw new InvalidStateException(_loc.get</span>
+<span class="nc" id="L735">                    (&quot;merged-order-with-result&quot;, q.getContext().getLanguage(),</span>
+<span class="nc" id="L736">                        q.getContext().getQueryString(), ordering));</span>
+            }
+
+            // use the parsed ordering expression to extract the ordering value
+<span class="nc" id="L740">            Val val = (Val) _exps[0].ordering[orderIndex];</span>
+<span class="nc" id="L741">            return val.evaluate(resultObject, resultObject, q.getContext().</span>
+<span class="nc" id="L742">                getStoreContext(), params);</span>
+        }
+
+        @Override
+        public Class[] getProjectionTypes(StoreQuery q) {
+<span class="nc" id="L747">            return _projTypes;</span>
+        }
+
+        /**
+         * Throws an exception if a variable is found.
+         */
+        private static class AssertNoVariablesExpressionVisitor
+            extends AbstractExpressionVisitor {
+
+            private final QueryContext _ctx;
+
+<span class="nc" id="L758">            public AssertNoVariablesExpressionVisitor(QueryContext ctx) {</span>
+<span class="nc" id="L759">                _ctx = ctx;</span>
+<span class="nc" id="L760">            }</span>
+
+            @Override
+            public void enter(Value val) {
+<span class="nc bnc" id="L764" title="All 2 branches missed.">                if (!val.isVariable())</span>
+<span class="nc" id="L765">                    return;</span>
+<span class="nc" id="L766">                throw new UnsupportedException(_loc.get(&quot;inmem-agg-proj-var&quot;,</span>
+<span class="nc" id="L767">                    _ctx.getCandidateType(), _ctx.getQueryString()));</span>
+            }
+        }
+    }
+
+    /**
+     * The DataStoreExecutor executes the query against the
+     * implementation's overridden {@link #executeQuery} method.
+     *
+     * @author Marc Prud'hommeaux
+     */
+    public static class DataStoreExecutor
+        extends AbstractExpressionExecutor
+        implements Executor, Serializable {
+
+        
+        private static final long serialVersionUID = 1L;
+        private ClassMetaData _meta;
+        private ClassMetaData[] _metas;
+        private boolean _subs;
+        private ExpressionParser _parser;
+        private ExpressionFactory[] _facts;
+        private QueryExpressions[] _exps;
+        private Class[] _projTypes;
+        private Value[] _inMemOrdering;
+
+        public DataStoreExecutor(ExpressionStoreQuery q,
+            ClassMetaData meta, boolean subclasses,
+<span class="nc" id="L795">            ExpressionParser parser, Object parsed) {</span>
+<span class="nc" id="L796">            _metas = q.getIndependentExpressionCandidates(meta, subclasses);</span>
+<span class="nc bnc" id="L797" title="All 2 branches missed.">            if (_metas.length == 0)</span>
+<span class="nc" id="L798">                throw new UserException(_loc.get(&quot;query-unmapped&quot;, meta));</span>
+<span class="nc" id="L799">            _meta = meta;</span>
+<span class="nc" id="L800">            _subs = subclasses;</span>
+<span class="nc" id="L801">            _parser = parser;</span>
+
+<span class="nc" id="L803">            _facts = new ExpressionFactory[_metas.length];</span>
+<span class="nc bnc" id="L804" title="All 2 branches missed.">            for (int i = 0; i &lt; _facts.length; i++)</span>
+<span class="nc" id="L805">                _facts[i] = q.getExpressionFactory(_metas[i]);</span>
+
+<span class="nc" id="L807">            _exps = new QueryExpressions[_metas.length];</span>
+<span class="nc bnc" id="L808" title="All 2 branches missed.">            for (int i = 0; i &lt; _exps.length; i++)</span>
+<span class="nc" id="L809">                _exps[i] = parser.eval(parsed, q, _facts[i], _metas[i]);</span>
+
+<span class="nc bnc" id="L811" title="All 2 branches missed.">            if (_exps[0].projections.length == 0)</span>
+<span class="nc" id="L812">                _projTypes = StoreQuery.EMPTY_CLASSES;</span>
+            else {
+<span class="nc" id="L814">                _projTypes = new Class[_exps[0].projections.length];</span>
+<span class="nc bnc" id="L815" title="All 2 branches missed.">                for (int i = 0; i &lt; _exps[0].projections.length; i++) {</span>
+<span class="nc" id="L816">                    assertNotContainer(_exps[0].projections[i], q);</span>
+<span class="nc" id="L817">                    _projTypes[i] = _exps[0].projections[i].getType();</span>
+                }
+            }
+<span class="nc" id="L820">        }</span>
+
+        @Override
+        public QueryExpressions[] getQueryExpressions() {
+<span class="nc" id="L824">            return _exps;</span>
+        }
+
+        @Override
+        public ResultObjectProvider executeQuery(StoreQuery q,
+            Object[] params, Range range) {
+<span class="nc bnc" id="L830" title="All 4 branches missed.">            range.lrs &amp;= !isAggregate(q) &amp;&amp; !hasGrouping(q);</span>
+<span class="nc" id="L831">            return ((ExpressionStoreQuery) q).executeQuery(this, _meta, _metas,</span>
+                _subs, _facts, _exps, params, range);
+        }
+
+        @Override
+        public Number executeDelete(StoreQuery q, Object[] params) {
+            try {
+<span class="nc" id="L838">                Number num =</span>
+<span class="nc" id="L839">                    ((ExpressionStoreQuery) q).executeDelete(this, _meta, _metas, _subs, _facts, _exps, params);</span>
+<span class="nc bnc" id="L840" title="All 2 branches missed.">                if (num == null)</span>
+<span class="nc" id="L841">                    return q.getContext().deleteInMemory(q, this, params);</span>
+<span class="nc" id="L842">                return num;</span>
+            } finally {
+<span class="nc bnc" id="L844" title="All 2 branches missed.">                for (ClassMetaData cmd : getAccessPathMetaDatas(q)) {</span>
+<span class="nc" id="L845">                    DataCache cache = cmd.getDataCache();</span>
+<span class="nc bnc" id="L846" title="All 4 branches missed.">                    if (cache != null &amp;&amp; cache.getEvictOnBulkUpdate()) {</span>
+<span class="nc" id="L847">                        cache.removeAll(cmd.getDescribedType(), true);</span>
+                    }
+                }
+            }
+        }
+
+        @Override
+        public Number executeUpdate(StoreQuery q, Object[] params) {
+            try {
+<span class="nc" id="L856">                Number num =</span>
+<span class="nc" id="L857">                    ((ExpressionStoreQuery) q).executeUpdate(this, _meta, _metas, _subs, _facts, _exps, params);</span>
+<span class="nc bnc" id="L858" title="All 2 branches missed.">                if (num == null)</span>
+<span class="nc" id="L859">                    return q.getContext().updateInMemory(q, this, params);</span>
+<span class="nc" id="L860">                return num;</span>
+            } finally {
+<span class="nc bnc" id="L862" title="All 2 branches missed.">                for (ClassMetaData cmd : getAccessPathMetaDatas(q)) {</span>
+<span class="nc" id="L863">                    DataCache cache = cmd.getDataCache();</span>
+<span class="nc bnc" id="L864" title="All 4 branches missed.">                    if (cache != null &amp;&amp; cache.getEvictOnBulkUpdate()) {</span>
+<span class="nc" id="L865">                        cache.removeAll(cmd.getDescribedType(), true);</span>
+                    }
+                }
+            }
+        }
+
+        @Override
+        public String[] getDataStoreActions(StoreQuery q, Object[] params,
+            Range range) {
+<span class="nc" id="L874">            return ((ExpressionStoreQuery) q).getDataStoreActions(_meta,</span>
+                _metas, _subs, _facts, _exps, params, range);
+        }
+
+        @Override
+        public Object getOrderingValue(StoreQuery q, Object[] params,
+            Object resultObject, int orderIndex) {
+            // if this is a projection, then we have to order on something
+            // we selected
+<span class="nc bnc" id="L883" title="All 2 branches missed.">            if (_exps[0].projections.length &gt; 0) {</span>
+<span class="nc" id="L884">                String ordering = _exps[0].orderingClauses[orderIndex];</span>
+<span class="nc bnc" id="L885" title="All 2 branches missed.">                for (int i = 0; i &lt; _exps[0].projectionClauses.length; i++)</span>
+<span class="nc bnc" id="L886" title="All 2 branches missed.">                    if (ordering.equals(_exps[0].projectionClauses[i]))</span>
+<span class="nc" id="L887">                        return ((Object[]) resultObject)[i];</span>
+
+<span class="nc" id="L889">                throw new InvalidStateException(_loc.get</span>
+<span class="nc" id="L890">                    (&quot;merged-order-with-result&quot;, q.getContext().getLanguage(),</span>
+<span class="nc" id="L891">                        q.getContext().getQueryString(), ordering));</span>
+            }
+
+            // need to parse orderings?
+<span class="nc" id="L895">            synchronized (this) {</span>
+<span class="nc bnc" id="L896" title="All 2 branches missed.">                if (_inMemOrdering == null) {</span>
+<span class="nc" id="L897">                    ExpressionFactory factory = new InMemoryExpressionFactory();</span>
+<span class="nc" id="L898">                    _inMemOrdering = _parser.eval(_exps[0].orderingClauses,</span>
+                        (ExpressionStoreQuery) q, factory, _meta);
+                }
+<span class="nc bnc" id="L901" title="All 2 branches missed.">                if (_inMemOrdering == null)</span>
+<span class="nc" id="L902">                    _inMemOrdering = _exps[0].ordering;</span>
+<span class="nc" id="L903">            }</span>
+
+            // use the parsed ordering expression to extract the ordering value
+<span class="nc" id="L906">            Val val = (Val) _inMemOrdering[orderIndex];</span>
+<span class="nc" id="L907">            return val.evaluate(resultObject, resultObject,</span>
+<span class="nc" id="L908">                q.getContext().getStoreContext(), params);</span>
+        }
+
+        @Override
+        public Class[] getProjectionTypes(StoreQuery q) {
+<span class="nc" id="L913">            return _projTypes;</span>
+		}
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

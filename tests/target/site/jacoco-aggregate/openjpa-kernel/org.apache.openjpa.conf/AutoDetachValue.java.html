@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AutoDetachValue.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.conf</a> &gt; <span class="el_source">AutoDetachValue.java</span></div><h1>AutoDetachValue.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.conf;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.apache.openjpa.kernel.AutoDetach;
+import org.apache.openjpa.lib.conf.StringListValue;
+
+/**
+ * Value type used to represent auto detach flags. Separate to
+ * optimize translation of Strings to bit flags.
+ *
+ * @author Steve Kim
+ */
+class AutoDetachValue
+    extends StringListValue {
+
+    public static final String DETACH_CLOSE = &quot;close&quot;;
+    public static final String DETACH_COMMIT = &quot;commit&quot;;
+    public static final String DETACH_ROLLBACK= &quot;rollback&quot;;
+    public static final String DETACH_NONTXREAD = &quot;nontx-read&quot;;
+    public static final String DETACH_NONE = &quot;none&quot;;
+
+<span class="nc" id="L42">    private static String[] ALIASES = new String[]{</span>
+<span class="nc" id="L43">        DETACH_CLOSE, String.valueOf(AutoDetach.DETACH_CLOSE),</span>
+<span class="nc" id="L44">        DETACH_COMMIT, String.valueOf(AutoDetach.DETACH_COMMIT),</span>
+<span class="nc" id="L45">        DETACH_NONTXREAD, String.valueOf(AutoDetach.DETACH_NONTXREAD),</span>
+<span class="nc" id="L46">        DETACH_ROLLBACK, String.valueOf(AutoDetach.DETACH_ROLLBACK),</span>
+<span class="nc" id="L47">        DETACH_NONE, String.valueOf(AutoDetach.DETACH_NONE),</span>
+        // for compatibility with JDO DetachAllOnCommit
+<span class="nc" id="L49">        &quot;true&quot;, String.valueOf(AutoDetach.DETACH_COMMIT),</span>
+        &quot;false&quot;, &quot;0&quot;,
+    };
+
+    private int _flags;
+    private boolean _flagsSet;
+
+    public AutoDetachValue() {
+<span class="nc" id="L57">        super(&quot;AutoDetach&quot;);</span>
+<span class="nc" id="L58">        setAliases(ALIASES);</span>
+<span class="nc" id="L59">        setAliasListComprehensive(true);</span>
+<span class="nc" id="L60">    }</span>
+
+    @Override
+    public Class getValueType() {
+<span class="nc" id="L64">        return String[].class;</span>
+    }
+
+    public void setConstant(int flags) {
+<span class="nc" id="L68">        _flags = flags;</span>
+<span class="nc" id="L69">    }</span>
+
+    public int getConstant() {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (!_flagsSet) {</span>
+<span class="nc" id="L73">            String[] vals = get();</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">            for (int i = 0; i &lt; vals.length; i++)</span>
+<span class="nc" id="L75">                _flags |= Integer.parseInt(unalias(vals[i]));</span>
+<span class="nc" id="L76">            _flagsSet = true;</span>
+        }
+
+<span class="nc" id="L79">        return _flags;</span>
+    }
+
+    @Override
+    protected List&lt;String&gt; getAliasList() {
+        // We do not document the numeric values and they are not
+        // helpful to someone trying to understand the error message
+<span class="nc" id="L86">        ArrayList&lt;String&gt; list = new ArrayList&lt;&gt;();</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        for (int x = 0; x &lt; ALIASES.length; x += 2)</span>
+<span class="nc" id="L88">            list.add(ALIASES[x]);</span>
+<span class="nc" id="L89">        return list;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

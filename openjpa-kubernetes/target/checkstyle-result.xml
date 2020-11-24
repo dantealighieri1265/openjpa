@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<checkstyle version="8.29">
+<file name="/home/marco/Scrivania/openjpa/openjpa-kubernetes/src/main/java/org/apache/openjpa/event/kubernetes/KubernetesTCPRemoteCommitProvider.java">
+</file>
+<file name="/home/marco/Scrivania/openjpa/openjpa-kubernetes/src/main/resources/org/apache/openjpa/event/kubernetes/localizer.properties">
+</file>
+</checkstyle>

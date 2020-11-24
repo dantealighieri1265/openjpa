@@ -1,0 +1,309 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ManagedCache.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">ManagedCache.java</span></div><h1>ManagedCache.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.io.Serializable;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+
+import org.apache.commons.collections4.map.AbstractReferenceMap.ReferenceStrength;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.ReferenceHashSet;
+import org.apache.openjpa.util.Exceptions;
+import org.apache.openjpa.util.UserException;
+
+/**
+ * Cache of managed objects. Must be static for serialization reasons.
+ */
+class ManagedCache implements Serializable {
+
+    
+    private static final long serialVersionUID = 1L;
+
+<span class="nc" id="L44">    private static final Localizer _loc =</span>
+<span class="nc" id="L45">        Localizer.forPackage(ManagedCache.class);</span>
+
+    private Map&lt;Object,StateManagerImpl&gt; _main; // oid -&gt; sm
+<span class="nc" id="L48">    private Map&lt;Object,StateManagerImpl&gt; _conflicts = null; // conflict oid -&gt; new sm</span>
+<span class="nc" id="L49">    private Map&lt;Object,StateManagerImpl&gt; _news = null; // tmp id -&gt; new sm</span>
+<span class="nc" id="L50">    private Collection&lt;StateManagerImpl&gt; _embeds = null; // embedded/non-persistent sms</span>
+<span class="nc" id="L51">    private Collection&lt;StateManagerImpl&gt; _untracked = null; // hard refs to untracked sms</span>
+    private BrokerImpl broker;
+
+    /**
+     * Constructor; supply primary cache map.
+     */
+<span class="nc" id="L57">    ManagedCache(BrokerImpl broker) {</span>
+<span class="nc" id="L58">        this.broker = broker;</span>
+<span class="nc" id="L59">        _main = (Map&lt;Object, StateManagerImpl&gt;) broker.newManagedObjectCache();</span>
+<span class="nc" id="L60">    }</span>
+
+    /**
+     * Return the instance for the given oid, optionally allowing
+     * new instances.
+     */
+    public StateManagerImpl getById(Object oid, boolean allowNew) {
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (oid == null)</span>
+<span class="nc" id="L68">            return null;</span>
+
+        // check main cache for oid
+<span class="nc" id="L71">        StateManagerImpl sm = _main.get(oid);</span>
+        StateManagerImpl sm2;
+<span class="nc bnc" id="L73" title="All 2 branches missed.">        if (sm != null) {</span>
+            // if it's a new instance, we know it's the only match, because
+            // other pers instances override new instances in _cache
+<span class="nc bnc" id="L76" title="All 4 branches missed.">            if (sm.isNew() &amp;&amp; !sm.isDeleted())</span>
+<span class="nc bnc" id="L77" title="All 2 branches missed.">                return (allowNew) ? sm : null;</span>
+<span class="nc bnc" id="L78" title="All 4 branches missed.">            if (!allowNew || !sm.isDeleted())</span>
+<span class="nc" id="L79">                return sm;</span>
+
+            // sm is deleted; check conflict cache
+<span class="nc bnc" id="L82" title="All 2 branches missed.">            if (_conflicts != null) {</span>
+<span class="nc" id="L83">                sm2 = _conflicts.get(oid);</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">                if (sm2 != null)</span>
+<span class="nc" id="L85">                    return sm2;</span>
+            }
+        }
+
+        // at this point sm is null or deleted; check the new cache for
+        // any matches. this allows us to match app id objects to new
+        // instances without permanent oids
+<span class="nc bnc" id="L92" title="All 6 branches missed.">        if (allowNew &amp;&amp; _news != null &amp;&amp; !_news.isEmpty()) {</span>
+<span class="nc" id="L93">            sm2 = _news.get(oid);</span>
+<span class="nc bnc" id="L94" title="All 2 branches missed.">            if (sm2 != null)</span>
+<span class="nc" id="L95">                return sm2;</span>
+        }
+<span class="nc" id="L97">        return sm;</span>
+    }
+
+    /**
+     * Call this method when a new state manager initializes itself.
+     */
+    public void add(StateManagerImpl sm) {
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (!sm.isIntercepting()) {</span>
+<span class="nc bnc" id="L105" title="All 2 branches missed.">            if (_untracked == null)</span>
+<span class="nc" id="L106">                _untracked = new HashSet&lt;&gt;();</span>
+<span class="nc" id="L107">            _untracked.add(sm);</span>
+        }
+
+<span class="nc bnc" id="L110" title="All 4 branches missed.">        if (!sm.isPersistent() || sm.isEmbedded()) {</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            if (_embeds == null)</span>
+<span class="nc" id="L112">                _embeds = new ReferenceHashSet(ReferenceStrength.WEAK);</span>
+<span class="nc" id="L113">            _embeds.add(sm);</span>
+<span class="nc" id="L114">            return;</span>
+        }
+
+        // initializing new instance; put in new cache because won't have
+        // permanent oid yet
+<span class="nc bnc" id="L119" title="All 2 branches missed.">        if (sm.isNew()) {</span>
+<span class="nc bnc" id="L120" title="All 2 branches missed.">            if (_news == null)</span>
+<span class="nc" id="L121">                _news = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L122">            _news.put(sm.getId(), sm);</span>
+<span class="nc" id="L123">            return;</span>
+        }
+
+        // initializing persistent instance; put in main cache
+<span class="nc" id="L127">        StateManagerImpl orig = _main.put(sm.getObjectId(), sm);</span>
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        if (orig != null) {</span>
+<span class="nc" id="L129">            _main.put(sm.getObjectId(), orig);</span>
+<span class="nc" id="L130">            throw new UserException(_loc.get(&quot;dup-load&quot;, sm.getObjectId(),</span>
+<span class="nc" id="L131">                Exceptions.toString(orig.getManagedInstance())))</span>
+<span class="nc" id="L132">                .setFailedObject(sm.getManagedInstance());</span>
+        }
+<span class="nc" id="L134">    }</span>
+
+    /**
+     * Remove the given state manager from the cache when it transitions
+     * to transient.
+     */
+    public void remove(Object id, StateManagerImpl sm) {
+        // if it has a permanent oid, remove from main / conflict cache,
+        // else remove from embedded/nontrans cache, and if not there
+        // remove from new cache
+    	StateManagerImpl orig;
+<span class="nc bnc" id="L145" title="All 2 branches missed.">        if (sm.getObjectId() != null) {</span>
+<span class="nc" id="L146">            orig = _main.remove(id);</span>
+<span class="nc bnc" id="L147" title="All 2 branches missed.">            if (orig != sm) {</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                if (orig != null)</span>
+<span class="nc" id="L149">                    _main.put(id, orig); // put back</span>
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                if (_conflicts != null) {</span>
+<span class="nc" id="L151">                    orig = _conflicts.remove(id);</span>
+<span class="nc bnc" id="L152" title="All 4 branches missed.">                    if (orig != null &amp;&amp; orig != sm)</span>
+<span class="nc" id="L153">                        _conflicts.put(id, orig); // put back</span>
+                }
+            }
+<span class="nc bnc" id="L156" title="All 6 branches missed.">        } else if ((_embeds == null || !_embeds.remove(sm))</span>
+            &amp;&amp; _news != null) {
+<span class="nc" id="L158">            orig = _news.remove(id);</span>
+<span class="nc bnc" id="L159" title="All 4 branches missed.">            if (orig != null &amp;&amp; orig != sm)</span>
+<span class="nc" id="L160">                _news.put(id, orig); // put back</span>
+        }
+
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (_untracked != null)</span>
+<span class="nc" id="L164">            _untracked.remove(sm);</span>
+<span class="nc" id="L165">    }</span>
+
+    /**
+     * An embedded or nonpersistent managed instance has been persisted.
+     */
+    public void persist(StateManagerImpl sm) {
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (_embeds != null)</span>
+<span class="nc" id="L172">            _embeds.remove(sm);</span>
+<span class="nc" id="L173">    }</span>
+
+    /**
+     * A new instance has just been assigned a permanent oid.
+     */
+    public void assignObjectId(Object id, StateManagerImpl sm) {
+        // if assigning oid, remove from new cache and put in primary; may
+        // not be in new cache if another new instance had same id
+<span class="nc" id="L181">        StateManagerImpl orig = null;</span>
+<span class="nc bnc" id="L182" title="All 2 branches missed.">        if (_news != null) {</span>
+<span class="nc" id="L183">            orig = _news.remove(id);</span>
+<span class="nc bnc" id="L184" title="All 4 branches missed.">            if (orig != null &amp;&amp; orig != sm)</span>
+<span class="nc" id="L185">                _news.put(id, orig); // put back</span>
+        }
+
+        // put in main cache, but make sure we don't replace another
+        // instance with the same oid
+<span class="nc" id="L190">        orig = _main.put(sm.getObjectId(), sm);</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        if (orig != null) {</span>
+<span class="nc" id="L192">            _main.put(sm.getObjectId(), orig);</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">            if (!orig.isDeleted())</span>
+<span class="nc" id="L194">                throw new UserException(_loc.get(&quot;dup-oid-assign&quot;,</span>
+<span class="nc" id="L195">                    sm.getObjectId(),</span>
+<span class="nc" id="L196">                    Exceptions.toString(sm.getManagedInstance())))</span>
+<span class="nc" id="L197">                    .setFailedObject(sm.getManagedInstance());</span>
+
+            // same oid as deleted instance; put in conflict cache
+<span class="nc bnc" id="L200" title="All 2 branches missed.">            if (_conflicts == null)</span>
+<span class="nc" id="L201">                _conflicts = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L202">            _conflicts.put(sm.getObjectId(), sm);</span>
+        }
+<span class="nc" id="L204">    }</span>
+
+    /**
+     * A new instance has committed; recache under permanent oid.
+     */
+    public void commitNew(Object id, StateManagerImpl sm) {
+        // if the id didn't change, the instance was already assigned an
+        // id, but it could have been in conflict cache
+        StateManagerImpl orig;
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        if (sm.getObjectId() == id) {</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">            orig = (_conflicts == null) ? null : _conflicts.remove(id);</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">            if (orig == sm) {</span>
+<span class="nc" id="L216">                orig = _main.put(id, sm);</span>
+<span class="nc bnc" id="L217" title="All 4 branches missed.">                if (orig != null &amp;&amp; !orig.isDeleted()) {</span>
+<span class="nc" id="L218">                    _main.put(sm.getObjectId(), orig);</span>
+<span class="nc" id="L219">                    throw new UserException(_loc.get(&quot;dup-oid-assign&quot;,</span>
+<span class="nc" id="L220">                        sm.getObjectId(), Exceptions.toString(</span>
+<span class="nc" id="L221">                            sm.getManagedInstance())))</span>
+<span class="nc" id="L222">                        .setFailedObject(sm.getManagedInstance())</span>
+<span class="nc" id="L223">                        .setFatal(true);</span>
+                }
+            }
+<span class="nc" id="L226">            return;</span>
+        }
+
+        // oid changed, so it must previously have been a new instance
+        // without an assigned oid.  remove it from the new cache; ok if
+        // we end up removing another instance with same id
+<span class="nc bnc" id="L232" title="All 2 branches missed.">        if (_news != null)</span>
+<span class="nc" id="L233">            _news.remove(id);</span>
+
+        // and put into main cache now that id is assigned
+<span class="nc" id="L236">        orig = _main.put(sm.getObjectId(), sm);</span>
+<span class="nc bnc" id="L237" title="All 6 branches missed.">        if (orig != null &amp;&amp; orig != sm &amp;&amp; !orig.isDeleted()) {</span>
+            // put back orig and throw error
+<span class="nc" id="L239">            _main.put(sm.getObjectId(), orig);</span>
+<span class="nc" id="L240">            throw new UserException(_loc.get(&quot;dup-oid-assign&quot;,</span>
+<span class="nc" id="L241">                sm.getObjectId(), Exceptions.toString(sm.getManagedInstance())))</span>
+<span class="nc" id="L242">                    .setFailedObject(sm.getManagedInstance()).setFatal(true);</span>
+        }
+<span class="nc" id="L244">    }</span>
+
+    /**
+     * Return a copy of all cached persistent objects.
+     */
+    public Collection&lt;StateManagerImpl&gt; copy() {
+        // proxies not included here because the state manager is always
+        // present in other caches too
+
+<span class="nc" id="L253">        int size = _main.size();</span>
+<span class="nc bnc" id="L254" title="All 2 branches missed.">        if (_conflicts != null)</span>
+<span class="nc" id="L255">            size += _conflicts.size();</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">        if (_news != null)</span>
+<span class="nc" id="L257">            size += _news.size();</span>
+<span class="nc bnc" id="L258" title="All 2 branches missed.">        if (_embeds != null)</span>
+<span class="nc" id="L259">            size += _embeds.size();</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">        if (size == 0)</span>
+<span class="nc" id="L261">            return Collections.EMPTY_LIST;</span>
+
+<span class="nc" id="L263">        List&lt;StateManagerImpl&gt; copy = new ArrayList&lt;&gt;(size);</span>
+<span class="nc bnc" id="L264" title="All 2 branches missed.">        for (StateManagerImpl sm : _main.values())</span>
+<span class="nc" id="L265">            copy.add(sm);</span>
+<span class="nc bnc" id="L266" title="All 4 branches missed.">        if (_conflicts != null &amp;&amp; !_conflicts.isEmpty())</span>
+<span class="nc bnc" id="L267" title="All 2 branches missed.">            for (StateManagerImpl sm : _conflicts.values())</span>
+<span class="nc" id="L268">                copy.add(sm);</span>
+<span class="nc bnc" id="L269" title="All 4 branches missed.">        if (_news != null &amp;&amp; !_news.isEmpty())</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">        	 for (StateManagerImpl sm : _news.values())</span>
+<span class="nc" id="L271">                 copy.add(sm);</span>
+<span class="nc bnc" id="L272" title="All 4 branches missed.">        if (_embeds != null &amp;&amp; !_embeds.isEmpty())</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        	for (StateManagerImpl sm : _embeds)</span>
+<span class="nc" id="L274">                copy.add(sm);</span>
+<span class="nc" id="L275">        return copy;</span>
+    }
+
+    /**
+     * Clear the cache.
+     */
+    public void clear() {
+<span class="nc" id="L282">        _main = (Map&lt;Object, StateManagerImpl&gt;) broker.newManagedObjectCache();</span>
+<span class="nc bnc" id="L283" title="All 2 branches missed.">        if (_conflicts != null)</span>
+<span class="nc" id="L284">            _conflicts = null;</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">        if (_news != null)</span>
+<span class="nc" id="L286">            _news = null;</span>
+<span class="nc bnc" id="L287" title="All 2 branches missed.">        if (_embeds != null)</span>
+<span class="nc" id="L288">            _embeds = null;</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">        if (_untracked != null)</span>
+<span class="nc" id="L290">            _untracked = null;</span>
+<span class="nc" id="L291">    }</span>
+
+    /**
+     * Clear new instances without permanent oids.
+     */
+    public void clearNew() {
+<span class="nc bnc" id="L297" title="All 2 branches missed.">        if (_news != null)</span>
+<span class="nc" id="L298">            _news = null;</span>
+<span class="nc" id="L299">    }</span>
+
+    void dirtyCheck() {
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        if (_untracked == null)</span>
+<span class="nc" id="L303">            return;</span>
+
+<span class="nc bnc" id="L305" title="All 2 branches missed.">        for (StateManagerImpl sm : _untracked)</span>
+<span class="nc" id="L306">        	sm.dirtyCheck();</span>
+<span class="nc" id="L307">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>
