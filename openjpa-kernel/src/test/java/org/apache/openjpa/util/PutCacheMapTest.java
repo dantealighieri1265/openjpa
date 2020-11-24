@@ -14,6 +14,8 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import javax.security.auth.kerberos.KerberosKey;
+
 import static org.mockito.Mockito.*;
 /*
 CacheMap maintains
@@ -28,8 +30,7 @@ amount of memory is used by the cache.
 
 @RunWith(Parameterized.class)
 public class PutCacheMapTest {
-
-//    private Object key;
+	
 //    private Object value;
       private Object previousValue;
 	  private CacheMap cacheMap;
@@ -43,8 +44,9 @@ public class PutCacheMapTest {
     //public MockitoRule mockitoRule = MockitoJUnit.rule();
 
 
-    public PutCacheMapTest(CacheMapEntity entity) {
+    public PutCacheMapTest(CacheMapEntity entity) { //, Object expectedResult
     	this.entity = entity;
+
 //        this.key = testInput.getKey();
 //        this.value = testInput.getValue();
 //        this.hasPreviousValue = testInput.isAlreadyExist();
@@ -62,13 +64,23 @@ public class PutCacheMapTest {
     @Parameterized.Parameters
     public static Collection<CacheMapEntity> getParameters(){
         List<CacheMapEntity> testInputs = new ArrayList<>();
-
-        testInputs.add(new CacheMapEntity(null, null, false,false, 0, 1));
-        testInputs.add(new CacheMapEntity(new Object(), null, false, true, 1, 2));
-        testInputs.add(new CacheMapEntity(new Object(), new Object(), false, false, 1, 1));
-        testInputs.add(new CacheMapEntity(new Object(), new Object(), true, false, 2,0));
-        testInputs.add(new CacheMapEntity(new Object(), new Object(), true, false, 1, 1));
-        testInputs.add(new CacheMapEntity(new Object(), new Object(), true, true, 1, 1));
+//      Object[][] matrix = new Object[5][2];
+//      matrix[0][0] = new CacheMapEntity(null, null, false, false, 0, 1);
+//      matrix[0][1] = null;
+//      return Arrays.asList(matrix);
+        
+        //suite minimale
+        //implementa l'expected results
+        testInputs.add(new CacheMapEntity(null, null, false, false, 0, 1)); //null
+        testInputs.add(new CacheMapEntity(new Object(), null, true, true, 1, 2)); //null
+        testInputs.add(new CacheMapEntity(null, new Object(), true, false, 1, 1)); //null
+        testInputs.add(new CacheMapEntity(new Object(), new Object(), false, true, 1, 1)); //null
+        
+        //coverage
+        testInputs.add(new CacheMapEntity(new Object(), new Object(), true, false, 2,0)); //Object
+        
+//        testInputs.add(new CacheMapEntity(new Object(), new Object(), true, false, 2, 1));
+//        testInputs.add(new CacheMapEntity(new Object(), new Object(), true, true, 1, 1));
         return testInputs;
 
     }
@@ -137,6 +149,7 @@ public class PutCacheMapTest {
     @Test
     public void putTest() {
         Object previousValue = this.cacheMap.put(entity.getKey(), entity.getValue());
+        System.out.println(previousValue+"\n");
         //verify(this.cacheMap).writeLock();
         //verify(this.cacheMap).writeUnlock();
 
@@ -146,9 +159,11 @@ public class PutCacheMapTest {
             Assert.assertNull(previousValue);
         }
 
-        Object getValue = this.cacheMap.get(entity.getKey());
-
-        Assert.assertEquals(entity.getValue(), getValue);
+        //testa la get a sto punto
+        
+//        Object getValue = this.cacheMap.get(entity.getKey());
+//
+//        Assert.assertEquals(entity.getValue(), getValue);
 
 
     }

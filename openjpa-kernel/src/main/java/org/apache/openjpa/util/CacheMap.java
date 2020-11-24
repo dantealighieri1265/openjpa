@@ -399,22 +399,22 @@ public class CacheMap
             }
 
             // if no hard refs, don't put anything
-            if (cacheMap.getMaxSize() == 0)
+            if (cacheMap.getMaxSize() == 0) //first test case
                 return null;
 
             // otherwise, put the value into the map and clear it from the
             // soft map
             val = put(cacheMap, key, value);
             if (val == null) {
-                val = remove(softMap, key);
+                val = remove(softMap, key); 
                 if (val == null)
-                    entryAdded(key, value);
+                    entryAdded(key, value); //no Already exist
                 else {
-                    entryRemoved(key, val, false);
+                    entryRemoved(key, val, false);//no storage & alreadyExixts
                     entryAdded(key, value);
                 }
             } else {
-                entryRemoved(key, val, false);
+                entryRemoved(key, val, false); //storage & alreadyExixts
                 entryAdded(key, value);
             }
             return val;
