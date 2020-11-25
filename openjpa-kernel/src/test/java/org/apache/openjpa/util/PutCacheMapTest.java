@@ -11,6 +11,7 @@ import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 
@@ -32,8 +33,9 @@ amount of memory is used by the cache.
 public class PutCacheMapTest {
 	
 //    private Object value;
-      private Object previousValue;
+      //private Object previousValue;
 	  private CacheMap cacheMap;
+	  private Object expectedResult;
 //    private boolean hasPreviousValue;
 //    private boolean pinned;
 //    private Integer cachedMaxMapSize;
@@ -44,8 +46,9 @@ public class PutCacheMapTest {
     //public MockitoRule mockitoRule = MockitoJUnit.rule();
 
 
-    public PutCacheMapTest(CacheMapEntity entity) { //, Object expectedResult
+    public PutCacheMapTest(CacheMapEntity entity, Object expectedResult) { //, Object expectedResult
     	this.entity = entity;
+    	this.expectedResult = expectedResult;
 
 //        this.key = testInput.getKey();
 //        this.value = testInput.getValue();
@@ -53,17 +56,29 @@ public class PutCacheMapTest {
 //        this.pinned = testInput.isPinned();
 //        this.cachedMaxMapSize = testInput.getCacheMaxMapSize();
 //        this.numObjectToInsert = testInput.getNumObjectToInsert();
-        if (entity.isAlreadyExist()) {
+        /*if (entity.isAlreadyExist()) {
             this.previousValue = new Object();
         } else {
             this.previousValue = null;
-        }
+        }*/
     }
 
 
     @Parameterized.Parameters
-    public static Collection<CacheMapEntity> getParameters(){
-        List<CacheMapEntity> testInputs = new ArrayList<>();
+    public static Collection<?> getParameters(){
+    	 return Arrays.asList(new Object[][] {
+    		 //suite minimale
+    		 {new CacheMapEntity(null, null, false, false, 0, 1), null},
+    		 {new CacheMapEntity(new Object(), null, true, true, 1, 2), new Object()},//new object()
+    		 {new CacheMapEntity(null, new Object(), true, false, 1, 1), new Object()},//new object()
+    		 {new CacheMapEntity(new Object(), new Object(), false, true, 1, 1), null},
+    		 
+    		 //coverage
+    		 {new CacheMapEntity(new Object(), new Object(), true, false, 2,0), new Object()}
+             //{new WriteTestEntity(0, -1), null},
+             //{new WriteTestEntity(-1, 0), null}
+         });
+        //List<CacheMapEntity> testInputs = new ArrayList<>();
 //      Object[][] matrix = new Object[5][2];
 //      matrix[0][0] = new CacheMapEntity(null, null, false, false, 0, 1);
 //      matrix[0][1] = null;
@@ -71,68 +86,26 @@ public class PutCacheMapTest {
         
         //suite minimale
         //implementa l'expected results
-        testInputs.add(new CacheMapEntity(null, null, false, false, 0, 1)); //null
+/*        testInputs.add(new CacheMapEntity(null, null, false, false, 0, 1)); //null
         testInputs.add(new CacheMapEntity(new Object(), null, true, true, 1, 2)); //null
         testInputs.add(new CacheMapEntity(null, new Object(), true, false, 1, 1)); //null
         testInputs.add(new CacheMapEntity(new Object(), new Object(), false, true, 1, 1)); //null
         
         //coverage
-        testInputs.add(new CacheMapEntity(new Object(), new Object(), true, false, 2,0)); //Object
+        testInputs.add(new CacheMapEntity(new Object(), new Object(), true, false, 2,0)); //Object*/
         
 //        testInputs.add(new CacheMapEntity(new Object(), new Object(), true, false, 2, 1));
 //        testInputs.add(new CacheMapEntity(new Object(), new Object(), true, true, 1, 1));
-        return testInputs;
+        
 
     }
-
-//    private static class TestInput {
-//        private Object key;
-//        private Object value;
-//        private boolean alreadyExist;
-//        private boolean pinned;
-//        private Integer cacheMaxMapSize;
-//        private Integer numObjectToInsert;
-//
-//        public TestInput(Object key, Object value, boolean alreadyExist, boolean pinned, Integer cacheMaxMapSize, Integer numObjectToInsert) {
-//            this.key = key;
-//            this.value = value;
-//            this.alreadyExist = alreadyExist;
-//            this.pinned = pinned;
-//            this.cacheMaxMapSize = cacheMaxMapSize;
-//            this.numObjectToInsert = numObjectToInsert;
-//        }
-//
-//        public Object getKey() {
-//            return key;
-//        }
-//
-//        public Object getValue() {
-//            return value;
-//        }
-//
-//        public boolean isAlreadyExist() {
-//            return alreadyExist;
-//        }
-//
-//        public boolean isPinned() {
-//            return pinned;
-//        }
-//
-//        public Integer getCacheMaxMapSize() {
-//            return cacheMaxMapSize;
-//        }
-//
-//        public Integer getNumObjectToInsert() {
-//            return numObjectToInsert;
-//        }
-//    }
 
     @Before
     public void setUp(){
         this.cacheMap = new CacheMap(true, entity.getCacheMaxMapSize(), entity.getCacheMaxMapSize() + 1, 1L, 1);
         //if (haspreviousvalue)
         if (entity.isAlreadyExist()) {
-            this.cacheMap.put(entity.getKey(), this.previousValue);
+            this.cacheMap.put(entity.getKey(), this.expectedResult);
         }
         for (int i = 0; i < entity.getNumObjectToInsert(); i++) {
             this.cacheMap.put(new Object(), new Object());
@@ -148,16 +121,18 @@ public class PutCacheMapTest {
 
     @Test
     public void putTest() {
-        Object previousValue = this.cacheMap.put(entity.getKey(), entity.getValue());
-        System.out.println(previousValue+"\n");
+        Object result = this.cacheMap.put(entity.getKey(), entity.getValue());
+        System.out.println(result+"\n");
         //verify(this.cacheMap).writeLock();
         //verify(this.cacheMap).writeUnlock();
-
-        if (entity.isAlreadyExist() && entity.getCacheMaxMapSize() != 0) {
-            Assert.assertEquals(this.previousValue, previousValue);
-        } else {
-            Assert.assertNull(previousValue);
-        }
+        
+        Assert.assertEquals(this.expectedResult, result);
+        
+//        if (entity.isAlreadyExist() && entity.getCacheMaxMapSize() != 0) {
+//            Assert.assertEquals(this.expectedResult, result);
+//        } else {
+//            Assert.assertNull(result);
+//        }
 
         //testa la get a sto punto
         
