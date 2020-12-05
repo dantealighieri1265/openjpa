@@ -1,6 +1,6 @@
 package org.apache.openjpa.util;
 
-import org.apache.openjpa.util.support.NonBeanClass;
+
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -8,7 +8,10 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
+import org.apache.openjpa.util.entity.ProxyManagerImplEntity;
+import org.apache.openjpa.util.support.NonBeanClass;
 
+import java.lang.reflect.Array;
 import java.util.*;
 
 
@@ -16,54 +19,41 @@ import java.util.*;
 public class CopyArrayTest {
 
     private ProxyManagerImpl proxyManager;
-    private Object object;
+	private ProxyManagerImplEntity entity;
+	private Object expectedResult;
 
-    @Rule
-    public ExpectedException expectedException = ExpectedException.none();
-
-    public CopyArrayTest(TestInput testInput) {
-        this.object = testInput.getObject();
-        if (testInput.getExpectedException() != null) {
-            this.expectedException.expect(testInput.getExpectedException());
-        }
+    public CopyArrayTest(ProxyManagerImplEntity entity, Object expectedResult) {
+    	this.entity = entity;
+    	this.expectedResult = expectedResult;
+        //this.object = testInput.getObject();
+        //if (testInput.getExpectedException() != null) {
+        //    this.expectedException.expect(testInput.getExpectedException());
+        //}
     }
 
     @Parameterized.Parameters
-    public static Collection<TestInput> getParameters(){
+    public static Collection<?> getParameters(){
+        
         Random r = new Random();
-        List<TestInput> testInputs = new ArrayList<>();
+        //List<TestInput> testInputs = new ArrayList<>();
 
-        testInputs.add(new TestInput(null, null));
-        testInputs.add(new TestInput(new NonBeanClass(r.nextInt(), r.nextInt()), UnsupportedException.class));
+        Object obj = new Object();
+        obj=null;
 
-        Integer[] list = new Integer[]{r.nextInt(), r.nextInt(), r.nextInt(), r.nextInt()};
+        ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity(obj);
+        ProxyManagerImplEntity entityNonBean = new ProxyManagerImplEntity(r.nextInt(), r.nextInt());
+        ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(r.nextFloat());
 
-        testInputs.add(new TestInput(list, null));
+        return Arrays.asList(new Object[][] {
+    		
+        	{entityNull , null},
+            {entityNonBean, UnsupportedException.class}, // non bean per ul branch coverage ultimo statement
+            {entityList, entityList.getObject()}
+    	});
 
-
-
-        return testInputs;
 
     }
 
-    private static class TestInput {
-        private Object object;
-        private Class<? extends Exception> expectedException;
-
-
-        public TestInput(Object object, Class<? extends Exception> expectedException) {
-            this.object = object;
-            this.expectedException = expectedException;
-        }
-
-        public Object getObject() {
-            return object;
-        }
-
-        public Class<? extends Exception> getExpectedException() {
-            return expectedException;
-        }
-    }
 
     @Before
     public void setUp(){
@@ -72,9 +62,17 @@ public class CopyArrayTest {
 
     @Test
     public void copyCustomTest() {
-        Object result = this.proxyManager.copyArray(this.object);
-
-        Assert.assertArrayEquals((Object[]) this.object, (Object[]) result);
+    	
+    	Object result = null;
+    	try {
+    		result = this.proxyManager.copyArray(this.entity.getObject());
+    		Assert.assertArrayEquals((Object[]) this.expectedResult, (Object[]) result);
+    	}catch (UnsupportedException e) {
+    		Assert.assertEquals(this.expectedResult, e.getClass());
+		}
+        
+    	
+        
 
     }
 

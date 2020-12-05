@@ -1,7 +1,6 @@
 package org.apache.openjpa.util;
 
-import org.apache.openjpa.util.support.BeanClass;
-import org.apache.openjpa.util.support.NonBeanClass;
+import org.apache.openjpa.util.entity.ProxyManagerImplEntity;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -15,71 +14,73 @@ import java.util.*;
 public class CopyCustomTest {
 
     private ProxyManagerImpl proxyManager;
-    private Object object;
-    private boolean resultNull;
+    private ProxyManagerImplEntity entity;
+    private Object expectedResult;
 
-    public CopyCustomTest(TestInput testInput) {
-        this.object = testInput.getObject();
-        this.resultNull = testInput.isResultNull();
+    public CopyCustomTest(ProxyManagerImplEntity entity, Object expectedResult) {
+        this.entity = entity;
+        this.expectedResult = expectedResult;
     }
 
     @Parameterized.Parameters
-    public static Collection<TestInput> getParameters(){
+    public static Collection<?> getParameters(){
+    	
+    	
+    	
         Random r = new Random();
-        List<TestInput> testInputs = new ArrayList<>();
+        //List<TestInput> testInputs = new ArrayList<>();
 
-        testInputs.add(new TestInput(null, true));
-        testInputs.add(new TestInput(new NonBeanClass(r.nextInt(), r.nextInt()), true));
+        Object obj = new Object();
+        obj=null;
+        ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity(obj);
+        ProxyManagerImplEntity entityNonBean = new ProxyManagerImplEntity(r.nextInt(), r.nextInt());
+        ProxyManagerImplEntity entityBean = new ProxyManagerImplEntity(r.nextInt());
+        ProxyManagerImplEntity entityMap = new ProxyManagerImplEntity(r.nextInt(), r.nextInt(), r.nextInt(), r.nextInt());
+        ProxyManagerImplEntity entityDate = new ProxyManagerImplEntity(new Date());
+        ProxyManagerImplEntity entityGregorian = new ProxyManagerImplEntity(new GregorianCalendar());
+        ProxyManagerImplEntity entityProxyDate = new ProxyManagerImplEntity(new ProxyManagerImpl().newDateProxy(Date.class));
+        ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(r.nextInt(), r.nextInt(), r.nextInt());
+        
+        //BeanClass beanClass = new BeanClass();
+        //beanClass.setValue(r.nextInt());
+        //testInputs.add(new TestInput(beanClass, false), beanClass);
 
-        BeanClass beanClass = new BeanClass();
-        beanClass.setValue(r.nextInt());
-        testInputs.add(new TestInput(beanClass, false));
+        //Map<Integer, Integer> map = new HashMap<>();
+        //map.put(r.nextInt(), r.nextInt());
+        //map.put(r.nextInt(), r.nextInt());
+        //map.put(r.nextInt(), r.nextInt());
 
-        Map<Integer, Integer> map = new HashMap<>();
-        map.put(r.nextInt(), r.nextInt());
-        map.put(r.nextInt(), r.nextInt());
-        map.put(r.nextInt(), r.nextInt());
+        
 
-        testInputs.add(new TestInput(map, false));
+        
 
-        testInputs.add(new TestInput(new Date(), false));
+        //Proxy proxy = new ProxyManagerImpl().newDateProxy(Date.class);
+        
 
-        testInputs.add(new TestInput(new GregorianCalendar(), false));
+        //List<Integer> list = new ArrayList<>();
 
-        Proxy proxy = new ProxyManagerImpl().newDateProxy(Date.class);
-        testInputs.add(new TestInput(proxy, false));
-
-        List<Integer> list = new ArrayList<>();
-
-        list.add(r.nextInt());
-        list.add(r.nextInt());
-        list.add(r.nextInt());
-
-        testInputs.add(new TestInput(list, false));
+        //list.add(r.nextInt());
+        //list.add(r.nextInt());
+        //list.add(r.nextInt());
 
 
 
-        return testInputs;
+
+        return Arrays.asList(new Object[][] {
+    		
+        	{entityNull , null},
+            {entityNonBean, null}, // non bean per ul branch coverage ultimo statement
+            {entityBean, entityBean.getObject()}, //bean per il branch coverage per l'ultimo statement
+            {entityMap, entityMap.getObject()},
+            {entityDate, entityDate.getObject()},
+            {entityGregorian, entityGregorian.getObject()},
+            {entityProxyDate, entityProxyDate.getObject()},
+            {entityList, entityList.getObject()}//Collection
+    	});
 
     }
 
-    private static class TestInput {
-        private Object object;
-        private boolean resultNull;
-
-        public TestInput(Object object, boolean resultNull) {
-            this.object = object;
-            this.resultNull = resultNull;
-        }
-
-        public Object getObject() {
-            return object;
-        }
-
-        public boolean isResultNull() {
-            return resultNull;
-        }
-    }
+    
 
     @Before
     public void setUp(){
@@ -88,13 +89,11 @@ public class CopyCustomTest {
 
     @Test
     public void copyCustomTest() {
-        Object result = this.proxyManager.copyCustom(this.object);
+        Object result = this.proxyManager.copyCustom(this.entity.getObject());
 
-        if (this.resultNull) {
-            Assert.assertNull(result);
-        } else {
-            Assert.assertEquals(this.object, result);
-        }
+       
+        Assert.assertEquals(this.expectedResult, result);
+      
 
     }
 

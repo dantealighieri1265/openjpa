@@ -12,7 +12,7 @@
 <property name="onCommentFormat" value="// STOP - ALLOW PRINT STATEMENTS"/>
 </module>
 </module>
-<module name="SuppressionFilter"><property name="file" value="openjpa-project/suppressions.xml"/>
+<module name="SuppressionFilter"><property name="file" value="openjpa-project\suppressions.xml"/>
 <property name="optional" value="true"/>
 </module>
 </module>

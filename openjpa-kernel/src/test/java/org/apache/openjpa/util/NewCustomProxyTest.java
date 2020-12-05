@@ -55,7 +55,7 @@ public class NewCustomProxyTest {
 
         testInputs.add(new TestInput(sortedMap, true, false));
 
-        Set<Integer> sortedSet = new TreeSet<>();
+        Set<Integer> sortedSet = new TreeSet<>(); //1 tra set e list forse ridondante
         sortedSet.add(r.nextInt());
         sortedSet.add(r.nextInt());
         sortedSet.add(r.nextInt());
