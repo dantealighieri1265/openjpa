@@ -78,6 +78,9 @@ public class NewCustomProxyTest {
         testInputs.add(new TestInput(list, true, false));
         testInputs.add(new TestInput(new Timestamp(System.currentTimeMillis()), false, false));
 
+        
+        /*In realtà questo non so a cosa serva. Non mi aumenta ne la coverage nè la branch. Forse
+         * è utile per la mutation*/
         BeanClass unproxyableClass = new BeanClass();
         unproxyableClass.setValue(r.nextInt());
         testInputs.add(new TestInput(unproxyableClass, false, BeanClass.class.getName(),true));

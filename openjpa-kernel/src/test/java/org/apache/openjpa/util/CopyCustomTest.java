@@ -29,17 +29,24 @@ public class CopyCustomTest {
     	
         Random r = new Random();
         //List<TestInput> testInputs = new ArrayList<>();
-
-        Object obj = new Object();
-        obj=null;
-        ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity(obj);
+        /*ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity(obj);
         ProxyManagerImplEntity entityNonBean = new ProxyManagerImplEntity(r.nextInt(), r.nextInt());
         ProxyManagerImplEntity entityBean = new ProxyManagerImplEntity(r.nextInt());
         ProxyManagerImplEntity entityMap = new ProxyManagerImplEntity(r.nextInt(), r.nextInt(), r.nextInt(), r.nextInt());
         ProxyManagerImplEntity entityDate = new ProxyManagerImplEntity(new Date());
         ProxyManagerImplEntity entityGregorian = new ProxyManagerImplEntity(new GregorianCalendar());
         ProxyManagerImplEntity entityProxyDate = new ProxyManagerImplEntity(new ProxyManagerImpl().newDateProxy(Date.class));
-        ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(r.nextInt(), r.nextInt(), r.nextInt());
+        ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(r.nextInt(), r.nextInt(), r.nextInt());*/
+        
+        ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity entityNonBean = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity entityBean = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity entityMap = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity entityDate = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity entityGregorian = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity entityProxyDate = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity entityList = new ProxyManagerImplEntity();
+        
         
         //BeanClass beanClass = new BeanClass();
         //beanClass.setValue(r.nextInt());
@@ -68,14 +75,14 @@ public class CopyCustomTest {
 
         return Arrays.asList(new Object[][] {
     		
-        	{entityNull , null},
-            {entityNonBean, null}, // non bean per ul branch coverage ultimo statement
-            {entityBean, entityBean.getObject()}, //bean per il branch coverage per l'ultimo statement
-            {entityMap, entityMap.getObject()},
-            {entityDate, entityDate.getObject()},
-            {entityGregorian, entityGregorian.getObject()},
-            {entityProxyDate, entityProxyDate.getObject()},
-            {entityList, entityList.getObject()}//Collection
+        	{entityNull.initializeEntityNull(null), null},
+            {entityNonBean.initializeEntityNonBean(r.nextInt(), r.nextInt()), null}, // non bean per ul branch coverage ultimo statement
+            {entityBean.initializeEntityBean(r.nextInt()), entityBean.getObject()}, //bean per il branch coverage per l'ultimo statement
+            {entityMap.initializeEntityMap(r.nextInt(), r.nextInt(), r.nextInt(), r.nextInt()), entityMap.getObject()},
+            {entityDate.initializeEntityDate(new Date()), entityDate.getObject()},
+            {entityGregorian.initializeEntityGregorian(new GregorianCalendar()), entityGregorian.getObject()},
+            {entityProxyDate.initializeEntityProxyDate(new ProxyManagerImpl().newDateProxy(Date.class)), entityProxyDate.getObject()},
+            {entityList.initializeEntityList(r.nextInt(), r.nextInt(), r.nextInt()), entityList.getObject()}//Collection
     	});
 
     }
@@ -96,5 +103,15 @@ public class CopyCustomTest {
       
 
     }
+    
+    public static void main(String[] args) {
+        /*ProxyManagerImplEntity proxyEntity = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity proxyEntity1= new ProxyManagerImplEntity();
+        System.out.println(proxyEntity.createInt(5));
+        System.out.println(proxyEntity.createString("ciao"));
+        System.out.println(proxyEntity1.createInt(5));
+        System.out.println(proxyEntity1.createString("ciao"));*/
+
+	}
 
 }

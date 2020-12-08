@@ -3,15 +3,11 @@ package org.apache.openjpa.util;
 
 import org.junit.Assert;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.apache.openjpa.util.entity.ProxyManagerImplEntity;
-import org.apache.openjpa.util.support.NonBeanClass;
 
-import java.lang.reflect.Array;
 import java.util.*;
 
 
@@ -40,15 +36,18 @@ public class CopyArrayTest {
         Object obj = new Object();
         obj=null;
 
-        ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity(obj);
+        /*ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity(obj);
         ProxyManagerImplEntity entityNonBean = new ProxyManagerImplEntity(r.nextInt(), r.nextInt());
-        ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(r.nextFloat());
+        ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(r.nextFloat());*/
+        ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity entityNonBean = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity entityList = new ProxyManagerImplEntity();
 
         return Arrays.asList(new Object[][] {
     		
-        	{entityNull , null},
-            {entityNonBean, UnsupportedException.class}, // non bean per ul branch coverage ultimo statement
-            {entityList, entityList.getObject()}
+        	{entityNull.initializeEntityNull(null) , null},
+            {entityNonBean.initializeEntityNonBean(r.nextInt(), r.nextInt()), UnsupportedException.class}, // non bean per ul branch coverage ultimo statement
+            {entityList.initializeEntityArray(r.nextFloat()), entityList.getObject()}
     	});
 
 
