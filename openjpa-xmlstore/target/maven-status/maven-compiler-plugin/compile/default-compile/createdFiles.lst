@@ -1,7 +1,0 @@
-org\apache\openjpa\xmlstore\XMLFileHandler.class
-org\apache\openjpa\xmlstore\XMLStore.class
-org\apache\openjpa\xmlstore\ObjectData.class
-org\apache\openjpa\xmlstore\XMLConfiguration.class
-org\apache\openjpa\xmlstore\XMLStoreManager.class
-org\apache\openjpa\xmlstore\XMLFileHandler$ObjectDataHandler.class
-org\apache\openjpa\xmlstore\XMLFileHandler$XMLEncoder.class
