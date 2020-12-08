@@ -15,7 +15,7 @@ import java.util.*;
 public class CopyArrayTest {
 
     private ProxyManagerImpl proxyManager;
-	private ProxyManagerImplEntity entity;
+	private ProxyManagerImplEntity entity; 
 	private Object expectedResult;
 
     public CopyArrayTest(ProxyManagerImplEntity entity, Object expectedResult) {
