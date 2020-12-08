@@ -1,12 +1,18 @@
 package org.apache.openjpa.util.entity;
 
+import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.TreeSet;
 
-import org.apache.openjpa.util.support.BeanClass;
-import org.apache.openjpa.util.support.NonBeanClass;
+import org.apache.openjpa.util.support.Valid;
+import org.apache.openjpa.util.support.FinalClass;
+import org.apache.openjpa.util.support.NonValid;
+
 
 public class ProxyManagerImplEntity {
 	
@@ -15,65 +21,44 @@ public class ProxyManagerImplEntity {
     private String unproxyable;
 	
 	public ProxyManagerImplEntity() {
-		// TODO Nothing to do
-	}
-
-    /*public ProxyManagerImplEntity(Object object) {
-        this.object = object;
-    }
-    
-    
-
-    public ProxyManagerImplEntity(int n1) {
-		BeanClass beanClass = new BeanClass();
-		beanClass.setValue(n1);
-		setObject(beanClass);
-	}
-
-	public ProxyManagerImplEntity(int n1, int n2, int n3, int n4) {
-		Map<Integer, Integer> map = new HashMap<>();
-        map.put(n1, n2);
-        map.put(n3, n4);
-        setObject(map);
-	}
-
-	
-
-	public ProxyManagerImplEntity(int n1, int n2, int n3 ) {
-		List<Integer> list = new ArrayList<>();
-
-        list.add(n1);
-        list.add(n2);
-        list.add(n3);
-        setObject(list);
+		// Nothing to do
 	}
 	
-	public ProxyManagerImplEntity(float n1) {
-		Float[] list = new Float[]{n1}; //immutable
-        
-        setObject(list);
-	}*/
+	public ProxyManagerImplEntity(boolean b) {
+		this.autoOff = b;
+	}
 	
 
 	public ProxyManagerImplEntity initializeEntityNull(Object object2) {
 		setObject(object2);
 		return this;
 	}
-	public ProxyManagerImplEntity initializeEntityNonBean(int n1, int n2) {
-        NonBeanClass nonBeanClass = new NonBeanClass(n1, n2);
-        setObject(nonBeanClass);
+	
+	
+	public ProxyManagerImplEntity initializeEntityNonValid(int nextInt, int nextInt2) {
+		
+        NonValid nonValid = new NonValid(nextInt, nextInt2);
+        setObject(nonValid);
         return this;
     }
-	public ProxyManagerImplEntity initializeEntityBean(int n1) {
-		BeanClass beanClass = new BeanClass();
-		beanClass.setValue(n1);
-		setObject(beanClass);
+
+	public ProxyManagerImplEntity initializeEntityValid(int nextInt, boolean proxyable) {
+		Valid valid = new Valid();
+		valid.setValue(nextInt);
+		if (!proxyable) {
+			setUnproxyable(Valid.class.getName());
+		}
+		setObject(valid);
 		return this;
 	}
-	public ProxyManagerImplEntity initializeEntityMap(int n1, int n2, int n3, int n4) {
-		Map<Integer, Integer> map = new HashMap<>();
-        map.put(n1, n2);
-        map.put(n3, n4);
+	public ProxyManagerImplEntity initializeEntityMap(int nextInt, int nextInt2, boolean sortedMap) {
+		Map<Integer, Integer> map;
+		if (sortedMap){
+			map = new TreeMap<>();
+		}else {
+			map = new HashMap<>();
+		}
+		map.put(nextInt, nextInt2);
         setObject(map);
         return this;
 	}
@@ -89,20 +74,38 @@ public class ProxyManagerImplEntity {
         this.object = object2;
         return this;
     }
-	public ProxyManagerImplEntity initializeEntityList(int n1, int n2, int n3 ) {
+	public ProxyManagerImplEntity initializeEntityList(int nextInt) {
 		List<Integer> list = new ArrayList<>();
 
-        list.add(n1);
-        list.add(n2);
-        list.add(n3);
+        list.add(nextInt);
         setObject(list);
         return this;
 	}
-	public ProxyManagerImplEntity initializeEntityArray(float n1) {
-		Float[] list = new Float[]{n1}; //immutable
+	
+	public ProxyManagerImplEntity initializeEntityArray(float nextInt) {
+		Float[] list = new Float[]{nextInt}; //immutable
         setObject(list);
         return this;
 	}
+
+	public ProxyManagerImplEntity initializeEntityFinal() {
+		FinalClass finalClass = new FinalClass();
+		setObject(finalClass);
+		return this;
+	}
+
+	public Object initializeSortedSet(int nextInt) {
+		Set<Integer> sortedSet = new TreeSet<>(); //1 tra set e list forse ridondante
+        sortedSet.add(nextInt);
+        setObject(sortedSet);
+		return this;
+	}
+
+	public ProxyManagerImplEntity initializeEntityTimestamp(Timestamp timestamp) {
+		setObject(timestamp);
+		return this;
+	}
+	
 	
 	public Object getObject() {
         return object;
@@ -127,4 +130,7 @@ public class ProxyManagerImplEntity {
 	public void setAutoOff(boolean autoOff) {
 		this.autoOff = autoOff;
 	}
+
+
+
 }

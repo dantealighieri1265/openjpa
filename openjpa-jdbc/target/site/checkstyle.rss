@@ -74,6 +74,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.SelectConstructor.java">org/apache/openjpa/jdbc/kernel/exps/SelectConstructor.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.VersionStrategy.java">org/apache/openjpa/jdbc/meta/VersionStrategy.java</a>
                 </td>
                 <td>
@@ -89,20 +103,6 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.Sequence.java">org/apache/openjpa/jdbc/schema/Sequence.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.SelectConstructor.java">org/apache/openjpa/jdbc/kernel/exps/SelectConstructor.java</a>
                 </td>
                 <td>
                   0
@@ -158,6 +158,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.NotContainsExpression.java">org/apache/openjpa/jdbc/kernel/exps/NotContainsExpression.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.RelationToManyTableFieldStrategy.java">org/apache/openjpa/jdbc/meta/strats/RelationToManyTableFieldStrategy.java</a>
                 </td>
                 <td>
@@ -186,21 +200,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.NotContainsExpression.java">org/apache/openjpa/jdbc/kernel/exps/NotContainsExpression.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.Joins.java">org/apache/openjpa/jdbc/sql/Joins.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.StringLength.java">org/apache/openjpa/jdbc/kernel/exps/StringLength.java</a>
                 </td>
                 <td>
                   0
@@ -242,7 +242,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.StringLength.java">org/apache/openjpa/jdbc/kernel/exps/StringLength.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.Joins.java">org/apache/openjpa/jdbc/sql/Joins.java</a>
                 </td>
                 <td>
                   0
@@ -312,7 +312,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.GetColumn.java">org/apache/openjpa/jdbc/kernel/exps/GetColumn.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.DelegatingJDBCFetchConfiguration.java">org/apache/openjpa/jdbc/kernel/DelegatingJDBCFetchConfiguration.java</a>
                 </td>
                 <td>
                   0
@@ -326,7 +326,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.DelegatingJDBCFetchConfiguration.java">org/apache/openjpa/jdbc/kernel/DelegatingJDBCFetchConfiguration.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.GetColumn.java">org/apache/openjpa/jdbc/kernel/exps/GetColumn.java</a>
                 </td>
                 <td>
                   0
@@ -368,7 +368,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.RowManager.java">org/apache/openjpa/jdbc/sql/RowManager.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.PreparedQueryCacheImpl.java">org/apache/openjpa/jdbc/kernel/PreparedQueryCacheImpl.java</a>
                 </td>
                 <td>
                   0
@@ -396,21 +396,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.PreparedQueryCacheImpl.java">org/apache/openjpa/jdbc/kernel/PreparedQueryCacheImpl.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.MySQLDictionary.java">org/apache/openjpa/jdbc/sql/MySQLDictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.RowManager.java">org/apache/openjpa/jdbc/sql/RowManager.java</a>
                 </td>
                 <td>
                   0
@@ -425,6 +411,20 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.ColumnIO.java">org/apache/openjpa/jdbc/schema/ColumnIO.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.MySQLDictionary.java">org/apache/openjpa/jdbc/sql/MySQLDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -480,6 +480,48 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.ConstraintUpdateManager.java">org/apache/openjpa/jdbc/kernel/ConstraintUpdateManager.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.JDBC3SavepointManager.java">org/apache/openjpa/jdbc/kernel/JDBC3SavepointManager.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.TableJDBCSeq.java">org/apache/openjpa/jdbc/kernel/TableJDBCSeq.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.MappingDefaultsImpl.java">org/apache/openjpa/jdbc/meta/MappingDefaultsImpl.java</a>
                 </td>
                 <td>
@@ -508,48 +550,6 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.ConstraintUpdateManager.java">org/apache/openjpa/jdbc/kernel/ConstraintUpdateManager.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.TableJDBCSeq.java">org/apache/openjpa/jdbc/kernel/TableJDBCSeq.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.JDBC3SavepointManager.java">org/apache/openjpa/jdbc/kernel/JDBC3SavepointManager.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.FlatClassStrategy.java">org/apache/openjpa/jdbc/meta/strats/FlatClassStrategy.java</a>
                 </td>
                 <td>
@@ -565,20 +565,6 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.Avg.java">org/apache/openjpa/jdbc/kernel/exps/Avg.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.EmbedValueHandler.java">org/apache/openjpa/jdbc/meta/strats/EmbedValueHandler.java</a>
                 </td>
                 <td>
                   0
@@ -621,6 +607,20 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.ValueTableJDBCSeq.java">org/apache/openjpa/jdbc/kernel/ValueTableJDBCSeq.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.EmbedValueHandler.java">org/apache/openjpa/jdbc/meta/strats/EmbedValueHandler.java</a>
                 </td>
                 <td>
                   0
@@ -760,6 +760,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.ClassMappingInfo.java">org/apache/openjpa/jdbc/meta/ClassMappingInfo.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.MaxEmbeddedCharArrayFieldStrategy.java">org/apache/openjpa/jdbc/meta/strats/MaxEmbeddedCharArrayFieldStrategy.java</a>
                 </td>
                 <td>
@@ -774,7 +788,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.ClassMappingInfo.java">org/apache/openjpa/jdbc/meta/ClassMappingInfo.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.ProjectionResultObjectProvider.java">org/apache/openjpa/jdbc/kernel/ProjectionResultObjectProvider.java</a>
                 </td>
                 <td>
                   0
@@ -817,20 +831,6 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.NameSet.java">org/apache/openjpa/jdbc/schema/NameSet.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.ProjectionResultObjectProvider.java">org/apache/openjpa/jdbc/kernel/ProjectionResultObjectProvider.java</a>
                 </td>
                 <td>
                   0
@@ -900,7 +900,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.InValueDiscriminatorStrategy.java">org/apache/openjpa/jdbc/meta/strats/InValueDiscriminatorStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.identifier.QualifiedDBIdentifier.java">org/apache/openjpa/jdbc/identifier/QualifiedDBIdentifier.java</a>
                 </td>
                 <td>
                   0
@@ -928,7 +928,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.identifier.QualifiedDBIdentifier.java">org/apache/openjpa/jdbc/identifier/QualifiedDBIdentifier.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.InValueDiscriminatorStrategy.java">org/apache/openjpa/jdbc/meta/strats/InValueDiscriminatorStrategy.java</a>
                 </td>
                 <td>
                   0
@@ -1040,7 +1040,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.HSQLDictionary.java">org/apache/openjpa/jdbc/sql/HSQLDictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.AbstractVersionStrategy.java">org/apache/openjpa/jdbc/meta/strats/AbstractVersionStrategy.java</a>
                 </td>
                 <td>
                   0
@@ -1054,7 +1054,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.AbstractVersionStrategy.java">org/apache/openjpa/jdbc/meta/strats/AbstractVersionStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.HSQLDictionary.java">org/apache/openjpa/jdbc/sql/HSQLDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -1110,20 +1110,6 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.StrategyInstaller.java">org/apache/openjpa/jdbc/meta/StrategyInstaller.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.Size.java">org/apache/openjpa/jdbc/kernel/exps/Size.java</a>
                 </td>
                 <td>
@@ -1138,7 +1124,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.ContainerFieldStrategy.java">org/apache/openjpa/jdbc/meta/strats/ContainerFieldStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.StrategyInstaller.java">org/apache/openjpa/jdbc/meta/StrategyInstaller.java</a>
                 </td>
                 <td>
                   0
@@ -1166,6 +1152,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.ContainerFieldStrategy.java">org/apache/openjpa/jdbc/meta/strats/ContainerFieldStrategy.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.UnaryOp.java">org/apache/openjpa/jdbc/kernel/exps/UnaryOp.java</a>
                 </td>
                 <td>
@@ -1180,7 +1180,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.EmpressDictionary.java">org/apache/openjpa/jdbc/sql/EmpressDictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.FilterValueImpl.java">org/apache/openjpa/jdbc/kernel/exps/FilterValueImpl.java</a>
                 </td>
                 <td>
                   0
@@ -1194,7 +1194,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.FilterValueImpl.java">org/apache/openjpa/jdbc/kernel/exps/FilterValueImpl.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.EmpressDictionary.java">org/apache/openjpa/jdbc/sql/EmpressDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -1236,7 +1236,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.SequenceMapping.java">org/apache/openjpa/jdbc/meta/SequenceMapping.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.identifier.DefaultIdentifierConfiguration.java">org/apache/openjpa/jdbc/identifier/DefaultIdentifierConfiguration.java</a>
                 </td>
                 <td>
                   0
@@ -1250,7 +1250,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.identifier.DefaultIdentifierConfiguration.java">org/apache/openjpa/jdbc/identifier/DefaultIdentifierConfiguration.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.SequenceMapping.java">org/apache/openjpa/jdbc/meta/SequenceMapping.java</a>
                 </td>
                 <td>
                   0
@@ -1320,7 +1320,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.PointbaseDictionary.java">org/apache/openjpa/jdbc/sql/PointbaseDictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.ClassStrategy.java">org/apache/openjpa/jdbc/meta/ClassStrategy.java</a>
                 </td>
                 <td>
                   0
@@ -1334,7 +1334,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.ClassStrategy.java">org/apache/openjpa/jdbc/meta/ClassStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.PointbaseDictionary.java">org/apache/openjpa/jdbc/sql/PointbaseDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -1684,7 +1684,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SQLServerDictionary.java">org/apache/openjpa/jdbc/sql/SQLServerDictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.DBDictionary.java">org/apache/openjpa/jdbc/sql/DBDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -1698,7 +1698,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.DBDictionary.java">org/apache/openjpa/jdbc/sql/DBDictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SQLServerDictionary.java">org/apache/openjpa/jdbc/sql/SQLServerDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -1768,7 +1768,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.XMLValueHandler.java">org/apache/openjpa/jdbc/meta/strats/XMLValueHandler.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.InKeyExpression.java">org/apache/openjpa/jdbc/kernel/exps/InKeyExpression.java</a>
                 </td>
                 <td>
                   0
@@ -1782,7 +1782,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.InKeyExpression.java">org/apache/openjpa/jdbc/kernel/exps/InKeyExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.XMLValueHandler.java">org/apache/openjpa/jdbc/meta/strats/XMLValueHandler.java</a>
                 </td>
                 <td>
                   0
@@ -1838,7 +1838,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.ReverseCustomizer.java">org/apache/openjpa/jdbc/meta/ReverseCustomizer.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.Lit.java">org/apache/openjpa/jdbc/kernel/exps/Lit.java</a>
                 </td>
                 <td>
                   0
@@ -1852,7 +1852,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.Lit.java">org/apache/openjpa/jdbc/kernel/exps/Lit.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.ReverseCustomizer.java">org/apache/openjpa/jdbc/meta/ReverseCustomizer.java</a>
                 </td>
                 <td>
                   0
@@ -2034,20 +2034,6 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.HandlerHandlerMapTableFieldStrategy.java">org/apache/openjpa/jdbc/meta/strats/HandlerHandlerMapTableFieldStrategy.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.NoneMappingDefaults.java">org/apache/openjpa/jdbc/meta/NoneMappingDefaults.java</a>
                 </td>
                 <td>
@@ -2062,7 +2048,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.VersionMappingInfo.java">org/apache/openjpa/jdbc/meta/VersionMappingInfo.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.HandlerHandlerMapTableFieldStrategy.java">org/apache/openjpa/jdbc/meta/strats/HandlerHandlerMapTableFieldStrategy.java</a>
                 </td>
                 <td>
                   0
@@ -2077,6 +2063,20 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.CharArrayValueHandler.java">org/apache/openjpa/jdbc/meta/strats/CharArrayValueHandler.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.VersionMappingInfo.java">org/apache/openjpa/jdbc/meta/VersionMappingInfo.java</a>
                 </td>
                 <td>
                   0
@@ -2118,20 +2118,6 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.Union.java">org/apache/openjpa/jdbc/sql/Union.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.JoinSyntaxes.java">org/apache/openjpa/jdbc/sql/JoinSyntaxes.java</a>
                 </td>
                 <td>
@@ -2146,7 +2132,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.XMLSchemaSerializer.java">org/apache/openjpa/jdbc/schema/XMLSchemaSerializer.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.Union.java">org/apache/openjpa/jdbc/sql/Union.java</a>
                 </td>
                 <td>
                   0
@@ -2174,7 +2160,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.ClassNameDiscriminatorStrategy.java">org/apache/openjpa/jdbc/meta/strats/ClassNameDiscriminatorStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.XMLSchemaSerializer.java">org/apache/openjpa/jdbc/schema/XMLSchemaSerializer.java</a>
                 </td>
                 <td>
                   0
@@ -2189,6 +2175,20 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.PreparedStatementManager.java">org/apache/openjpa/jdbc/kernel/PreparedStatementManager.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.ClassNameDiscriminatorStrategy.java">org/apache/openjpa/jdbc/meta/strats/ClassNameDiscriminatorStrategy.java</a>
                 </td>
                 <td>
                   0
@@ -2230,7 +2230,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.ResultSetResult.java">org/apache/openjpa/jdbc/sql/ResultSetResult.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.FieldMappingInfo.java">org/apache/openjpa/jdbc/meta/FieldMappingInfo.java</a>
                 </td>
                 <td>
                   0
@@ -2244,7 +2244,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.FieldMappingInfo.java">org/apache/openjpa/jdbc/meta/FieldMappingInfo.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.ResultSetResult.java">org/apache/openjpa/jdbc/sql/ResultSetResult.java</a>
                 </td>
                 <td>
                   0
@@ -2272,7 +2272,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.DataSourceFactory.java">org/apache/openjpa/jdbc/schema/DataSourceFactory.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.InstanceofExpression.java">org/apache/openjpa/jdbc/kernel/exps/InstanceofExpression.java</a>
                 </td>
                 <td>
                   0
@@ -2286,7 +2286,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.InstanceofExpression.java">org/apache/openjpa/jdbc/kernel/exps/InstanceofExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.DataSourceFactory.java">org/apache/openjpa/jdbc/schema/DataSourceFactory.java</a>
                 </td>
                 <td>
                   0
@@ -2314,7 +2314,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.FieldMapping.java">org/apache/openjpa/jdbc/meta/FieldMapping.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.SQLValue.java">org/apache/openjpa/jdbc/kernel/exps/SQLValue.java</a>
                 </td>
                 <td>
                   0
@@ -2328,7 +2328,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.SQLValue.java">org/apache/openjpa/jdbc/kernel/exps/SQLValue.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.FieldMapping.java">org/apache/openjpa/jdbc/meta/FieldMapping.java</a>
                 </td>
                 <td>
                   0
@@ -2426,7 +2426,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.H2Dictionary.java">org/apache/openjpa/jdbc/sql/H2Dictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.DynamicSchemaFactory.java">org/apache/openjpa/jdbc/schema/DynamicSchemaFactory.java</a>
                 </td>
                 <td>
                   0
@@ -2440,7 +2440,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.DynamicSchemaFactory.java">org/apache/openjpa/jdbc/schema/DynamicSchemaFactory.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.H2Dictionary.java">org/apache/openjpa/jdbc/sql/H2Dictionary.java</a>
                 </td>
                 <td>
                   0
@@ -2482,7 +2482,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SecondaryRow.java">org/apache/openjpa/jdbc/sql/SecondaryRow.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.JDBCValueOrder.java">org/apache/openjpa/jdbc/meta/JDBCValueOrder.java</a>
                 </td>
                 <td>
                   0
@@ -2496,7 +2496,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.JDBCValueOrder.java">org/apache/openjpa/jdbc/meta/JDBCValueOrder.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SecondaryRow.java">org/apache/openjpa/jdbc/sql/SecondaryRow.java</a>
                 </td>
                 <td>
                   0
@@ -2538,20 +2538,6 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.RuntimeStrategyInstaller.java">org/apache/openjpa/jdbc/meta/RuntimeStrategyInstaller.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.JDBCExpressionFactory.java">org/apache/openjpa/jdbc/kernel/exps/JDBCExpressionFactory.java</a>
                 </td>
                 <td>
@@ -2566,7 +2552,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SQLExceptions.java">org/apache/openjpa/jdbc/sql/SQLExceptions.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.RuntimeStrategyInstaller.java">org/apache/openjpa/jdbc/meta/RuntimeStrategyInstaller.java</a>
                 </td>
                 <td>
                   0
@@ -2594,6 +2580,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SQLExceptions.java">org/apache/openjpa/jdbc/sql/SQLExceptions.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.localizer.properties">org/apache/openjpa/jdbc/kernel/exps/localizer.properties</a>
                 </td>
                 <td>
@@ -2608,7 +2608,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.ObjectIdClassStrategy.java">org/apache/openjpa/jdbc/meta/strats/ObjectIdClassStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.EqualExpression.java">org/apache/openjpa/jdbc/kernel/exps/EqualExpression.java</a>
                 </td>
                 <td>
                   0
@@ -2622,7 +2622,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.EqualExpression.java">org/apache/openjpa/jdbc/kernel/exps/EqualExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.ObjectIdClassStrategy.java">org/apache/openjpa/jdbc/meta/strats/ObjectIdClassStrategy.java</a>
                 </td>
                 <td>
                   0
@@ -2664,7 +2664,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.PrimaryRow.java">org/apache/openjpa/jdbc/sql/PrimaryRow.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.Joinable.java">org/apache/openjpa/jdbc/meta/Joinable.java</a>
                 </td>
                 <td>
                   0
@@ -2678,7 +2678,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.Joinable.java">org/apache/openjpa/jdbc/meta/Joinable.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.PrimaryRow.java">org/apache/openjpa/jdbc/sql/PrimaryRow.java</a>
                 </td>
                 <td>
                   0
@@ -2706,21 +2706,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SybaseDictionary.java">org/apache/openjpa/jdbc/sql/SybaseDictionary.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.DerbyDictionary.java">org/apache/openjpa/jdbc/sql/DerbyDictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.ToLowerCase.java">org/apache/openjpa/jdbc/kernel/exps/ToLowerCase.java</a>
                 </td>
                 <td>
                   0
@@ -2748,7 +2734,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.ToLowerCase.java">org/apache/openjpa/jdbc/kernel/exps/ToLowerCase.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.DerbyDictionary.java">org/apache/openjpa/jdbc/sql/DerbyDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -2762,7 +2748,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.EmbeddedClassStrategy.java">org/apache/openjpa/jdbc/meta/strats/EmbeddedClassStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SybaseDictionary.java">org/apache/openjpa/jdbc/sql/SybaseDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -2790,6 +2776,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.EmbeddedClassStrategy.java">org/apache/openjpa/jdbc/meta/strats/EmbeddedClassStrategy.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.ByteArrayValueHandler.java">org/apache/openjpa/jdbc/meta/strats/ByteArrayValueHandler.java</a>
                 </td>
                 <td>
@@ -2804,7 +2804,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.NumberVersionStrategy.java">org/apache/openjpa/jdbc/meta/strats/NumberVersionStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.NativeJDBCSeq.java">org/apache/openjpa/jdbc/kernel/NativeJDBCSeq.java</a>
                 </td>
                 <td>
                   0
@@ -2832,7 +2832,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.NativeJDBCSeq.java">org/apache/openjpa/jdbc/kernel/NativeJDBCSeq.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.NumberVersionStrategy.java">org/apache/openjpa/jdbc/meta/strats/NumberVersionStrategy.java</a>
                 </td>
                 <td>
                   0
@@ -2944,7 +2944,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.SchemaGroup.java">org/apache/openjpa/jdbc/schema/SchemaGroup.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.Exp.java">org/apache/openjpa/jdbc/kernel/exps/Exp.java</a>
                 </td>
                 <td>
                   0
@@ -2958,7 +2958,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.Exp.java">org/apache/openjpa/jdbc/kernel/exps/Exp.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.SchemaGroup.java">org/apache/openjpa/jdbc/schema/SchemaGroup.java</a>
                 </td>
                 <td>
                   0
@@ -3014,7 +3014,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.FoxProDictionary.java">org/apache/openjpa/jdbc/sql/FoxProDictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.RelationId.java">org/apache/openjpa/jdbc/meta/RelationId.java</a>
                 </td>
                 <td>
                   0
@@ -3042,7 +3042,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.RelationId.java">org/apache/openjpa/jdbc/meta/RelationId.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.FoxProDictionary.java">org/apache/openjpa/jdbc/sql/FoxProDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -3084,7 +3084,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.ValueMapDiscriminatorStrategy.java">org/apache/openjpa/jdbc/meta/strats/ValueMapDiscriminatorStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.Trim.java">org/apache/openjpa/jdbc/kernel/exps/Trim.java</a>
                 </td>
                 <td>
                   0
@@ -3098,7 +3098,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.Trim.java">org/apache/openjpa/jdbc/kernel/exps/Trim.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.ValueMapDiscriminatorStrategy.java">org/apache/openjpa/jdbc/meta/strats/ValueMapDiscriminatorStrategy.java</a>
                 </td>
                 <td>
                   0
@@ -3224,7 +3224,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.MaxDBDictionary.java">org/apache/openjpa/jdbc/sql/MaxDBDictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.ElementEmbedValueHandler.java">org/apache/openjpa/jdbc/meta/strats/ElementEmbedValueHandler.java</a>
                 </td>
                 <td>
                   0
@@ -3238,7 +3238,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.ElementEmbedValueHandler.java">org/apache/openjpa/jdbc/meta/strats/ElementEmbedValueHandler.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.MaxDBDictionary.java">org/apache/openjpa/jdbc/sql/MaxDBDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -3308,7 +3308,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.DelegatingJoinable.java">org/apache/openjpa/jdbc/meta/DelegatingJoinable.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.AbstractUpdateManager.java">org/apache/openjpa/jdbc/kernel/AbstractUpdateManager.java</a>
                 </td>
                 <td>
                   0
@@ -3322,7 +3322,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.AbstractUpdateManager.java">org/apache/openjpa/jdbc/kernel/AbstractUpdateManager.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.DelegatingJoinable.java">org/apache/openjpa/jdbc/meta/DelegatingJoinable.java</a>
                 </td>
                 <td>
                   0
@@ -3504,7 +3504,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.Schemas.java">org/apache/openjpa/jdbc/schema/Schemas.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.FinderQueryImpl.java">org/apache/openjpa/jdbc/kernel/FinderQueryImpl.java</a>
                 </td>
                 <td>
                   0
@@ -3518,7 +3518,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.FinderQueryImpl.java">org/apache/openjpa/jdbc/kernel/FinderQueryImpl.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.Schemas.java">org/apache/openjpa/jdbc/schema/Schemas.java</a>
                 </td>
                 <td>
                   0
@@ -3588,6 +3588,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.StoreCollectionFieldStrategy.java">org/apache/openjpa/jdbc/meta/strats/StoreCollectionFieldStrategy.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.DB2Dictionary.java">org/apache/openjpa/jdbc/sql/DB2Dictionary.java</a>
                 </td>
                 <td>
@@ -3602,7 +3616,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.StoreCollectionFieldStrategy.java">org/apache/openjpa/jdbc/meta/strats/StoreCollectionFieldStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.ClassMapping.java">org/apache/openjpa/jdbc/meta/ClassMapping.java</a>
                 </td>
                 <td>
                   0
@@ -3630,7 +3644,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.ClassMapping.java">org/apache/openjpa/jdbc/meta/ClassMapping.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.Type.java">org/apache/openjpa/jdbc/kernel/exps/Type.java</a>
                 </td>
                 <td>
                   0
@@ -3659,20 +3673,6 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.PrimitiveWrapperArrays.java">org/apache/openjpa/jdbc/meta/strats/PrimitiveWrapperArrays.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.Type.java">org/apache/openjpa/jdbc/kernel/exps/Type.java</a>
                 </td>
                 <td>
                   0
@@ -3728,7 +3728,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.RelationToManyInverseKeyFieldStrategy.java">org/apache/openjpa/jdbc/meta/strats/RelationToManyInverseKeyFieldStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.PreparedStatementManagerImpl.java">org/apache/openjpa/jdbc/kernel/PreparedStatementManagerImpl.java</a>
                 </td>
                 <td>
                   0
@@ -3742,7 +3742,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.PreparedStatementManagerImpl.java">org/apache/openjpa/jdbc/kernel/PreparedStatementManagerImpl.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.RelationToManyInverseKeyFieldStrategy.java">org/apache/openjpa/jdbc/meta/strats/RelationToManyInverseKeyFieldStrategy.java</a>
                 </td>
                 <td>
                   0
@@ -3826,6 +3826,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.NoneDiscriminatorStrategy.java">org/apache/openjpa/jdbc/meta/strats/NoneDiscriminatorStrategy.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.FirebirdDictionary.java">org/apache/openjpa/jdbc/sql/FirebirdDictionary.java</a>
                 </td>
                 <td>
@@ -3854,20 +3868,6 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.NoneDiscriminatorStrategy.java">org/apache/openjpa/jdbc/meta/strats/NoneDiscriminatorStrategy.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.Column.java">org/apache/openjpa/jdbc/schema/Column.java</a>
                 </td>
                 <td>
@@ -3882,7 +3882,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SelectImpl.java">org/apache/openjpa/jdbc/sql/SelectImpl.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.AbstractJDBCSavepointManager.java">org/apache/openjpa/jdbc/kernel/AbstractJDBCSavepointManager.java</a>
                 </td>
                 <td>
                   0
@@ -3910,7 +3910,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.AbstractJDBCSavepointManager.java">org/apache/openjpa/jdbc/kernel/AbstractJDBCSavepointManager.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SelectImpl.java">org/apache/openjpa/jdbc/sql/SelectImpl.java</a>
                 </td>
                 <td>
                   0
@@ -3980,7 +3980,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.RowManagerImpl.java">org/apache/openjpa/jdbc/sql/RowManagerImpl.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.LogicalUnion.java">org/apache/openjpa/jdbc/sql/LogicalUnion.java</a>
                 </td>
                 <td>
                   0
@@ -3994,7 +3994,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.LogicalUnion.java">org/apache/openjpa/jdbc/sql/LogicalUnion.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.RowManagerImpl.java">org/apache/openjpa/jdbc/sql/RowManagerImpl.java</a>
                 </td>
                 <td>
                   0
@@ -4022,7 +4022,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.DBCPDriverDataSource.java">org/apache/openjpa/jdbc/schema/DBCPDriverDataSource.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.UpdateManager.java">org/apache/openjpa/jdbc/kernel/UpdateManager.java</a>
                 </td>
                 <td>
                   0
@@ -4036,7 +4036,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.UpdateManager.java">org/apache/openjpa/jdbc/kernel/UpdateManager.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.DBCPDriverDataSource.java">org/apache/openjpa/jdbc/schema/DBCPDriverDataSource.java</a>
                 </td>
                 <td>
                   0
@@ -4106,20 +4106,6 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.RelationCollectionInverseKeyFieldStrategy.java">org/apache/openjpa/jdbc/meta/strats/RelationCollectionInverseKeyFieldStrategy.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.MaxEmbeddedByteArrayFieldStrategy.java">org/apache/openjpa/jdbc/meta/strats/MaxEmbeddedByteArrayFieldStrategy.java</a>
                 </td>
                 <td>
@@ -4134,7 +4120,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.AbstractResult.java">org/apache/openjpa/jdbc/sql/AbstractResult.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.RelationCollectionInverseKeyFieldStrategy.java">org/apache/openjpa/jdbc/meta/strats/RelationCollectionInverseKeyFieldStrategy.java</a>
                 </td>
                 <td>
                   0
@@ -4149,6 +4135,20 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.JDBCPath.java">org/apache/openjpa/jdbc/kernel/exps/JDBCPath.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.AbstractResult.java">org/apache/openjpa/jdbc/sql/AbstractResult.java</a>
                 </td>
                 <td>
                   0
@@ -4302,7 +4302,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.InformixDictionary.java">org/apache/openjpa/jdbc/sql/InformixDictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.identifier.DBIdentifierRule.java">org/apache/openjpa/jdbc/identifier/DBIdentifierRule.java</a>
                 </td>
                 <td>
                   0
@@ -4316,7 +4316,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.identifier.DBIdentifierRule.java">org/apache/openjpa/jdbc/identifier/DBIdentifierRule.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.InformixDictionary.java">org/apache/openjpa/jdbc/sql/InformixDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -4344,7 +4344,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SQLBuffer.java">org/apache/openjpa/jdbc/sql/SQLBuffer.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.TimestampVersionStrategy.java">org/apache/openjpa/jdbc/meta/strats/TimestampVersionStrategy.java</a>
                 </td>
                 <td>
                   0
@@ -4358,7 +4358,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.TimestampVersionStrategy.java">org/apache/openjpa/jdbc/meta/strats/TimestampVersionStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SQLBuffer.java">org/apache/openjpa/jdbc/sql/SQLBuffer.java</a>
                 </td>
                 <td>
                   0
@@ -4456,7 +4456,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.PostgresDictionary.java">org/apache/openjpa/jdbc/sql/PostgresDictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.GenericResultObjectProvider.java">org/apache/openjpa/jdbc/kernel/GenericResultObjectProvider.java</a>
                 </td>
                 <td>
                   0
@@ -4470,7 +4470,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.GenericResultObjectProvider.java">org/apache/openjpa/jdbc/kernel/GenericResultObjectProvider.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.PostgresDictionary.java">org/apache/openjpa/jdbc/sql/PostgresDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -4624,20 +4624,6 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.AbstractSQLServerDictionary.java">org/apache/openjpa/jdbc/sql/AbstractSQLServerDictionary.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.RefreshStrategyInstaller.java">org/apache/openjpa/jdbc/meta/RefreshStrategyInstaller.java</a>
                 </td>
                 <td>
@@ -4652,7 +4638,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.JDBCOrder.java">org/apache/openjpa/jdbc/meta/JDBCOrder.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.AbstractSQLServerDictionary.java">org/apache/openjpa/jdbc/sql/AbstractSQLServerDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -4680,7 +4666,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SQLFactoryImpl.java">org/apache/openjpa/jdbc/sql/SQLFactoryImpl.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.JDBCOrder.java">org/apache/openjpa/jdbc/meta/JDBCOrder.java</a>
                 </td>
                 <td>
                   0
@@ -4722,7 +4708,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.Strategy.java">org/apache/openjpa/jdbc/meta/Strategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SQLFactoryImpl.java">org/apache/openjpa/jdbc/sql/SQLFactoryImpl.java</a>
                 </td>
                 <td>
                   0
@@ -4750,6 +4736,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.Strategy.java">org/apache/openjpa/jdbc/meta/Strategy.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.GetMapValue.java">org/apache/openjpa/jdbc/kernel/exps/GetMapValue.java</a>
                 </td>
                 <td>
@@ -4764,7 +4764,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SolidDBDictionary.java">org/apache/openjpa/jdbc/sql/SolidDBDictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.SchemaGenerator.java">org/apache/openjpa/jdbc/schema/SchemaGenerator.java</a>
                 </td>
                 <td>
                   0
@@ -4778,7 +4778,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.schema.SchemaGenerator.java">org/apache/openjpa/jdbc/schema/SchemaGenerator.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SolidDBDictionary.java">org/apache/openjpa/jdbc/sql/SolidDBDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -4890,7 +4890,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.CacheDictionary.java">org/apache/openjpa/jdbc/sql/CacheDictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.SubclassJoinDiscriminatorStrategy.java">org/apache/openjpa/jdbc/meta/strats/SubclassJoinDiscriminatorStrategy.java</a>
                 </td>
                 <td>
                   0
@@ -4904,7 +4904,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.SubclassJoinDiscriminatorStrategy.java">org/apache/openjpa/jdbc/meta/strats/SubclassJoinDiscriminatorStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.CacheDictionary.java">org/apache/openjpa/jdbc/sql/CacheDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -4932,7 +4932,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.OracleDictionary.java">org/apache/openjpa/jdbc/sql/OracleDictionary.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.GetObjectId.java">org/apache/openjpa/jdbc/kernel/exps/GetObjectId.java</a>
                 </td>
                 <td>
                   0
@@ -4946,7 +4946,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.GetObjectId.java">org/apache/openjpa/jdbc/kernel/exps/GetObjectId.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.OracleDictionary.java">org/apache/openjpa/jdbc/sql/OracleDictionary.java</a>
                 </td>
                 <td>
                   0
@@ -4974,20 +4974,6 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.AbstractStrategy.java">org/apache/openjpa/jdbc/meta/strats/AbstractStrategy.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.NullIfExpression.java">org/apache/openjpa/jdbc/kernel/exps/NullIfExpression.java</a>
                 </td>
                 <td>
@@ -5002,7 +4988,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.Join.java">org/apache/openjpa/jdbc/sql/Join.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.strats.AbstractStrategy.java">org/apache/openjpa/jdbc/meta/strats/AbstractStrategy.java</a>
                 </td>
                 <td>
                   0
@@ -5030,6 +5016,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.Join.java">org/apache/openjpa/jdbc/sql/Join.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.SQLEmbed.java">org/apache/openjpa/jdbc/kernel/exps/SQLEmbed.java</a>
                 </td>
                 <td>
@@ -5044,7 +5044,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.MappingStrategyInstaller.java">org/apache/openjpa/jdbc/meta/MappingStrategyInstaller.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.MapEntry.java">org/apache/openjpa/jdbc/kernel/exps/MapEntry.java</a>
                 </td>
                 <td>
                   0
@@ -5072,7 +5072,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.MapEntry.java">org/apache/openjpa/jdbc/kernel/exps/MapEntry.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.meta.MappingStrategyInstaller.java">org/apache/openjpa/jdbc/meta/MappingStrategyInstaller.java</a>
                 </td>
                 <td>
                   0
@@ -5198,7 +5198,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SelectExecutor.java">org/apache/openjpa/jdbc/sql/SelectExecutor.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.StringFunction.java">org/apache/openjpa/jdbc/kernel/exps/StringFunction.java</a>
                 </td>
                 <td>
                   0
@@ -5212,7 +5212,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.kernel.exps.StringFunction.java">org/apache/openjpa/jdbc/kernel/exps/StringFunction.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jdbc/checkstyle.html#org.apache.openjpa.jdbc.sql.SelectExecutor.java">org/apache/openjpa/jdbc/sql/SelectExecutor.java</a>
                 </td>
                 <td>
                   0

@@ -44,8 +44,8 @@ Tests/openjpa-kernel,org.apache.openjpa.datacache,QueryCacheStoreQuery.CachingRe
 Tests/openjpa-kernel,org.apache.openjpa.datacache,DefaultCacheDistributionPolicy,10,0,0,0,5,0,5,0,5,0
 Tests/openjpa-kernel,org.apache.openjpa.datacache,QueryCacheStoreQuery.CachedList,72,0,6,0,17,0,7,0,4,0
 Tests/openjpa-kernel,org.apache.openjpa.datacache,DataCachePCDataImpl,260,0,38,0,72,0,43,0,24,0
-Tests/openjpa-kernel,org.apache.openjpa.datacache,QueryCacheStoreQuery,322,0,44,0,87,0,50,0,27,0
 Tests/openjpa-kernel,org.apache.openjpa.datacache,PartitionedDataCache,291,0,28,0,59,0,25,0,11,0
+Tests/openjpa-kernel,org.apache.openjpa.datacache,QueryCacheStoreQuery,322,0,44,0,87,0,50,0,27,0
 Tests/openjpa-kernel,org.apache.openjpa.datacache,QueryCacheStoreQuery.CachedObjectId,6,0,0,0,3,0,1,0,1,0
 Tests/openjpa-kernel,org.apache.openjpa.datacache,DelegatingQueryCache,276,0,38,0,102,0,40,0,21,0
 Tests/openjpa-kernel,org.apache.openjpa.datacache,QueryKey,817,0,127,0,183,0,84,0,20,0
@@ -103,14 +103,14 @@ Tests/openjpa-kernel,org.apache.openjpa.kernel,AbstractPCData.ProxyDataList,13,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,StoreQuery.Range,30,0,0,0,9,0,2,0,2,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,BrokerImpl.TransactionalCache,319,0,78,0,69,0,61,0,22,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,BrokerImpl,9519,0,1426,0,2494,0,995,0,277,0
-Tests/openjpa-kernel,org.apache.openjpa.kernel,FillStrategy.Factory,158,0,12,0,21,0,8,0,2,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,DistinctResultList,216,0,6,0,63,0,29,0,26,0
+Tests/openjpa-kernel,org.apache.openjpa.kernel,FillStrategy.Factory,158,0,12,0,21,0,8,0,2,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,ECopyState,42,0,0,0,18,0,14,0,14,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,ExpressionStoreQuery.AbstractExpressionExecutor,405,0,56,0,96,0,50,0,22,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,AbstractLockManager,37,0,2,0,13,0,9,0,8,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,PNonTransDirtyState,30,0,0,0,13,0,11,0,11,0
-Tests/openjpa-kernel,org.apache.openjpa.kernel,SaveFieldManager,377,0,70,0,89,0,47,0,10,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,BrokerImpl.ManagedObjectCollection,18,0,0,0,6,0,4,0,4,0
+Tests/openjpa-kernel,org.apache.openjpa.kernel,SaveFieldManager,377,0,70,0,89,0,47,0,10,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,OpenJPASavepoint,107,0,8,0,26,0,12,0,8,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,PNewFlushedDeletedState,49,0,0,0,18,0,17,0,17,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,QueryImpl,3471,0,515,0,855,0,371,0,109,0
@@ -122,8 +122,8 @@ Tests/openjpa-kernel,org.apache.openjpa.kernel,DetachManager.DetachFieldManager,
 Tests/openjpa-kernel,org.apache.openjpa.kernel,InMemorySavepointManager,29,0,2,0,10,0,6,0,5,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,OrderingMergedResultObjectProvider.OrderingComparator,87,0,20,0,22,0,13,0,3,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,DataCacheRetrieveMode,24,0,0,0,3,0,1,0,1,0
-Tests/openjpa-kernel,org.apache.openjpa.kernel,VersionAttachStrategy,802,0,150,0,198,0,92,0,14,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,QueryStatistics.None,54,0,0,0,23,0,19,0,19,0
+Tests/openjpa-kernel,org.apache.openjpa.kernel,VersionAttachStrategy,802,0,150,0,198,0,92,0,14,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,Filters,2151,0,582,0,547,0,341,0,37,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,TimeSeededSeq,35,0,0,0,12,0,8,0,8,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,QueryImpl.PackingResultObjectProvider,84,0,8,0,26,0,15,0,11,0
@@ -182,8 +182,8 @@ Tests/openjpa-kernel,org.apache.openjpa.kernel,QueryLanguages,61,0,2,0,18,0,4,0,
 Tests/openjpa-kernel,org.apache.openjpa.kernel,EDeletedState,30,0,0,0,13,0,12,0,12,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,DataCacheStoreMode,34,0,0,0,4,0,1,0,1,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,PDeletedState,57,0,2,0,19,0,18,0,17,0
-Tests/openjpa-kernel,org.apache.openjpa.kernel,QueryResultCallback,53,0,0,0,13,0,7,0,7,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,AbstractBrokerFactory.new Object() {...},6,0,0,0,1,0,1,0,1,0
+Tests/openjpa-kernel,org.apache.openjpa.kernel,QueryResultCallback,53,0,0,0,13,0,7,0,7,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,TLoadedState,11,0,0,0,5,0,4,0,4,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,PDeletedFlushedState,11,0,0,0,5,0,4,0,4,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,DelegatingResultList,362,0,8,0,114,0,41,0,37,0
@@ -206,8 +206,8 @@ Tests/openjpa-kernel,org.apache.openjpa.kernel,TDirtyState,47,0,2,0,16,0,13,0,12
 Tests/openjpa-kernel,org.apache.openjpa.kernel,SavepointFieldManager,332,0,40,0,80,0,38,0,16,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,ECleanState,35,0,0,0,17,0,15,0,15,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,BrokerImpl.StateManagerId,106,0,10,0,20,0,12,0,7,0
-Tests/openjpa-kernel,org.apache.openjpa.kernel,StoreQuery,25,0,0,0,7,0,1,0,1,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,DelegatingBroker,1875,0,18,0,678,0,193,0,184,0
+Tests/openjpa-kernel,org.apache.openjpa.kernel,StoreQuery,25,0,0,0,7,0,1,0,1,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,ExpressionStoreQuery.DataStoreExecutor,429,0,40,0,61,0,28,0,8,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,PCleanState,38,0,2,0,19,0,16,0,15,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel,LocalManagedRuntime,238,0,34,0,86,0,35,0,18,0
@@ -240,8 +240,8 @@ Tests/openjpa-kernel,org.apache.openjpa.kernel.jpql,JPQLConstants,428,0,0,0,1,0,
 Tests/openjpa-kernel,org.apache.openjpa.kernel.jpql,JPQLExpressionBuilder,5544,0,737,0,1124,0,510,0,101,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.jpql,JJTJPQLState,228,0,10,0,54,0,17,0,12,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.jpql,JPQLTokenManager,6405,0,987,0,1204,0,692,0,35,0
-Tests/openjpa-kernel,org.apache.openjpa.kernel.jpql,JPQLParser,87,0,6,0,22,0,10,0,7,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.jpql,JPQLExpressionBuilder.ParsedJPQL,75,0,6,0,21,0,9,0,6,0
+Tests/openjpa-kernel,org.apache.openjpa.kernel.jpql,JPQLParser,87,0,6,0,22,0,10,0,7,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.jpql,Token,34,0,0,0,12,0,7,0,7,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.jpql,JPQLExpressionBuilder.JPQLNode,292,0,34,0,63,0,40,0,23,0
 Tests/openjpa-kernel,org.apache.openjpa.ee,InvocationManagedRuntime,82,0,2,0,23,0,10,0,9,0
@@ -295,8 +295,8 @@ Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,Index,17,0,0,0,5,0,4,0,4,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,BindVariableExpression,76,0,8,0,21,0,11,0,7,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,Add,11,0,0,0,3,0,2,0,2,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,GreaterThanExpression,19,0,4,0,5,0,4,0,2,0
-Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,ValuePath,34,0,0,0,9,0,4,0,4,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,CandidatePath,229,0,40,0,72,0,37,0,17,0
+Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,ValuePath,34,0,0,0,9,0,4,0,4,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,InMemoryExpressionFactory.ArrayKey,79,0,14,0,18,0,10,0,3,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,UnaryMathVal,39,0,0,0,11,0,5,0,5,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,GeneralCase,153,0,12,0,31,0,13,0,7,0
@@ -311,8 +311,8 @@ Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,Abs,89,0,24,0,20,0,15,0,3,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,MathVal,64,0,0,0,16,0,5,0,5,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,ToLowerCase,30,0,0,0,10,0,5,0,5,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,AbstractExpressionVisitor,7,0,0,0,5,0,5,0,5,0
-Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,Sqrt,12,0,0,0,4,0,3,0,3,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,Distinct,55,0,4,0,16,0,8,0,6,0
+Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,Sqrt,12,0,0,0,4,0,3,0,3,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,Count,25,0,4,0,8,0,5,0,3,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,Subtract,11,0,0,0,3,0,2,0,2,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,StringLength,50,0,4,0,17,0,7,0,5,0
@@ -326,8 +326,8 @@ Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,NullIf,135,0,20,0,33,0,19,0,
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,Val,113,0,8,0,36,0,19,0,15,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,NotExpression,40,0,4,0,9,0,6,0,4,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,Substring,89,0,4,0,20,0,7,0,5,0
-Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,QueryExpressions.ParameterExpressionVisitor,48,0,8,0,14,0,7,0,3,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,Mod,11,0,0,0,3,0,2,0,2,0
+Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,QueryExpressions.ParameterExpressionVisitor,48,0,8,0,14,0,7,0,3,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,InMemoryExpressionFactory.OrderValueComparator,131,0,24,0,29,0,14,0,2,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,EndsWithExpression,17,0,4,0,5,0,4,0,2,0
 Tests/openjpa-kernel,org.apache.openjpa.kernel.exps,Trim,96,0,14,0,25,0,12,0,5,0
@@ -358,8 +358,8 @@ Tests/openjpa-kernel,org.apache.openjpa.ant,MetaDataToolTask,88,0,8,0,21,0,10,0,
 Tests/openjpa-kernel,org.apache.openjpa.ant,PCEnhancerTask,65,0,2,0,18,0,8,0,7,0
 Tests/openjpa-kernel,org.apache.openjpa.conf,Compatibility,339,0,6,0,131,0,66,0,63,0
 Tests/openjpa-kernel,org.apache.openjpa.conf,CacheMarshallersValue,144,0,14,0,39,0,15,0,8,0
-Tests/openjpa-kernel,org.apache.openjpa.conf,DetachOptions,132,0,16,0,42,0,22,0,14,0
 Tests/openjpa-kernel,org.apache.openjpa.conf,DetachOptions.All,5,0,0,0,2,0,2,0,2,0
+Tests/openjpa-kernel,org.apache.openjpa.conf,DetachOptions,132,0,16,0,42,0,22,0,14,0
 Tests/openjpa-kernel,org.apache.openjpa.conf,CacheMarshallerImpl,433,0,50,0,123,0,43,0,18,0
 Tests/openjpa-kernel,org.apache.openjpa.conf,AutoDetachValue,133,0,6,0,24,0,9,0,6,0
 Tests/openjpa-kernel,org.apache.openjpa.conf,SeqValue,49,0,0,0,9,0,2,0,2,0
@@ -456,8 +456,8 @@ Tests/openjpa-kernel,org.apache.openjpa.util,DelayedCollectionChangeTrackerImpl,
 Tests/openjpa-kernel,org.apache.openjpa.util,GeneralException,27,0,0,0,13,0,7,0,7,0
 Tests/openjpa-kernel,org.apache.openjpa.util,DelayedLinkedHashSetProxy,511,0,102,0,138,0,94,0,43,0
 Tests/openjpa-kernel,org.apache.openjpa.util,ClassResolverImpl,56,0,16,0,19,0,10,0,2,0
-Tests/openjpa-kernel,org.apache.openjpa.util,ObjectId,52,0,6,0,13,0,10,0,7,0
 Tests/openjpa-kernel,org.apache.openjpa.util,GeneratedClasses,24,53,3,7,7,20,4,5,1,3
+Tests/openjpa-kernel,org.apache.openjpa.util,ObjectId,52,0,6,0,13,0,10,0,7,0
 Tests/openjpa-kernel,org.apache.openjpa.util,InvalidStateException,14,0,0,0,6,0,3,0,3,0
 Tests/openjpa-kernel,org.apache.openjpa.util,DelayedVectorProxy,961,0,212,0,280,0,177,0,71,0
 Tests/openjpa-kernel,org.apache.openjpa.util,Exceptions,453,0,82,0,109,0,54,0,13,0
@@ -469,8 +469,8 @@ Tests/openjpa-kernel,org.apache.openjpa.util,BigIntegerId,68,0,10,0,20,0,13,0,8,
 Tests/openjpa-kernel,org.apache.openjpa.util,CacheMap.new LRUMap() {...},0,14,0,0,0,3,0,2,0,2
 Tests/openjpa-kernel,org.apache.openjpa.util,CacheMap.new ConcurrentReferenceHashMap() {...},11,10,0,0,4,1,2,1,2,1
 Tests/openjpa-kernel,org.apache.openjpa.util,CacheMap.new ConcurrentHashMap() {...},14,0,0,0,3,0,2,0,2,0
-Tests/openjpa-kernel,org.apache.openjpa.util,DateId,70,0,4,0,17,0,12,0,10,0
 Tests/openjpa-kernel,org.apache.openjpa.util,AbstractLRSProxyCollection.Itr,113,0,16,0,36,0,15,0,7,0
+Tests/openjpa-kernel,org.apache.openjpa.util,DateId,70,0,4,0,17,0,12,0,10,0
 Tests/openjpa-kernel,org.apache.openjpa.util,ApplicationIds,1248,0,225,0,285,0,145,0,15,0
 Tests/openjpa-kernel,org.apache.openjpa.util,Serialization.ClassResolvingObjectInputStream,38,0,0,0,11,0,3,0,3,0
 Tests/openjpa-kernel,org.apache.openjpa.util,MapChangeTrackerImpl,183,28,42,2,41,11,28,3,6,3
@@ -501,14 +501,14 @@ Tests/openjpa-kernel,org.apache.openjpa.util,ProxyManagerImpl.new PrivilegedActi
 Tests/openjpa-kernel,org.apache.openjpa.util,UnsupportedException,25,9,0,0,10,3,4,1,4,1
 Tests/openjpa-kernel,org.apache.openjpa.util,InternalException,51,0,0,0,19,0,7,0,7,0
 Tests/openjpa-kernel,org.apache.openjpa.util,MetaDataException,34,0,0,0,13,0,5,0,5,0
-Tests/openjpa-kernel,org.apache.openjpa.util,ProxyManagerImpl,832,3587,151,245,186,807,129,135,10,56
+Tests/openjpa-kernel,org.apache.openjpa.util,ProxyManagerImpl,832,3587,150,246,186,807,128,136,10,56
 Tests/openjpa-kernel,org.apache.openjpa.util,ImplHelper,337,37,77,7,92,7,56,3,12,3
 Tests/openjpa-kernel,org.apache.openjpa.util,OpenJPAException,156,38,8,2,40,12,23,3,18,3
 Tests/openjpa-kernel,org.apache.openjpa.util,ApplicationIds.PrimaryKeyFieldManager,183,0,8,0,49,0,30,0,26,0
 Tests/openjpa-kernel,org.apache.openjpa.util,ProxyMaps.ProxyEntrySetImpl.new Iterator() {...},49,30,4,1,10,6,4,3,1,3
 Tests/openjpa-kernel,org.apache.openjpa.util,ShortId,59,0,6,0,15,0,12,0,9,0
+Tests/openjpa-kernel,org.apache.openjpa.util,CacheMap,337,363,41,33,74,93,46,30,22,17
 Tests/openjpa-kernel,org.apache.openjpa.util,ProxyMaps.ProxyEntrySetImpl,43,26,7,0,12,9,8,3,4,3
-Tests/openjpa-kernel,org.apache.openjpa.util,CacheMap,337,363,40,34,74,93,45,31,22,17
 Tests/openjpa-kernel,org.apache.openjpa.util,OptimisticException,44,0,0,0,14,0,6,0,6,0
 Tests/openjpa-kernel,org.apache.openjpa.util,ImplHelper.new ConcurrentReferenceHashMap() {...},25,5,6,0,6,1,5,1,2,1
 Tests/openjpa-kernel,org.apache.openjpa.util,CacheMap.ValueCollection,17,0,0,0,3,0,3,0,3,0

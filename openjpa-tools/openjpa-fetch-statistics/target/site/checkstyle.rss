@@ -60,7 +60,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-tools/openjpa-fetch-statistics/checkstyle.html#org.apache.openjpa.enhance.stats.FetchStatsCollector.java">org/apache/openjpa/enhance/stats/FetchStatsCollector.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-tools/openjpa-fetch-statistics/checkstyle.html#org.apache.openjpa.enhance.stats.FetchStatisticsAuxEnhancer.java">org/apache/openjpa/enhance/stats/FetchStatisticsAuxEnhancer.java</a>
                 </td>
                 <td>
                   0
@@ -74,7 +74,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-tools/openjpa-fetch-statistics/checkstyle.html#org.apache.openjpa.enhance.stats.FetchStatisticsAuxEnhancer.java">org/apache/openjpa/enhance/stats/FetchStatisticsAuxEnhancer.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-tools/openjpa-fetch-statistics/checkstyle.html#org.apache.openjpa.enhance.stats.FetchStatsCollector.java">org/apache/openjpa/enhance/stats/FetchStatsCollector.java</a>
                 </td>
                 <td>
                   0

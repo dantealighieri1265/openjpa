@@ -186,7 +186,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jest/checkstyle.html#org.apache.openjpa.persistence.jest.QueryCommand.java">org/apache/openjpa/persistence/jest/QueryCommand.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jest/checkstyle.html#org.apache.openjpa.persistence.jest.PrototypeFactory.java">org/apache/openjpa/persistence/jest/PrototypeFactory.java</a>
                 </td>
                 <td>
                   0
@@ -200,7 +200,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jest/checkstyle.html#org.apache.openjpa.persistence.jest.PrototypeFactory.java">org/apache/openjpa/persistence/jest/PrototypeFactory.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jest/checkstyle.html#org.apache.openjpa.persistence.jest.QueryCommand.java">org/apache/openjpa/persistence/jest/QueryCommand.java</a>
                 </td>
                 <td>
                   0
@@ -270,7 +270,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jest/checkstyle.html#org.apache.openjpa.persistence.jest.JSON.java">org/apache/openjpa/persistence/jest/JSON.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jest/checkstyle.html#org.apache.openjpa.persistence.jest.IOR.java">org/apache/openjpa/persistence/jest/IOR.java</a>
                 </td>
                 <td>
                   0
@@ -284,7 +284,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-jest/checkstyle.html#org.apache.openjpa.persistence.jest.IOR.java">org/apache/openjpa/persistence/jest/IOR.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-jest/checkstyle.html#org.apache.openjpa.persistence.jest.JSON.java">org/apache/openjpa/persistence/jest/JSON.java</a>
                 </td>
                 <td>
                   0

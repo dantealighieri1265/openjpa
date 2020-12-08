@@ -1,7 +1,7 @@
 Manifest-Version: 1.0
 Agent-Class: org.apache.openjpa.enhance.InstrumentationFactory
-Bnd-LastModified: 1606236968566
-Build-Jdk: 11.0.9.1
+Bnd-LastModified: 1607449057884
+Build-Jdk: 13.0.2
 Built-By: marco
 Bundle-Activator: org.apache.openjpa.persistence.osgi.PersistenceActivat
  or

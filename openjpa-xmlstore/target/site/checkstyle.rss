@@ -46,7 +46,7 @@ under the License.
           <tbody>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-xmlstore/checkstyle.html#org.apache.openjpa.xmlstore.XMLStoreManager.java">org/apache/openjpa/xmlstore/XMLStoreManager.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-xmlstore/checkstyle.html#org.apache.openjpa.xmlstore.XMLStore.java">org/apache/openjpa/xmlstore/XMLStore.java</a>
                 </td>
                 <td>
                   0
@@ -60,7 +60,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-xmlstore/checkstyle.html#org.apache.openjpa.xmlstore.XMLStore.java">org/apache/openjpa/xmlstore/XMLStore.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-xmlstore/checkstyle.html#org.apache.openjpa.xmlstore.XMLStoreManager.java">org/apache/openjpa/xmlstore/XMLStoreManager.java</a>
                 </td>
                 <td>
                   0

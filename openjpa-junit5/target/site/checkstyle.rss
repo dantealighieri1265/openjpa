@@ -60,7 +60,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-junit5/checkstyle.html#org.apache.openjpa.junit5.OpenJPASupport.java">org/apache/openjpa/junit5/OpenJPASupport.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-junit5/checkstyle.html#org.apache.openjpa.junit5.internal.OpenJPAExtension.java">org/apache/openjpa/junit5/internal/OpenJPAExtension.java</a>
                 </td>
                 <td>
                   0
@@ -74,7 +74,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-junit5/checkstyle.html#org.apache.openjpa.junit5.internal.OpenJPAExtension.java">org/apache/openjpa/junit5/internal/OpenJPAExtension.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-junit5/checkstyle.html#org.apache.openjpa.junit5.OpenJPASupport.java">org/apache/openjpa/junit5/OpenJPASupport.java</a>
                 </td>
                 <td>
                   0

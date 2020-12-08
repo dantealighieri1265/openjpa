@@ -1,8 +1,9 @@
 package org.apache.openjpa.util;
 
-import org.apache.openjpa.util.support.BeanClass;
+import org.apache.openjpa.util.entity.ProxyManagerImplEntity;
+import org.apache.openjpa.util.support.Valid;
 import org.apache.openjpa.util.support.FinalClass;
-import org.apache.openjpa.util.support.NonBeanClass;
+import org.apache.openjpa.util.support.NonValid;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -15,26 +16,56 @@ import java.util.*;
 @RunWith(Parameterized.class)
 public class NewCustomProxyTest {
 
-    private ProxyManagerImpl proxyManager;
+    //private ProxyManagerImpl proxyManager;
     private Object object;
-    private boolean autoOff;
+    /*private boolean autoOff;
     private String unproxyable;
-    private boolean resultNull;
+    private boolean resultNull;*/
+    private ProxyManagerImpl proxyManager;
+    private ProxyManagerImplEntity entity;
+    private Object expectedResult;
 
-    public NewCustomProxyTest(TestInput testInput) {
+    /*public NewCustomProxyTest(TestInput testInput) {
         this.object = testInput.getObject();
         this.autoOff = testInput.isAutoOff();
         this.unproxyable = testInput.getUnproxyable();
         this.resultNull = testInput.isResultNull();
+    }*/
+    
+    public NewCustomProxyTest(ProxyManagerImplEntity entity, Object expectedResult) {
+        this.entity = entity;
+        this.expectedResult = expectedResult;
     }
 
     @Parameterized.Parameters
-    public static Collection<TestInput> getParameters(){
+    public static Collection<?> getParameters(){
         Random r = new Random();
-        List<TestInput> testInputs = new ArrayList<>();
-
-        testInputs.add(new TestInput(null, true, true));
-        testInputs.add(new TestInput(new NonBeanClass(r.nextInt(), r.nextInt()), false,true));
+        //List<TestInput> testInputs = new ArrayList<>();
+        
+        
+        ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity(true);
+        ProxyManagerImplEntity entityNonValid = new ProxyManagerImplEntity(false);
+        ProxyManagerImplEntity entityFinal = new ProxyManagerImplEntity(true);
+        ProxyManagerImplEntity entityValid = new ProxyManagerImplEntity(true);
+        ProxyManagerImplEntity entityMap = new ProxyManagerImplEntity(true);
+        ProxyManagerImplEntity entitySortedMap = new ProxyManagerImplEntity(true);
+        ProxyManagerImplEntity entitySortedSet = new ProxyManagerImplEntity(false);
+        ProxyManagerImplEntity entityDate = new ProxyManagerImplEntity(false);
+        ProxyManagerImplEntity entityGregorian = new ProxyManagerImplEntity(false);
+        ProxyManagerImplEntity entityProxyDate = new ProxyManagerImplEntity(true);
+        ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(true);//TODO: vedi se è una lista o array
+        ProxyManagerImplEntity entityTimestamp = new ProxyManagerImplEntity(false);
+        
+        /*TODO: RICORDATI DI SETTARE LA VARIABILE STRINGA UNPROXYBLE*/
+        ProxyManagerImplEntity entityUnproxyable = new ProxyManagerImplEntity(false);
+        
+        boolean sortedMap = true;
+        boolean notSortedMap = false;
+        boolean proxyable = true;
+        boolean unproxyable = false;
+        
+        /*testInputs.add(new TestInput(null, true, true));
+        testInputs.add(new TestInput(new NonBeanClass(r.nextInt(), r.nextInt()), false, true));
         testInputs.add(new TestInput(new FinalClass(), true, true));
 
         BeanClass beanClass = new BeanClass();
@@ -79,18 +110,33 @@ public class NewCustomProxyTest {
         testInputs.add(new TestInput(new Timestamp(System.currentTimeMillis()), false, false));
 
         
-        /*In realtà questo non so a cosa serva. Non mi aumenta ne la coverage nè la branch. Forse
-         * è utile per la mutation*/
         BeanClass unproxyableClass = new BeanClass();
         unproxyableClass.setValue(r.nextInt());
-        testInputs.add(new TestInput(unproxyableClass, false, BeanClass.class.getName(),true));
+        testInputs.add(new TestInput(unproxyableClass, false, BeanClass.class.getName(),true));*/
 
 
-        return testInputs;
+        return Arrays.asList(new Object[][] {
+    		
+        	{entityNull.initializeEntityNull(null), null},
+            {entityNonValid.initializeEntityNonValid(r.nextInt(), r.nextInt()), null},// non bean per ul branch coverage ultimo statement
+            {entityFinal.initializeEntityFinal(), null},
+            {entityValid.initializeEntityValid(r.nextInt(), proxyable), entityValid.getObject()}, //bean per il branch coverage per l'ultimo statement
+            {entityMap.initializeEntityMap(r.nextInt(), r.nextInt(), notSortedMap), entityMap.getObject()},
+            {entitySortedMap.initializeEntityMap(r.nextInt(), r.nextInt(), sortedMap), entitySortedMap.getObject()},
+            {entitySortedSet.initializeSortedSet(r.nextInt()), entitySortedSet.getObject()},
+            {entityDate.initializeEntityDate(new Date()), entityDate.getObject()},
+            {entityGregorian.initializeEntityGregorian(new GregorianCalendar()), entityGregorian.getObject()},
+            {entityProxyDate.initializeEntityProxyDate(new ProxyManagerImpl().newDateProxy(Date.class)), entityProxyDate.getObject()},
+            {entityList.initializeEntityList(r.nextInt()), entityList.getObject()},
+            {entityTimestamp.initializeEntityTimestamp(new Timestamp(System.currentTimeMillis())), entityTimestamp.getObject()},
+            /*In realtà questo non so a cosa serva. Non mi aumenta ne la coverage nè la branch. Forse
+            * è utile per la mutation*/
+            {entityUnproxyable.initializeEntityValid(r.nextInt(), unproxyable), null},
+    	});
 
     }
 
-    private static class TestInput {
+    /*private static class TestInput {
         private Object object;
         private boolean autoOff;
         private String unproxyable;
@@ -124,24 +170,31 @@ public class NewCustomProxyTest {
         public boolean isResultNull() {
             return resultNull;
         }
-    }
+    }*/
 
     @Before
     public void setUp(){
         this.proxyManager = new ProxyManagerImpl();
-        this.proxyManager.setUnproxyable(this.unproxyable);
+        this.proxyManager.setUnproxyable(this.entity.getUnproxyable());
     }
 
     @Test
     public void newCustomProxyTest() {
-        Object result = this.proxyManager.newCustomProxy(this.object, this.autoOff);
+        Object result = this.proxyManager.newCustomProxy(this.entity.getObject(), this.entity.isAutoOff());
 
-        if (this.resultNull) {
+        /*if (this.resultNull) {
             Assert.assertNull(result);
         } else {
             Assert.assertEquals(this.object, result);
-        }
+        }*/
+        
+        Assert.assertEquals(this.expectedResult, result);
 
     }
+    
+    public static void main(String[] args) {
+    	Valid unproxyableClass = new Valid();
+		System.out.println(Valid.class.getName());
+	}
 
 }

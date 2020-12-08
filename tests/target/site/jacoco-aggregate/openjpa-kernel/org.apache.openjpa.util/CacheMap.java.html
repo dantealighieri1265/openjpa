@@ -364,7 +364,7 @@ public class CacheMap
 <span class="fc" id="L364">            val = softMap.get(key);</span>
 <span class="pc bpc" id="L365" title="1 of 2 branches missed.">            if (val == null) {</span>
 <span class="fc" id="L366">                val = cacheMap.get(key);</span>
-<span class="fc bfc" id="L367" title="All 2 branches covered.">                if (val == null) {</span>
+<span class="pc bpc" id="L367" title="1 of 2 branches missed.">                if (val == null) {</span>
 <span class="fc" id="L368">                    val = pinnedMap.get(key);</span>
                 }
             } else {
@@ -399,22 +399,22 @@ public class CacheMap
             }
 
             // if no hard refs, don't put anything
-<span class="fc bfc" id="L402" title="All 2 branches covered.">            if (cacheMap.getMaxSize() == 0)</span>
+<span class="fc bfc" id="L402" title="All 2 branches covered.">            if (cacheMap.getMaxSize() == 0) //first test case</span>
 <span class="fc" id="L403">                return null;</span>
 
             // otherwise, put the value into the map and clear it from the
             // soft map
 <span class="fc" id="L407">            val = put(cacheMap, key, value);</span>
 <span class="fc bfc" id="L408" title="All 2 branches covered.">            if (val == null) {</span>
-<span class="fc" id="L409">                val = remove(softMap, key);</span>
+<span class="fc" id="L409">                val = remove(softMap, key); </span>
 <span class="fc bfc" id="L410" title="All 2 branches covered.">                if (val == null)</span>
-<span class="fc" id="L411">                    entryAdded(key, value);</span>
+<span class="fc" id="L411">                    entryAdded(key, value); //no Already exist</span>
                 else {
-<span class="fc" id="L413">                    entryRemoved(key, val, false);</span>
+<span class="fc" id="L413">                    entryRemoved(key, val, false);//no storage &amp; alreadyExixts</span>
 <span class="fc" id="L414">                    entryAdded(key, value);</span>
                 }
             } else {
-<span class="fc" id="L417">                entryRemoved(key, val, false);</span>
+<span class="fc" id="L417">                entryRemoved(key, val, false); //storage &amp; alreadyExixts</span>
 <span class="fc" id="L418">                entryAdded(key, value);</span>
             }
 <span class="fc" id="L420">            return val;</span>

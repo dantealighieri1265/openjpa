@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <checkstyle version="8.29">
-<file name="/home/marco/Scrivania/openjpa/openjpa-tools/openjpa-fetch-statistics/src/main/java/org/apache/openjpa/enhance/stats/FetchStatsCollector.java">
+<file name="C:\Users\marco\Desktop\de-angelis\openjpa\openjpa-tools\openjpa-fetch-statistics\src\main\java\org\apache\openjpa\enhance\stats\FetchStatisticsAuxEnhancer.java">
 </file>
-<file name="/home/marco/Scrivania/openjpa/openjpa-tools/openjpa-fetch-statistics/src/main/java/org/apache/openjpa/enhance/stats/FetchStatisticsAuxEnhancer.java">
+<file name="C:\Users\marco\Desktop\de-angelis\openjpa\openjpa-tools\openjpa-fetch-statistics\src\main\java\org\apache\openjpa\enhance\stats\FetchStatsCollector.java">
 </file>
-<file name="/home/marco/Scrivania/openjpa/openjpa-tools/openjpa-fetch-statistics/src/main/resources/org/apache/openjpa/enhance/stats/localizer.properties">
+<file name="C:\Users\marco\Desktop\de-angelis\openjpa\openjpa-tools\openjpa-fetch-statistics\src\main\resources\org\apache\openjpa\enhance\stats\localizer.properties">
 </file>
 </checkstyle>

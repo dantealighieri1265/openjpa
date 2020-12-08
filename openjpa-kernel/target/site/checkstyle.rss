@@ -25,7 +25,7 @@ under the License.
     <language>en-us</language>
     <copyright>&#169;2006 - 2020 Apache Software Foundation</copyright>
     <item>
-      <title>File: 535,
+      <title>File: 536,
              Errors: 0,
              Warnings: 0,
              Infos: 0
@@ -2104,6 +2104,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-kernel/checkstyle.html#org.apache.openjpa.util.support.NonValid.java">org/apache/openjpa/util/support/NonValid.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-kernel/checkstyle.html#org.apache.openjpa.kernel.exps.Avg.java">org/apache/openjpa/kernel/exps/Avg.java</a>
                 </td>
                 <td>
@@ -2777,20 +2791,6 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-kernel/checkstyle.html#org.apache.openjpa.validation.ValidatingLifecycleEventManager.java">org/apache/openjpa/validation/ValidatingLifecycleEventManager.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
-                  <a href="http://openjpa.apache.org/openjpa-kernel/checkstyle.html#org.apache.openjpa.util.support.BeanClass.java">org/apache/openjpa/util/support/BeanClass.java</a>
                 </td>
                 <td>
                   0
@@ -4862,6 +4862,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-kernel/checkstyle.html#org.apache.openjpa.util.support.Valid.java">org/apache/openjpa/util/support/Valid.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-kernel/checkstyle.html#org.apache.openjpa.util.Id.java">org/apache/openjpa/util/Id.java</a>
                 </td>
                 <td>
@@ -5003,20 +5017,6 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-kernel/checkstyle.html#org.apache.openjpa.datacache.Caches.java">org/apache/openjpa/datacache/Caches.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
-                  <a href="http://openjpa.apache.org/openjpa-kernel/checkstyle.html#org.apache.openjpa.util.support.NonBeanClass.java">org/apache/openjpa/util/support/NonBeanClass.java</a>
                 </td>
                 <td>
                   0
@@ -6501,6 +6501,20 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-kernel/checkstyle.html#org.apache.openjpa.kernel.exps.Constant.java">org/apache/openjpa/kernel/exps/Constant.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
+                  <a href="http://openjpa.apache.org/openjpa-kernel/checkstyle.html#org.apache.openjpa.util.entity.ProxyManagerImplEntity.java">org/apache/openjpa/util/entity/ProxyManagerImplEntity.java</a>
                 </td>
                 <td>
                   0

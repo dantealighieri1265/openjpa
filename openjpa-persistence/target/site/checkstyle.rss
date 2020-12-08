@@ -298,7 +298,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.SizeExpression.java">org/apache/openjpa/persistence/query/SizeExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.LoadFetchGroup.java">org/apache/openjpa/persistence/LoadFetchGroup.java</a>
                 </td>
                 <td>
                   0
@@ -312,7 +312,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.LoadFetchGroup.java">org/apache/openjpa/persistence/LoadFetchGroup.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.SizeExpression.java">org/apache/openjpa/persistence/query/SizeExpression.java</a>
                 </td>
                 <td>
                   0
@@ -368,7 +368,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.WhenClause.java">org/apache/openjpa/persistence/query/WhenClause.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.LRS.java">org/apache/openjpa/persistence/LRS.java</a>
                 </td>
                 <td>
                   0
@@ -382,7 +382,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.LRS.java">org/apache/openjpa/persistence/LRS.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.WhenClause.java">org/apache/openjpa/persistence/query/WhenClause.java</a>
                 </td>
                 <td>
                   0
@@ -620,7 +620,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.ArrayExpression.java">org/apache/openjpa/persistence/query/ArrayExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.NonUniqueResultException.java">org/apache/openjpa/persistence/NonUniqueResultException.java</a>
                 </td>
                 <td>
                   0
@@ -634,7 +634,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.NonUniqueResultException.java">org/apache/openjpa/persistence/NonUniqueResultException.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.ArrayExpression.java">org/apache/openjpa/persistence/query/ArrayExpression.java</a>
                 </td>
                 <td>
                   0
@@ -676,7 +676,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.meta.SourceAnnotationHandler.java">org/apache/openjpa/persistence/meta/SourceAnnotationHandler.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.criteria.OpenJPACriteriaBuilder.java">org/apache/openjpa/persistence/criteria/OpenJPACriteriaBuilder.java</a>
                 </td>
                 <td>
                   0
@@ -690,7 +690,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.criteria.OpenJPACriteriaBuilder.java">org/apache/openjpa/persistence/criteria/OpenJPACriteriaBuilder.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.meta.SourceAnnotationHandler.java">org/apache/openjpa/persistence/meta/SourceAnnotationHandler.java</a>
                 </td>
                 <td>
                   0
@@ -830,20 +830,6 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.AliasContext.java">org/apache/openjpa/persistence/query/AliasContext.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
                   <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.criteria.ExpressionImpl.java">org/apache/openjpa/persistence/criteria/ExpressionImpl.java</a>
                 </td>
                 <td>
@@ -858,7 +844,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.JPAProperties.java">org/apache/openjpa/persistence/JPAProperties.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.AliasContext.java">org/apache/openjpa/persistence/query/AliasContext.java</a>
                 </td>
                 <td>
                   0
@@ -873,6 +859,20 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.criteria.OrderImpl.java">org/apache/openjpa/persistence/criteria/OrderImpl.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.JPAProperties.java">org/apache/openjpa/persistence/JPAProperties.java</a>
                 </td>
                 <td>
                   0
@@ -956,7 +956,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.PersistentMap.java">org/apache/openjpa/persistence/PersistentMap.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.ElementType.java">org/apache/openjpa/persistence/ElementType.java</a>
                 </td>
                 <td>
                   0
@@ -970,7 +970,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.ElementType.java">org/apache/openjpa/persistence/ElementType.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.PersistentMap.java">org/apache/openjpa/persistence/PersistentMap.java</a>
                 </td>
                 <td>
                   0
@@ -1040,7 +1040,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.UnaryOperatorExpression.java">org/apache/openjpa/persistence/query/UnaryOperatorExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.criteria.CriteriaExpressionBuilder.java">org/apache/openjpa/persistence/criteria/CriteriaExpressionBuilder.java</a>
                 </td>
                 <td>
                   0
@@ -1054,7 +1054,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.criteria.CriteriaExpressionBuilder.java">org/apache/openjpa/persistence/criteria/CriteriaExpressionBuilder.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.UnaryOperatorExpression.java">org/apache/openjpa/persistence/query/UnaryOperatorExpression.java</a>
                 </td>
                 <td>
                   0
@@ -1096,7 +1096,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.Externalizer.java">org/apache/openjpa/persistence/Externalizer.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.EntityManagerImpl.java">org/apache/openjpa/persistence/EntityManagerImpl.java</a>
                 </td>
                 <td>
                   0
@@ -1110,7 +1110,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.EntityManagerImpl.java">org/apache/openjpa/persistence/EntityManagerImpl.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.Externalizer.java">org/apache/openjpa/persistence/Externalizer.java</a>
                 </td>
                 <td>
                   0
@@ -1194,7 +1194,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.QueryImpl.java">org/apache/openjpa/persistence/QueryImpl.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.FetchPlanImpl.java">org/apache/openjpa/persistence/FetchPlanImpl.java</a>
                 </td>
                 <td>
                   0
@@ -1208,7 +1208,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.FetchPlanImpl.java">org/apache/openjpa/persistence/FetchPlanImpl.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.QueryImpl.java">org/apache/openjpa/persistence/QueryImpl.java</a>
                 </td>
                 <td>
                   0
@@ -1516,7 +1516,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.JPQLHelper.java">org/apache/openjpa/persistence/query/JPQLHelper.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.GreaterThanExpression.java">org/apache/openjpa/persistence/query/GreaterThanExpression.java</a>
                 </td>
                 <td>
                   0
@@ -1530,7 +1530,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.GreaterThanExpression.java">org/apache/openjpa/persistence/query/GreaterThanExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.JPQLHelper.java">org/apache/openjpa/persistence/query/JPQLHelper.java</a>
                 </td>
                 <td>
                   0
@@ -1586,7 +1586,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.StoredProcedureQueryImpl.java">org/apache/openjpa/persistence/StoredProcedureQueryImpl.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.LiteralExpression.java">org/apache/openjpa/persistence/query/LiteralExpression.java</a>
                 </td>
                 <td>
                   0
@@ -1600,7 +1600,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.LiteralExpression.java">org/apache/openjpa/persistence/query/LiteralExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.StoredProcedureQueryImpl.java">org/apache/openjpa/persistence/StoredProcedureQueryImpl.java</a>
                 </td>
                 <td>
                   0
@@ -1712,7 +1712,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.UnaryFunctionalOperator.java">org/apache/openjpa/persistence/query/UnaryFunctionalOperator.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.ParameterExpression.java">org/apache/openjpa/persistence/query/ParameterExpression.java</a>
                 </td>
                 <td>
                   0
@@ -1726,7 +1726,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.ParameterExpression.java">org/apache/openjpa/persistence/query/ParameterExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.UnaryFunctionalOperator.java">org/apache/openjpa/persistence/query/UnaryFunctionalOperator.java</a>
                 </td>
                 <td>
                   0
@@ -1810,7 +1810,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.PersistenceProductDerivation.java">org/apache/openjpa/persistence/PersistenceProductDerivation.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.criteria.Expressions.java">org/apache/openjpa/persistence/criteria/Expressions.java</a>
                 </td>
                 <td>
                   0
@@ -1824,7 +1824,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.criteria.Expressions.java">org/apache/openjpa/persistence/criteria/Expressions.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.PersistenceProductDerivation.java">org/apache/openjpa/persistence/PersistenceProductDerivation.java</a>
                 </td>
                 <td>
                   0
@@ -1852,7 +1852,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.BinaryConditionalOperator.java">org/apache/openjpa/persistence/query/BinaryConditionalOperator.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.DataCache.java">org/apache/openjpa/persistence/DataCache.java</a>
                 </td>
                 <td>
                   0
@@ -1866,7 +1866,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.DataCache.java">org/apache/openjpa/persistence/DataCache.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.BinaryConditionalOperator.java">org/apache/openjpa/persistence/query/BinaryConditionalOperator.java</a>
                 </td>
                 <td>
                   0
@@ -1992,6 +1992,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.AutoDetachType.java">org/apache/openjpa/persistence/AutoDetachType.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.meta.MetadataProcessor.java">org/apache/openjpa/persistence/meta/MetadataProcessor.java</a>
                 </td>
                 <td>
@@ -2007,20 +2021,6 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.LogicalPredicate.java">org/apache/openjpa/persistence/query/LogicalPredicate.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.AutoDetachType.java">org/apache/openjpa/persistence/AutoDetachType.java</a>
                 </td>
                 <td>
                   0
@@ -2062,7 +2062,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.StoreCache.java">org/apache/openjpa/persistence/StoreCache.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.Visitable.java">org/apache/openjpa/persistence/query/Visitable.java</a>
                 </td>
                 <td>
                   0
@@ -2076,7 +2076,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.Visitable.java">org/apache/openjpa/persistence/query/Visitable.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.StoreCache.java">org/apache/openjpa/persistence/StoreCache.java</a>
                 </td>
                 <td>
                   0
@@ -2356,7 +2356,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.validation.TraversableResolverImpl.java">org/apache/openjpa/persistence/validation/TraversableResolverImpl.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.criteria.CompareByExample.java">org/apache/openjpa/persistence/criteria/CompareByExample.java</a>
                 </td>
                 <td>
                   0
@@ -2370,7 +2370,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.criteria.CompareByExample.java">org/apache/openjpa/persistence/criteria/CompareByExample.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.validation.TraversableResolverImpl.java">org/apache/openjpa/persistence/validation/TraversableResolverImpl.java</a>
                 </td>
                 <td>
                   0
@@ -2496,7 +2496,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.LockScopesHelper.java">org/apache/openjpa/persistence/LockScopesHelper.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.AnnotationPersistenceMetaDataParser.java">org/apache/openjpa/persistence/AnnotationPersistenceMetaDataParser.java</a>
                 </td>
                 <td>
                   0
@@ -2510,7 +2510,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.AnnotationPersistenceMetaDataParser.java">org/apache/openjpa/persistence/AnnotationPersistenceMetaDataParser.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.LockScopesHelper.java">org/apache/openjpa/persistence/LockScopesHelper.java</a>
                 </td>
                 <td>
                   0
@@ -2538,7 +2538,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.ModExpression.java">org/apache/openjpa/persistence/query/ModExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.GreaterEqualExpression.java">org/apache/openjpa/persistence/query/GreaterEqualExpression.java</a>
                 </td>
                 <td>
                   0
@@ -2552,7 +2552,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.GreaterEqualExpression.java">org/apache/openjpa/persistence/query/GreaterEqualExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.ModExpression.java">org/apache/openjpa/persistence/query/ModExpression.java</a>
                 </td>
                 <td>
                   0
@@ -2888,7 +2888,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.RestoreStateType.java">org/apache/openjpa/persistence/RestoreStateType.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.EqualExpression.java">org/apache/openjpa/persistence/query/EqualExpression.java</a>
                 </td>
                 <td>
                   0
@@ -2902,7 +2902,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.EqualExpression.java">org/apache/openjpa/persistence/query/EqualExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.RestoreStateType.java">org/apache/openjpa/persistence/RestoreStateType.java</a>
                 </td>
                 <td>
                   0
@@ -2958,20 +2958,6 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.ConstantExpression.java">org/apache/openjpa/persistence/query/ConstantExpression.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
                   <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.AbstractPath.java">org/apache/openjpa/persistence/query/AbstractPath.java</a>
                 </td>
                 <td>
@@ -2986,7 +2972,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.OrderByItem.java">org/apache/openjpa/persistence/query/OrderByItem.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.ConstantExpression.java">org/apache/openjpa/persistence/query/ConstantExpression.java</a>
                 </td>
                 <td>
                   0
@@ -3014,6 +3000,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.OrderByItem.java">org/apache/openjpa/persistence/query/OrderByItem.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.ExternalValues.java">org/apache/openjpa/persistence/ExternalValues.java</a>
                 </td>
                 <td>
@@ -3028,7 +3028,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.TimesExpression.java">org/apache/openjpa/persistence/query/TimesExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.ElementDependent.java">org/apache/openjpa/persistence/ElementDependent.java</a>
                 </td>
                 <td>
                   0
@@ -3056,7 +3056,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.ElementDependent.java">org/apache/openjpa/persistence/ElementDependent.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.TimesExpression.java">org/apache/openjpa/persistence/query/TimesExpression.java</a>
                 </td>
                 <td>
                   0
@@ -3140,7 +3140,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.Type.java">org/apache/openjpa/persistence/Type.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.FetchGroup.java">org/apache/openjpa/persistence/FetchGroup.java</a>
                 </td>
                 <td>
                   0
@@ -3154,7 +3154,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.FetchGroup.java">org/apache/openjpa/persistence/FetchGroup.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.Type.java">org/apache/openjpa/persistence/Type.java</a>
                 </td>
                 <td>
                   0
@@ -3224,7 +3224,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.TypeExpression.java">org/apache/openjpa/persistence/query/TypeExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.OpenJPAEntityTransaction.java">org/apache/openjpa/persistence/OpenJPAEntityTransaction.java</a>
                 </td>
                 <td>
                   0
@@ -3238,7 +3238,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.OpenJPAEntityTransaction.java">org/apache/openjpa/persistence/OpenJPAEntityTransaction.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.TypeExpression.java">org/apache/openjpa/persistence/query/TypeExpression.java</a>
                 </td>
                 <td>
                   0
@@ -3336,7 +3336,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.TrimExpression.java">org/apache/openjpa/persistence/query/TrimExpression.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.criteria.CompoundSelections.java">org/apache/openjpa/persistence/criteria/CompoundSelections.java</a>
                 </td>
                 <td>
                   0
@@ -3350,7 +3350,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.criteria.CompoundSelections.java">org/apache/openjpa/persistence/criteria/CompoundSelections.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.query.TrimExpression.java">org/apache/openjpa/persistence/query/TrimExpression.java</a>
                 </td>
                 <td>
                   0
@@ -3378,7 +3378,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.PersistenceStrategy.java">org/apache/openjpa/persistence/PersistenceStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.Generator.java">org/apache/openjpa/persistence/Generator.java</a>
                 </td>
                 <td>
                   0
@@ -3392,7 +3392,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.Generator.java">org/apache/openjpa/persistence/Generator.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence/checkstyle.html#org.apache.openjpa.persistence.PersistenceStrategy.java">org/apache/openjpa/persistence/PersistenceStrategy.java</a>
                 </td>
                 <td>
                   0

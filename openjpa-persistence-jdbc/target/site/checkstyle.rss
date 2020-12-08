@@ -228,6 +228,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.ClassCriteria.java">org/apache/openjpa/persistence/jdbc/ClassCriteria.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.FetchDirection.java">org/apache/openjpa/persistence/jdbc/FetchDirection.java</a>
                 </td>
                 <td>
@@ -243,20 +257,6 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.KeyNonpolymorphic.java">org/apache/openjpa/persistence/jdbc/KeyNonpolymorphic.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.ClassCriteria.java">org/apache/openjpa/persistence/jdbc/ClassCriteria.java</a>
                 </td>
                 <td>
                   0
@@ -354,6 +354,20 @@ under the License.
               </tr>
                           <tr>
                 <td>
+                  <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.LRSSizeAlgorithm.java">org/apache/openjpa/persistence/jdbc/LRSSizeAlgorithm.java</a>
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+                <td>
+                  0
+                </td>
+              </tr>
+                          <tr>
+                <td>
                   <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.Nonpolymorphic.java">org/apache/openjpa/persistence/jdbc/Nonpolymorphic.java</a>
                 </td>
                 <td>
@@ -382,7 +396,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.LRSSizeAlgorithm.java">org/apache/openjpa/persistence/jdbc/LRSSizeAlgorithm.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.ElementColumns.java">org/apache/openjpa/persistence/jdbc/ElementColumns.java</a>
                 </td>
                 <td>
                   0
@@ -411,20 +425,6 @@ under the License.
                           <tr>
                 <td>
                   <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.XSecondaryTables.java">org/apache/openjpa/persistence/jdbc/XSecondaryTables.java</a>
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-                <td>
-                  0
-                </td>
-              </tr>
-                          <tr>
-                <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.ElementColumns.java">org/apache/openjpa/persistence/jdbc/ElementColumns.java</a>
                 </td>
                 <td>
                   0
@@ -536,7 +536,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.MappingOverride.java">org/apache/openjpa/persistence/jdbc/MappingOverride.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.DiscriminatorStrategy.java">org/apache/openjpa/persistence/jdbc/DiscriminatorStrategy.java</a>
                 </td>
                 <td>
                   0
@@ -550,7 +550,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.DiscriminatorStrategy.java">org/apache/openjpa/persistence/jdbc/DiscriminatorStrategy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.MappingOverride.java">org/apache/openjpa/persistence/jdbc/MappingOverride.java</a>
                 </td>
                 <td>
                   0
@@ -648,7 +648,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.PersistenceMappingDefaults.java">org/apache/openjpa/persistence/jdbc/PersistenceMappingDefaults.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.DataStoreIdColumn.java">org/apache/openjpa/persistence/jdbc/DataStoreIdColumn.java</a>
                 </td>
                 <td>
                   0
@@ -662,7 +662,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.DataStoreIdColumn.java">org/apache/openjpa/persistence/jdbc/DataStoreIdColumn.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-persistence-jdbc/checkstyle.html#org.apache.openjpa.persistence.jdbc.PersistenceMappingDefaults.java">org/apache/openjpa/persistence/jdbc/PersistenceMappingDefaults.java</a>
                 </td>
                 <td>
                   0

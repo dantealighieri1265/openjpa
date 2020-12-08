@@ -270,7 +270,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-slice/checkstyle.html#org.apache.openjpa.slice.FinderTargetPolicy.java">org/apache/openjpa/slice/FinderTargetPolicy.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-slice/checkstyle.html#org.apache.openjpa.slice.DistributedBrokerFactory.java">org/apache/openjpa/slice/DistributedBrokerFactory.java</a>
                 </td>
                 <td>
                   0
@@ -284,7 +284,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-slice/checkstyle.html#org.apache.openjpa.slice.DistributedBrokerFactory.java">org/apache/openjpa/slice/DistributedBrokerFactory.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-slice/checkstyle.html#org.apache.openjpa.slice.FinderTargetPolicy.java">org/apache/openjpa/slice/FinderTargetPolicy.java</a>
                 </td>
                 <td>
                   0
@@ -438,7 +438,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-slice/checkstyle.html#org.apache.openjpa.slice.jdbc.TargetFetchConfiguration.java">org/apache/openjpa/slice/jdbc/TargetFetchConfiguration.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-slice/checkstyle.html#org.apache.openjpa.slice.jdbc.DistributedTemplate.java">org/apache/openjpa/slice/jdbc/DistributedTemplate.java</a>
                 </td>
                 <td>
                   0
@@ -452,7 +452,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-slice/checkstyle.html#org.apache.openjpa.slice.jdbc.DistributedTemplate.java">org/apache/openjpa/slice/jdbc/DistributedTemplate.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-slice/checkstyle.html#org.apache.openjpa.slice.jdbc.TargetFetchConfiguration.java">org/apache/openjpa/slice/jdbc/TargetFetchConfiguration.java</a>
                 </td>
                 <td>
                   0
@@ -494,7 +494,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-slice/checkstyle.html#org.apache.openjpa.slice.DistributedConfiguration.java">org/apache/openjpa/slice/DistributedConfiguration.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-slice/checkstyle.html#org.apache.openjpa.slice.DistributedBrokerImpl.java">org/apache/openjpa/slice/DistributedBrokerImpl.java</a>
                 </td>
                 <td>
                   0
@@ -508,7 +508,7 @@ under the License.
               </tr>
                           <tr>
                 <td>
-                  <a href="http://openjpa.apache.org/openjpa-slice/checkstyle.html#org.apache.openjpa.slice.DistributedBrokerImpl.java">org/apache/openjpa/slice/DistributedBrokerImpl.java</a>
+                  <a href="http://openjpa.apache.org/openjpa-slice/checkstyle.html#org.apache.openjpa.slice.DistributedConfiguration.java">org/apache/openjpa/slice/DistributedConfiguration.java</a>
                 </td>
                 <td>
                   0

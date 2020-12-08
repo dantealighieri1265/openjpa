@@ -39,8 +39,8 @@ public class CopyCustomTest {
         ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(r.nextInt(), r.nextInt(), r.nextInt());*/
         
         ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity();
-        ProxyManagerImplEntity entityNonBean = new ProxyManagerImplEntity();
-        ProxyManagerImplEntity entityBean = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity entityNonValid = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity entityValid = new ProxyManagerImplEntity();
         ProxyManagerImplEntity entityMap = new ProxyManagerImplEntity();
         ProxyManagerImplEntity entityDate = new ProxyManagerImplEntity();
         ProxyManagerImplEntity entityGregorian = new ProxyManagerImplEntity();
@@ -76,13 +76,13 @@ public class CopyCustomTest {
         return Arrays.asList(new Object[][] {
     		
         	{entityNull.initializeEntityNull(null), null},
-            {entityNonBean.initializeEntityNonBean(r.nextInt(), r.nextInt()), null}, // non bean per ul branch coverage ultimo statement
-            {entityBean.initializeEntityBean(r.nextInt()), entityBean.getObject()}, //bean per il branch coverage per l'ultimo statement
-            {entityMap.initializeEntityMap(r.nextInt(), r.nextInt(), r.nextInt(), r.nextInt()), entityMap.getObject()},
+            {entityNonValid.initializeEntityNonValid(r.nextInt(), r.nextInt()), null}, // non bean per ul branch coverage ultimo statement
+            {entityValid.initializeEntityValid(r.nextInt(), true), entityValid.getObject()}, //bean per il branch coverage per l'ultimo statement
+            {entityMap.initializeEntityMap(r.nextInt(), r.nextInt(), false), entityMap.getObject()},
             {entityDate.initializeEntityDate(new Date()), entityDate.getObject()},
             {entityGregorian.initializeEntityGregorian(new GregorianCalendar()), entityGregorian.getObject()},
             {entityProxyDate.initializeEntityProxyDate(new ProxyManagerImpl().newDateProxy(Date.class)), entityProxyDate.getObject()},
-            {entityList.initializeEntityList(r.nextInt(), r.nextInt(), r.nextInt()), entityList.getObject()}//Collection
+            {entityList.initializeEntityList(r.nextInt()), entityList.getObject()}//Collection
     	});
 
     }

@@ -1,9 +1,9 @@
 package org.apache.openjpa.util.support;
 
-public class BeanClass {
+public class Valid {
     Integer value;
 
-    public BeanClass() {}
+    public Valid() {}
 
 
     public Integer getValue() {
@@ -17,7 +17,7 @@ public class BeanClass {
     @Override
     public boolean equals(Object obj) {
         try {
-            BeanClass bean = (BeanClass) obj;
+            Valid bean = (Valid) obj;
             return this.value.equals(bean.getValue());
         } catch (Exception e) {
             return false;

@@ -40,13 +40,16 @@ public class CopyArrayTest {
         ProxyManagerImplEntity entityNonBean = new ProxyManagerImplEntity(r.nextInt(), r.nextInt());
         ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(r.nextFloat());*/
         ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity();
-        ProxyManagerImplEntity entityNonBean = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity entityNonValid = new ProxyManagerImplEntity();
         ProxyManagerImplEntity entityList = new ProxyManagerImplEntity();
 
         return Arrays.asList(new Object[][] {
     		
         	{entityNull.initializeEntityNull(null) , null},
-            {entityNonBean.initializeEntityNonBean(r.nextInt(), r.nextInt()), UnsupportedException.class}, // non bean per ul branch coverage ultimo statement
+        	
+        	//non bean per il branch coverage ultimo statement
+            {entityNonValid.initializeEntityNonValid(r.nextInt(), r.nextInt()), UnsupportedException.class}, 
+            
             {entityList.initializeEntityArray(r.nextFloat()), entityList.getObject()}
     	});
 
