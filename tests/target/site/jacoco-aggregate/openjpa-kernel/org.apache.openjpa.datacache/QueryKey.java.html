@@ -1,0 +1,482 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>QueryKey.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.datacache</a> &gt; <span class="el_source">QueryKey.java</span></div><h1>QueryKey.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.datacache;
+
+import java.io.Externalizable;
+import java.io.IOException;
+import java.io.ObjectInput;
+import java.io.ObjectOutput;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.SortedSet;
+import java.util.TreeSet;
+
+import org.apache.openjpa.enhance.PCRegistry;
+import org.apache.openjpa.kernel.Query;
+import org.apache.openjpa.kernel.QueryContext;
+import org.apache.openjpa.kernel.StoreContext;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.JavaTypes;
+import org.apache.openjpa.meta.MetaDataRepository;
+import org.apache.openjpa.util.ImplHelper;
+
+/**
+ * This class stores information about a particular invocation of
+ * a query. It contains a reference to the external properties of the
+ * query that was executed, as well as any parameters used to execute
+ * that query, with one exception: first-class objects used as
+ * parameter values are converted to OIDs.
+ *
+ * @author Patrick Linskey
+ */
+public class QueryKey
+    implements Externalizable {
+
+    // initialize the set of unmodifiable classes. This allows us
+    // to avoid cloning collections that are not modifiable,
+    // provided that they do not contain mutable objects.
+<span class="nc" id="L64">    private static Collection&lt;Class&lt;?&gt;&gt; s_unmod = new HashSet&lt;&gt;();</span>
+
+    static {
+        // handle the set types; jdk uses different classes for collection,
+        // set, and sorted set
+<span class="nc" id="L69">        TreeSet&lt;Object&gt; s = new TreeSet&lt;&gt;();</span>
+<span class="nc" id="L70">        s_unmod.add(Collections.unmodifiableCollection(s).getClass());</span>
+<span class="nc" id="L71">        s_unmod.add(Collections.unmodifiableSet(s).getClass());</span>
+<span class="nc" id="L72">        s_unmod.add(Collections.unmodifiableSortedSet(s).getClass());</span>
+
+        // handle the list types; jdk uses different classes for standard
+        // and random access lists
+<span class="nc" id="L76">        List&lt;Object&gt; l = new LinkedList&lt;&gt;();</span>
+<span class="nc" id="L77">        s_unmod.add(Collections.unmodifiableList(l).getClass());</span>
+<span class="nc" id="L78">        l = new ArrayList&lt;&gt;(0);</span>
+<span class="nc" id="L79">        s_unmod.add(Collections.unmodifiableList(l).getClass());</span>
+
+        // handle the constant types
+<span class="nc" id="L82">        s_unmod.add(Collections.EMPTY_SET.getClass());</span>
+<span class="nc" id="L83">        s_unmod.add(Collections.EMPTY_LIST.getClass());</span>
+<span class="nc" id="L84">    }</span>
+
+    // caching state; no need to include parameter and variable declarations
+    // because they are implicit in the filter
+    private String _candidateClassName;
+    private boolean _subclasses;
+    private Set&lt;String&gt; _accessPathClassNames;
+    private Object _query;
+    private boolean _ignoreChanges;
+    private Map&lt;Object,Object&gt; _params;
+    private long _rangeStart;
+    private long _rangeEnd;
+
+    // ### pcl: 2 May 2003: should this timeout take into account the
+    // ### timeouts for classes in the access path of the query?
+    // ### Currently, it only considers the candidate class and its
+    // ### subclasses. Note that this value is used to decide whether
+    // ### or not OIDs should be registered for expiration callbacks
+<span class="nc" id="L102">    private int _timeout = -1;</span>
+
+    /**
+     * Return a key for the given query, or null if it is not cacheable.
+     */
+    public static QueryKey newInstance(Query q) {
+<span class="nc" id="L108">        return newInstance(q, (Object[]) null);</span>
+    }
+
+    /**
+     * Return a key for the given query, or null if it is not cacheable.
+     */
+    public static QueryKey newInstance(Query q, Object[] args) {
+        // compile to make sure info encoded in query string is available
+        // via API calls (candidate class, result class, etc)
+<span class="nc" id="L117">        q.compile();</span>
+<span class="nc" id="L118">        return newInstance(q, false, args, q.getCandidateType(),</span>
+<span class="nc" id="L119">            q.hasSubclasses(), q.getStartRange(), q.getEndRange(), null);</span>
+    }
+
+    /**
+     * Return a key for the given query, or null if it is not cacheable.
+     */
+    public static QueryKey newInstance(Query q, Map&lt;Object,Object&gt; args) {
+        // compile to make sure info encoded in query string is available
+        // via API calls (candidate class, result class, etc)
+<span class="nc" id="L128">        q.compile();</span>
+<span class="nc" id="L129">        return newInstance(q, false, args, q.getCandidateType(),</span>
+<span class="nc" id="L130">            q.hasSubclasses(), q.getStartRange(), q.getEndRange(), null);</span>
+    }
+
+    /**
+     * Return a key for the given query, or null if it is not cacheable.
+     */
+    static QueryKey newInstance(QueryContext q, boolean packed, Object[] args,
+        Class&lt;?&gt; candidate, boolean subs, long startIdx, long endIdx, Object parsed) {
+<span class="nc" id="L138">        QueryKey key = createKey(q, packed, candidate, subs, startIdx, endIdx, parsed);</span>
+<span class="nc bnc" id="L139" title="All 4 branches missed.">        if (key != null &amp;&amp; setParams(key, q, args))</span>
+<span class="nc" id="L140">            return key;</span>
+<span class="nc" id="L141">        return null;</span>
+    }
+
+    /**
+     * Return a key for the given query, or null if it is not cacheable.
+     */
+    static QueryKey newInstance(QueryContext q, boolean packed, Map&lt;Object,Object&gt; args,
+        Class&lt;?&gt; candidate, boolean subs, long startIdx, long endIdx, Object parsed) {
+<span class="nc" id="L149">        QueryKey key = createKey(q, packed, candidate, subs, startIdx, endIdx, parsed);</span>
+<span class="nc bnc" id="L150" title="All 6 branches missed.">        if (key != null &amp;&amp; (args == null || args.isEmpty() ||</span>
+<span class="nc bnc" id="L151" title="All 2 branches missed.">            setParams(key, q.getStoreContext(), new HashMap&lt;&gt;(args))))</span>
+<span class="nc" id="L152">            return key;</span>
+<span class="nc" id="L153">        return null;</span>
+    }
+
+    /**
+     * Extract the relevant identifying information from
+     * &lt;code&gt;q&lt;/code&gt;. This includes information such as candidate
+     * class, query filter, etc.
+     */
+    private static QueryKey createKey(QueryContext q, boolean packed,
+        Class&lt;?&gt; candidateClass, boolean subclasses, long startIdx, long endIdx, Object parsed) {
+<span class="nc bnc" id="L163" title="All 2 branches missed.">        if (candidateClass == null)</span>
+<span class="nc" id="L164">            return null;</span>
+
+        // can only cache datastore queries
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        if (q.getCandidateCollection() != null)</span>
+<span class="nc" id="L168">            return null;</span>
+
+        // no support already-packed results
+<span class="nc bnc" id="L171" title="All 4 branches missed.">        if (q.getResultType() != null &amp;&amp; packed)</span>
+<span class="nc" id="L172">            return null;</span>
+
+        // can't cache non-serializable non-managed complex types
+<span class="nc" id="L175">        Class&lt;?&gt;[] types = q.getProjectionTypes();</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        for (int i = 0; i &lt; types.length; i++) {</span>
+<span class="nc bnc" id="L177" title="All 3 branches missed.">            switch (JavaTypes.getTypeCode(types[i])) {</span>
+                case JavaTypes.ARRAY:
+<span class="nc" id="L179">                    return null;</span>
+                case JavaTypes.COLLECTION:
+                case JavaTypes.MAP:
+                case JavaTypes.OBJECT:
+<span class="nc bnc" id="L183" title="All 2 branches missed.">                    if (!ImplHelper.isManagedType(</span>
+<span class="nc" id="L184">                        q.getStoreContext().getConfiguration(), types[i]))</span>
+<span class="nc" id="L185">                        return null;</span>
+                    break;
+            }
+        }
+
+        // we can't cache the query if we don't know which classes are in the
+        // access path
+<span class="nc" id="L192">        ClassMetaData[] metas = q.getAccessPathMetaDatas();</span>
+<span class="nc bnc" id="L193" title="All 2 branches missed.">        if (metas.length == 0)</span>
+<span class="nc" id="L194">            return null;</span>
+
+<span class="nc" id="L196">        Set&lt;String&gt; accessPathClassNames = new HashSet&lt;&gt;((int) (metas.length * 1.33 + 1));</span>
+        ClassMetaData meta;
+<span class="nc bnc" id="L198" title="All 2 branches missed.">        for (int i = 0; i &lt; metas.length; i++) {</span>
+            // since the class change framework deals with least-derived types,
+            // record the least-derived access path types
+<span class="nc" id="L201">            meta = metas[i];</span>
+<span class="nc" id="L202">            accessPathClassNames.add(meta.getDescribedType().getName());</span>
+<span class="nc bnc" id="L203" title="All 2 branches missed.">            while (meta.getPCSuperclass() != null) {</span>
+<span class="nc" id="L204">                meta = meta.getPCSuperclassMetaData();</span>
+            }
+
+<span class="nc" id="L207">            accessPathClassNames.add(meta.getDescribedType().getName());</span>
+        }
+
+        // if any of the types are currently dirty, we can't cache this query
+<span class="nc" id="L211">        StoreContext ctx = q.getStoreContext();</span>
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (intersects(accessPathClassNames, ctx.getPersistedTypes())</span>
+<span class="nc bnc" id="L213" title="All 2 branches missed.">            || intersects(accessPathClassNames, ctx.getUpdatedTypes())</span>
+<span class="nc bnc" id="L214" title="All 2 branches missed.">            || intersects(accessPathClassNames, ctx.getDeletedTypes()))</span>
+<span class="nc" id="L215">            return null;</span>
+
+        // calculate the timeout for the key
+<span class="nc" id="L218">        MetaDataRepository repos = ctx.getConfiguration().</span>
+<span class="nc" id="L219">            getMetaDataRepositoryInstance();</span>
+
+        // won't find metadata for interfaces.
+<span class="nc bnc" id="L222" title="All 2 branches missed.">        if (candidateClass.isInterface())</span>
+<span class="nc" id="L223">            return null;</span>
+<span class="nc" id="L224">        meta = repos.getMetaData(candidateClass, ctx.getClassLoader(), true);</span>
+<span class="nc" id="L225">        int timeout = meta.getDataCacheTimeout();</span>
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (subclasses) {</span>
+<span class="nc" id="L227">            metas = meta.getPCSubclassMetaDatas();</span>
+            int subTimeout;
+<span class="nc bnc" id="L229" title="All 2 branches missed.">            for (int i = 0; i &lt; metas.length; i++) {</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">                if (metas[i].getDataCache() == null)</span>
+<span class="nc" id="L231">                    return null;</span>
+
+<span class="nc" id="L233">                accessPathClassNames.add(metas[i].getDescribedType().getName());</span>
+<span class="nc" id="L234">                subTimeout = metas[i].getDataCacheTimeout();</span>
+<span class="nc bnc" id="L235" title="All 4 branches missed.">                if (subTimeout != -1 &amp;&amp; subTimeout &lt; timeout)</span>
+<span class="nc" id="L236">                    timeout = subTimeout;</span>
+            }
+        }
+
+        // tests all passed; cacheable
+<span class="nc" id="L241">        QueryKey key = new QueryKey();</span>
+<span class="nc" id="L242">        key._candidateClassName = candidateClass.getName();</span>
+<span class="nc" id="L243">        key._subclasses = subclasses;</span>
+<span class="nc" id="L244">        key._accessPathClassNames = accessPathClassNames;</span>
+<span class="nc" id="L245">        key._timeout = timeout;</span>
+<span class="nc" id="L246">        key._query = q.getQueryString();</span>
+<span class="nc bnc" id="L247" title="All 4 branches missed.">        if (key._query == null &amp;&amp; parsed != null) {</span>
+            // this is a criteria query. Store the Stringified query value rather than the full cq.
+<span class="nc" id="L249">            key._query = parsed.toString();</span>
+        }
+<span class="nc" id="L251">        key._ignoreChanges = q.getIgnoreChanges();</span>
+<span class="nc" id="L252">        key._rangeStart = startIdx;</span>
+<span class="nc" id="L253">        key._rangeEnd = endIdx;</span>
+<span class="nc" id="L254">        return key;</span>
+    }
+
+    /**
+     * Convert an array of arguments into the corresponding parameter
+     * map, and do any PC to OID conversion necessary.
+     */
+    private static boolean setParams(QueryKey key, QueryContext q,
+        Object[] args) {
+<span class="nc bnc" id="L263" title="All 4 branches missed.">        if (args == null || args.length == 0)</span>
+<span class="nc" id="L264">            return true;</span>
+
+        // Create a map for the given parameters, and convert the
+        // parameter list into a map, using the query's parameter
+        // declaration to determine ordering etc.
+<span class="nc" id="L269">        Map&lt;Object,Class&lt;?&gt;&gt; types = q.getOrderedParameterTypes();</span>
+<span class="nc" id="L270">        Map&lt;Object,Object&gt; map = new HashMap&lt;&gt;((int) (types.size() * 1.33 + 1));</span>
+<span class="nc" id="L271">        int idx = 0;</span>
+<span class="nc bnc" id="L272" title="All 2 branches missed.">        for (Iterator&lt;Object&gt; iter = types.keySet().iterator(); iter.hasNext(); idx++)</span>
+<span class="nc" id="L273">            map.put(iter.next(), args[idx]);</span>
+<span class="nc" id="L274">        return setParams(key, q.getStoreContext(), map);</span>
+    }
+
+    /**
+     * Convert parameters to a form that is cacheable. Mutable params
+     * will be cloned.
+     */
+    private static boolean setParams(QueryKey key, StoreContext ctx,
+        Map&lt;Object,Object&gt; params) {
+<span class="nc bnc" id="L283" title="All 4 branches missed.">        if (params == null || params.isEmpty())</span>
+<span class="nc" id="L284">            return true;</span>
+
+        Object v;
+<span class="nc bnc" id="L287" title="All 2 branches missed.">        for (Map.Entry&lt;Object,Object&gt; e : params.entrySet()) {</span>
+<span class="nc" id="L288">            v = e.getValue();</span>
+<span class="nc bnc" id="L289" title="All 2 branches missed.">            if (ImplHelper.isManageable(v)) {</span>
+<span class="nc bnc" id="L290" title="All 6 branches missed.">                if (!ctx.isPersistent(v) || ctx.isNew(v) || ctx.isDeleted(v))</span>
+<span class="nc" id="L291">                    return false;</span>
+<span class="nc" id="L292">                e.setValue(ctx.getObjectId(v));</span>
+            }
+
+<span class="nc bnc" id="L295" title="All 2 branches missed.">            if (v instanceof Collection) {</span>
+<span class="nc" id="L296">                Collection&lt;Object&gt; c = (Collection&lt;Object&gt;) v;</span>
+<span class="nc" id="L297">                boolean contentsAreDates = false;</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">                if (c.iterator().hasNext()) {</span>
+                    // this assumes that the collection is homogeneous
+<span class="nc" id="L300">                    Object o = c.iterator().next();</span>
+<span class="nc bnc" id="L301" title="All 2 branches missed.">                    if (ImplHelper.isManageable(o))</span>
+<span class="nc" id="L302">                        return false;</span>
+
+                    // pcl: 27 Jun 2004: if we grow this logic to
+                    // handle other mutable types that are not
+                    // known to be cloneable, we will have to add
+                    // logic to handle them. This is because we
+                    // can't just cast to Cloneable and invoke
+                    // clone(), as clone() is a protected method
+                    // in Object.
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                    if (o instanceof Date)</span>
+<span class="nc" id="L312">                        contentsAreDates = true;</span>
+
+                    // if the collection is not a known immutable
+                    // type, or if it contains mutable instances,
+                    // clone it for good measure.
+<span class="nc bnc" id="L317" title="All 4 branches missed.">                    if (contentsAreDates || !s_unmod.contains(c.getClass())) {</span>
+                        // copy the collection
+                        Collection&lt;Object&gt; copy;
+<span class="nc bnc" id="L320" title="All 2 branches missed.">                        if (c instanceof SortedSet)</span>
+<span class="nc" id="L321">                            copy = new TreeSet&lt;&gt;();</span>
+<span class="nc bnc" id="L322" title="All 2 branches missed.">                        else if (c instanceof Set)</span>
+<span class="nc" id="L323">                            copy = new HashSet&lt;&gt;();</span>
+                        else
+<span class="nc" id="L325">                            copy = new ArrayList&lt;&gt;(c.size());</span>
+
+<span class="nc bnc" id="L327" title="All 2 branches missed.">                        if (contentsAreDates) {</span>
+                            // must go through by hand and do the
+                            // copy, since Date is mutable.
+<span class="nc bnc" id="L330" title="All 2 branches missed.">                            for (Iterator&lt;Object&gt; itr2 = c.iterator(); itr2.hasNext();)</span>
+<span class="nc" id="L331">                                copy.add(((Date) itr2.next()).clone());</span>
+                        } else
+<span class="nc" id="L333">                            copy.addAll(c);</span>
+
+<span class="nc" id="L335">                        e.setValue(copy);</span>
+                    }
+                }
+<span class="nc bnc" id="L338" title="All 2 branches missed.">            } else if (v instanceof Date)</span>
+<span class="nc" id="L339">                e.setValue(((Date) v).clone());</span>
+<span class="nc" id="L340">        }</span>
+
+<span class="nc" id="L342">        key._params = params;</span>
+<span class="nc" id="L343">        return true;</span>
+    }
+
+    /**
+     * Public constructor for externalization only.
+     */
+<span class="nc" id="L349">    public QueryKey() {</span>
+<span class="nc" id="L350">    }</span>
+
+    /**
+     * Returns the candidate class name for this query.
+     */
+    public String getCandidateTypeName() {
+<span class="nc" id="L356">        return _candidateClassName;</span>
+    }
+
+    /**
+     * Return the amount of time this key is good for.
+     */
+    public int getTimeout() {
+<span class="nc" id="L363">        return _timeout;</span>
+    }
+
+    /**
+     * Returns &lt;code&gt;true&lt;/code&gt; if modifications to any of the
+     * classes in &lt;code&gt;changed&lt;/code&gt; results in a possible
+     * invalidation of this query; otherwise returns
+     * &lt;code&gt;false&lt;/code&gt;. Invalidation is possible if one or more of
+     * the classes in this query key's access path has been changed.
+     */
+    public boolean changeInvalidatesQuery(Collection&lt;Class&lt;?&gt;&gt; changed) {
+<span class="nc" id="L374">        return intersects(_accessPathClassNames, changed);</span>
+    }
+
+    /**
+     * Whether the given set of least-derived class names intersects with
+     * the given set of changed classes.
+     */
+    private static boolean intersects(Collection&lt;String&gt; names, Collection&lt;Class&lt;?&gt;&gt; changed) {
+        Class&lt;?&gt; sup;
+<span class="nc bnc" id="L383" title="All 2 branches missed.">        for (Class&lt;?&gt; cls : changed) {</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">            while ((sup = PCRegistry.getPersistentSuperclass(cls)) != null)</span>
+<span class="nc" id="L385">                cls = sup;</span>
+<span class="nc bnc" id="L386" title="All 2 branches missed.">            if (names.contains(cls.getName()))</span>
+<span class="nc" id="L387">                return true;</span>
+<span class="nc" id="L388">        }</span>
+<span class="nc" id="L389">        return false;</span>
+    }
+
+    /**
+     * Determine equality based on identifying information. Keys
+     * created for queries that specify a candidate collection are
+     * always not equal.
+     */
+    @Override
+    public boolean equals(Object ob) {
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        if (this == ob)</span>
+<span class="nc" id="L400">            return true;</span>
+<span class="nc bnc" id="L401" title="All 4 branches missed.">        if (ob == null || getClass() != ob.getClass())</span>
+<span class="nc" id="L402">            return false;</span>
+
+<span class="nc" id="L404">        QueryKey other = (QueryKey) ob;</span>
+<span class="nc bnc" id="L405" title="All 10 branches missed.">        return Objects.equals(_candidateClassName,</span>
+            other._candidateClassName)
+            &amp;&amp; _subclasses == other._subclasses
+            &amp;&amp; _ignoreChanges == other._ignoreChanges
+            &amp;&amp; _rangeStart == other._rangeStart
+            &amp;&amp; _rangeEnd == other._rangeEnd
+<span class="nc bnc" id="L411" title="All 2 branches missed.">            &amp;&amp; Objects.equals(_query, other._query)</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">            &amp;&amp; Objects.equals(_params, other._params);</span>
+    }
+
+    /**
+     * Define a hashing algorithm corresponding to the {@link #equals}
+     * method defined above.
+     */
+    @Override
+    public int hashCode() {
+<span class="nc" id="L421">        int code = 37 * 17 + _candidateClassName.hashCode();</span>
+<span class="nc bnc" id="L422" title="All 2 branches missed.">        if (_query != null)</span>
+<span class="nc" id="L423">            code = 37 * code + _query.hashCode();</span>
+<span class="nc bnc" id="L424" title="All 2 branches missed.">        if (_params != null)</span>
+<span class="nc" id="L425">            code = 37 * code + _params.hashCode();</span>
+<span class="nc" id="L426">        return code;</span>
+    }
+
+    @Override
+    public String toString() {
+<span class="nc" id="L431">        StringBuilder buf = new StringBuilder(1024);</span>
+<span class="nc" id="L432">        buf.append(super.toString()).</span>
+<span class="nc" id="L433">            append(&quot;[query:[&quot;).append(_query).append(&quot;]&quot;).</span>
+<span class="nc" id="L434">            append(&quot;,access path:&quot;).append(_accessPathClassNames).</span>
+<span class="nc" id="L435">            append(&quot;,subs:&quot;).append(_subclasses).</span>
+<span class="nc" id="L436">            append(&quot;,ignoreChanges:&quot;).append(_ignoreChanges).</span>
+<span class="nc" id="L437">            append(&quot;,startRange:&quot;).append(_rangeStart).</span>
+<span class="nc" id="L438">            append(&quot;,endRange:&quot;).append(_rangeEnd).</span>
+<span class="nc" id="L439">            append(&quot;,timeout:&quot;).append(_timeout).</span>
+<span class="nc" id="L440">            append(&quot;]&quot;);</span>
+<span class="nc" id="L441">        return buf.toString();</span>
+    }
+
+    // ---------- Externalizable implementation ----------
+
+    @Override
+    public void writeExternal(ObjectOutput out)
+        throws IOException {
+<span class="nc" id="L449">        out.writeObject(_candidateClassName);</span>
+<span class="nc" id="L450">        out.writeBoolean(_subclasses);</span>
+<span class="nc" id="L451">        out.writeObject(_accessPathClassNames);</span>
+<span class="nc" id="L452">        out.writeObject(_query);</span>
+<span class="nc" id="L453">        out.writeBoolean(_ignoreChanges);</span>
+<span class="nc" id="L454">        out.writeObject(_params);</span>
+<span class="nc" id="L455">        out.writeLong(_rangeStart);</span>
+<span class="nc" id="L456">        out.writeLong(_rangeEnd);</span>
+<span class="nc" id="L457">        out.writeInt(_timeout);</span>
+<span class="nc" id="L458">    }</span>
+
+    @Override
+    public void readExternal(ObjectInput in)
+        throws IOException, ClassNotFoundException {
+<span class="nc" id="L463">        _candidateClassName = (String) in.readObject();</span>
+<span class="nc" id="L464">        _subclasses = in.readBoolean();</span>
+<span class="nc" id="L465">        _accessPathClassNames = (Set&lt;String&gt;) in.readObject();</span>
+<span class="nc" id="L466">        _query = (String) in.readObject();</span>
+<span class="nc" id="L467">        _ignoreChanges = in.readBoolean();</span>
+<span class="nc" id="L468">        _params = (Map&lt;Object,Object&gt;) in.readObject();</span>
+<span class="nc" id="L469">        _rangeStart = in.readLong();</span>
+<span class="nc" id="L470">        _rangeEnd = in.readLong ();</span>
+<span class="nc" id="L471">		_timeout = in.readInt ();</span>
+<span class="nc" id="L472">	}</span>
+
+    /**
+     * Returns the set of the accessPathClassnames that exists in the query
+     * @return -- Returns a set of accesspath classnames.
+     */
+    public Set&lt;String&gt; getAcessPathClassNames() {
+<span class="nc" id="L479">        return this._accessPathClassNames;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

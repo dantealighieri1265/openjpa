@@ -1,0 +1,1034 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>Filters.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">Filters.java</span></div><h1>Filters.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.sql.Time;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.List;
+
+import org.apache.openjpa.enhance.Reflection;
+import org.apache.openjpa.kernel.exps.AggregateListener;
+import org.apache.openjpa.kernel.exps.FilterListener;
+import org.apache.openjpa.lib.util.J2DoPrivHelper;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.StringUtil;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.JavaTypes;
+import org.apache.openjpa.util.InternalException;
+import org.apache.openjpa.util.UserException;
+
+/**
+ * Helper methods for dealing with query filters.
+ *
+ * @author Abe White
+ */
+<span class="nc" id="L51">public class Filters {</span>
+
+<span class="nc" id="L53">    private static final BigDecimal ZERO_BIGDECIMAL = new BigDecimal(0D);</span>
+<span class="nc" id="L54">    private static final BigInteger ZERO_BIGINTEGER = new BigInteger(&quot;0&quot;);</span>
+
+    private static final int OP_ADD = 0;
+    private static final int OP_SUBTRACT = 1;
+    private static final int OP_MULTIPLY = 2;
+    private static final int OP_DIVIDE = 3;
+    private static final int OP_MOD = 4;
+
+<span class="nc" id="L62">    private static final Localizer _loc = Localizer.forPackage(Filters.class);</span>
+
+    /**
+     * Return the correct wrapper type for the given class.
+     */
+    public static Class&lt;?&gt; wrap(Class&lt;?&gt; c) {
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (!c.isPrimitive())</span>
+<span class="nc" id="L69">            return c;</span>
+<span class="nc bnc" id="L70" title="All 2 branches missed.">        if (c == int.class)</span>
+<span class="nc" id="L71">            return Integer.class;</span>
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (c == float.class)</span>
+<span class="nc" id="L73">            return Float.class;</span>
+<span class="nc bnc" id="L74" title="All 2 branches missed.">        if (c == double.class)</span>
+<span class="nc" id="L75">            return Double.class;</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">        if (c == long.class)</span>
+<span class="nc" id="L77">            return Long.class;</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (c == boolean.class)</span>
+<span class="nc" id="L79">            return Boolean.class;</span>
+<span class="nc bnc" id="L80" title="All 2 branches missed.">        if (c == short.class)</span>
+<span class="nc" id="L81">            return Short.class;</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (c == byte.class)</span>
+<span class="nc" id="L83">            return Byte.class;</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (c == char.class)</span>
+<span class="nc" id="L85">            return Character.class;</span>
+<span class="nc" id="L86">        return c;</span>
+    }
+
+    /**
+     * Return the correct primitive type for the given class, if it is a
+     * wrapper.
+     */
+    public static Class&lt;?&gt; unwrap(Class&lt;?&gt; c) {
+<span class="nc bnc" id="L94" title="All 4 branches missed.">        if (c.isPrimitive() || c == String.class)</span>
+<span class="nc" id="L95">            return c;</span>
+<span class="nc bnc" id="L96" title="All 2 branches missed.">        if (c == Integer.class)</span>
+<span class="nc" id="L97">            return int.class;</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">        if (c == Float.class)</span>
+<span class="nc" id="L99">            return float.class;</span>
+<span class="nc bnc" id="L100" title="All 2 branches missed.">        if (c == Double.class)</span>
+<span class="nc" id="L101">            return double.class;</span>
+<span class="nc bnc" id="L102" title="All 2 branches missed.">        if (c == Long.class)</span>
+<span class="nc" id="L103">            return long.class;</span>
+<span class="nc bnc" id="L104" title="All 2 branches missed.">        if (c == Boolean.class)</span>
+<span class="nc" id="L105">            return boolean.class;</span>
+<span class="nc bnc" id="L106" title="All 2 branches missed.">        if (c == Short.class)</span>
+<span class="nc" id="L107">            return short.class;</span>
+<span class="nc bnc" id="L108" title="All 2 branches missed.">        if (c == Byte.class)</span>
+<span class="nc" id="L109">            return byte.class;</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">        if (c == Character.class)</span>
+<span class="nc" id="L111">            return char.class;</span>
+<span class="nc" id="L112">        return c;</span>
+    }
+
+    /**
+     * Given two types, return type they should both be converted
+     * to before performing any operations between them.
+     */
+    public static Class&lt;?&gt; promote(Class&lt;?&gt; c1, Class&lt;?&gt; c2) {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        if (c1 == c2)</span>
+<span class="nc" id="L121">            return unwrap(c1);</span>
+<span class="nc" id="L122">        Class&lt;?&gt; w1 = wrap(c1);</span>
+<span class="nc" id="L123">        Class&lt;?&gt; w2 = wrap(c2);</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">        if (w1 == w2)</span>
+<span class="nc" id="L125">            return unwrap(c1);</span>
+
+        // not numbers?
+<span class="nc" id="L128">        boolean w1Number = Number.class.isAssignableFrom(w1);</span>
+<span class="nc" id="L129">        boolean w2Number = Number.class.isAssignableFrom(w2);</span>
+<span class="nc bnc" id="L130" title="All 4 branches missed.">        if (!w1Number || !w2Number) {</span>
+            // the only non-numeric promotion we do is string to char,
+            // or from char/string to number
+<span class="nc bnc" id="L133" title="All 2 branches missed.">            if (!w1Number) {</span>
+<span class="nc bnc" id="L134" title="All 6 branches missed.">                if (w2Number &amp;&amp; (w1 == Character.class || w1 == String.class))</span>
+<span class="nc bnc" id="L135" title="All 4 branches missed.">                    return (w2 == Byte.class || w2 == Short.class)</span>
+<span class="nc" id="L136">                        ? Integer.class : unwrap(c2);</span>
+<span class="nc bnc" id="L137" title="All 6 branches missed.">                if (!w2Number &amp;&amp; w1 == Character.class &amp;&amp; w2 == String.class)</span>
+<span class="nc" id="L138">                    return String.class;</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                if (w2Number)</span>
+<span class="nc" id="L140">                    return unwrap(c2);</span>
+            }
+<span class="nc bnc" id="L142" title="All 2 branches missed.">            if (!w2Number) {</span>
+<span class="nc bnc" id="L143" title="All 6 branches missed.">                if (w1Number &amp;&amp; (w2 == Character.class || w2 == String.class))</span>
+<span class="nc bnc" id="L144" title="All 4 branches missed.">                    return (w1 == Byte.class || w1 == Short.class)</span>
+<span class="nc" id="L145">                        ? Integer.class : unwrap(c1);</span>
+<span class="nc bnc" id="L146" title="All 6 branches missed.">                if (!w1Number &amp;&amp; w2 == Character.class &amp;&amp; w1 == String.class)</span>
+<span class="nc" id="L147">                    return String.class;</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                if (w1Number)</span>
+<span class="nc" id="L149">                    return unwrap(c1);</span>
+            }
+
+            // if neither are numbers, use least-derived of the two.  if neither
+            // is assignable from the other but one is a standard type, assume
+            // the other can be converted to that standard type
+<span class="nc bnc" id="L155" title="All 4 branches missed.">            if (!w1Number &amp;&amp; !w2Number) {</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">                if (w1 == Object.class)</span>
+<span class="nc" id="L157">                    return unwrap(c2);</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">                if (w2 == Object.class)</span>
+<span class="nc" id="L159">                    return unwrap(c1);</span>
+<span class="nc bnc" id="L160" title="All 2 branches missed.">                if (w1.isAssignableFrom(w2))</span>
+<span class="nc" id="L161">                    return unwrap(c1);</span>
+<span class="nc bnc" id="L162" title="All 2 branches missed.">                if (w2.isAssignableFrom(w1))</span>
+<span class="nc" id="L163">                    return unwrap(c2);</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">                if (isNonstandardType(w1))</span>
+<span class="nc bnc" id="L165" title="All 2 branches missed.">                    return (isNonstandardType(w2)) ? Object.class : unwrap(c2);</span>
+<span class="nc bnc" id="L166" title="All 2 branches missed.">                if (isNonstandardType(w2))</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">                    return (isNonstandardType(w1)) ? Object.class : unwrap(c1);</span>
+            }
+<span class="nc" id="L169">            return Object.class;</span>
+        }
+
+<span class="nc bnc" id="L172" title="All 4 branches missed.">        if (w1 == BigDecimal.class || w2 == BigDecimal.class)</span>
+<span class="nc" id="L173">            return BigDecimal.class;</span>
+<span class="nc bnc" id="L174" title="All 2 branches missed.">        if (w1 == BigInteger.class) {</span>
+<span class="nc bnc" id="L175" title="All 4 branches missed.">            if (w2 == Float.class || w2 == Double.class)</span>
+<span class="nc" id="L176">                return BigDecimal.class;</span>
+<span class="nc" id="L177">            return BigInteger.class;</span>
+        }
+<span class="nc bnc" id="L179" title="All 2 branches missed.">        if (w2 == BigInteger.class) {</span>
+<span class="nc bnc" id="L180" title="All 4 branches missed.">            if (w1 == Float.class || w1 == Double.class)</span>
+<span class="nc" id="L181">                return BigDecimal.class;</span>
+<span class="nc" id="L182">            return BigInteger.class;</span>
+        }
+<span class="nc bnc" id="L184" title="All 4 branches missed.">        if (w1 == Double.class || w2 == Double.class)</span>
+<span class="nc" id="L185">            return double.class;</span>
+<span class="nc bnc" id="L186" title="All 4 branches missed.">        if (w1 == Float.class || w2 == Float.class)</span>
+<span class="nc" id="L187">            return float.class;</span>
+<span class="nc bnc" id="L188" title="All 4 branches missed.">        if (w1 == Long.class || w2 == Long.class)</span>
+<span class="nc" id="L189">            return long.class;</span>
+<span class="nc" id="L190">        return int.class;</span>
+    }
+
+    /**
+     * Return whether the given type is not a standard persistent type.
+     */
+    private static boolean isNonstandardType(Class&lt;?&gt; c) {
+<span class="nc bnc" id="L197" title="All 2 branches missed.">        switch (JavaTypes.getTypeCode(c))</span>
+        {
+        case JavaTypes.ARRAY:
+        case JavaTypes.COLLECTION:
+        case JavaTypes.MAP:
+        case JavaTypes.PC:
+        case JavaTypes.PC_UNTYPED:
+        case JavaTypes.OID:
+        case JavaTypes.OBJECT:
+<span class="nc" id="L206">            return true;</span>
+        default:
+<span class="nc" id="L208">            return false;</span>
+        }
+    }
+
+    /**
+     * Return whether an instance of the first class can be converted to
+     * an instance of the second.
+     */
+    public static boolean canConvert(Class&lt;?&gt; c1, Class&lt;?&gt; c2, boolean strict) {
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        if (c1 == c2)</span>
+<span class="nc" id="L218">            return true;</span>
+<span class="nc" id="L219">        c1 = wrap(c1);</span>
+<span class="nc" id="L220">        c2 = wrap(c2);</span>
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        if (c2.isAssignableFrom(c1))</span>
+<span class="nc" id="L222">            return true;</span>
+
+<span class="nc" id="L224">        boolean c1Number = Number.class.isAssignableFrom(c1);</span>
+<span class="nc" id="L225">        boolean c2Number = Number.class.isAssignableFrom(c2);</span>
+<span class="nc bnc" id="L226" title="All 4 branches missed.">        if (c1Number &amp;&amp; c2Number)</span>
+<span class="nc" id="L227">            return true;</span>
+<span class="nc bnc" id="L228" title="All 16 branches missed.">        if ((c1Number &amp;&amp; (c2 == Character.class</span>
+            || (!strict &amp;&amp; c2 == String.class)))
+            || (c2Number &amp;&amp; (c1 == Character.class
+            || (!strict &amp;&amp; c1 == String.class))))
+<span class="nc" id="L232">            return true;</span>
+<span class="nc bnc" id="L233" title="All 4 branches missed.">        if (c1 == String.class &amp;&amp; c2 == Character.class)</span>
+<span class="nc" id="L234">            return true;</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        if (c2 == String.class)</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">            return !strict;</span>
+<span class="nc bnc" id="L237" title="All 4 branches missed.">        if (c1 == String.class &amp;&amp; isTemporalType(c2))</span>
+<span class="nc" id="L238">            return true;</span>
+<span class="nc bnc" id="L239" title="All 6 branches missed.">        if ((c1 == java.util.Date.class ||c1 == java.sql.Time.class) &amp;&amp; c2 == java.sql.Timestamp.class)</span>
+<span class="nc" id="L240">            return false;</span>
+<span class="nc bnc" id="L241" title="All 6 branches missed.">        if ((c1 == java.util.Date.class ||c1 == java.sql.Timestamp.class) &amp;&amp; c2 == java.sql.Time.class)</span>
+<span class="nc" id="L242">            return false;</span>
+<span class="nc bnc" id="L243" title="All 4 branches missed.">        if (isTemporalType(c1) &amp;&amp; isTemporalType(c2))</span>
+<span class="nc" id="L244">            return true;</span>
+<span class="nc" id="L245">        return false;</span>
+    }
+
+    /**
+     * Convert the given value to match the given (presumably a setter) method argument type.
+     *
+     * @param o given value
+     * @param method a presumably setter method
+     *
+     * @return the same value if the method does not have one and only one input argument.
+     */
+    public static Object convertToMatchMethodArgument(Object o, Method method) {
+<span class="nc bnc" id="L257" title="All 4 branches missed.">        if (method == null || method.getParameterTypes().length != 1) {</span>
+<span class="nc" id="L258">            return o;</span>
+        }
+<span class="nc" id="L260">        return convert(o, method.getParameterTypes()[0], true);</span>
+    }
+
+    public static Object convert(Object o, Class&lt;?&gt; type) {
+<span class="nc" id="L264">        return convert(o, type, false);</span>
+    }
+
+    /**
+     * Convert the given value to the given type.
+     */
+    public static Object convert(Object o, Class&lt;?&gt; type, boolean strictNumericConversion) {
+<span class="nc bnc" id="L271" title="All 2 branches missed.">        if (o == null)</span>
+<span class="nc" id="L272">            return null;</span>
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        if (o.getClass() == type)</span>
+<span class="nc" id="L274">            return o;</span>
+
+<span class="nc" id="L276">        type = wrap(type);</span>
+<span class="nc bnc" id="L277" title="All 2 branches missed.">        if (type.isAssignableFrom(o.getClass()))</span>
+<span class="nc" id="L278">            return o;</span>
+
+        // the non-numeric conversions we do are to string, or from
+        // string/char to number, or calendar/date
+        // String to Boolean
+        // String to Integer
+<span class="nc" id="L284">        boolean num = o instanceof Number;</span>
+<span class="nc bnc" id="L285" title="All 2 branches missed.">        if (!num) {</span>
+<span class="nc bnc" id="L286" title="All 2 branches missed.">            if (type == String.class)</span>
+<span class="nc" id="L287">                return o.toString();</span>
+<span class="nc bnc" id="L288" title="All 4 branches missed.">            else if (type == Boolean.class &amp;&amp; o instanceof String)</span>
+<span class="nc" id="L289">                return Boolean.valueOf(o.toString());</span>
+<span class="nc bnc" id="L290" title="All 4 branches missed.">            else if (type == Integer.class &amp;&amp; o instanceof String)</span>
+                try {
+<span class="nc" id="L292">                    return new Integer(o.toString());</span>
+<span class="nc" id="L293">                } catch (NumberFormatException e) {</span>
+<span class="nc" id="L294">                    throw new ClassCastException(_loc.get(&quot;cant-convert&quot;, o,</span>
+<span class="nc" id="L295">                        o.getClass(), type).getMessage());</span>
+                }
+<span class="nc bnc" id="L297" title="All 2 branches missed.">            else if (type == Character.class) {</span>
+<span class="nc" id="L298">                String str = o.toString();</span>
+<span class="nc bnc" id="L299" title="All 4 branches missed.">                if (str != null &amp;&amp; str.length() == 1)</span>
+<span class="nc" id="L300">                    return Character.valueOf(str.charAt(0));</span>
+<span class="nc bnc" id="L301" title="All 4 branches missed.">            } else if (Calendar.class.isAssignableFrom(type) &amp;&amp;</span>
+                o instanceof Date) {
+<span class="nc" id="L303">                Calendar cal = Calendar.getInstance();</span>
+<span class="nc" id="L304">                cal.setTime((Date) o);</span>
+<span class="nc" id="L305">                return cal;</span>
+<span class="nc bnc" id="L306" title="All 4 branches missed.">            } else if (Date.class.isAssignableFrom(type) &amp;&amp;</span>
+                o instanceof Calendar) {
+<span class="nc" id="L308">                return ((Calendar) o).getTime();</span>
+<span class="nc bnc" id="L309" title="All 2 branches missed.">            } else if (Number.class.isAssignableFrom(type)) {</span>
+<span class="nc" id="L310">                Integer i = null;</span>
+<span class="nc bnc" id="L311" title="All 2 branches missed.">                if (o instanceof Character) {</span>
+<span class="nc" id="L312">                    i = Integer.valueOf((Character)o);</span>
+                }
+<span class="nc bnc" id="L314" title="All 4 branches missed.">                else if (o instanceof String &amp;&amp; ((String) o).length() == 1)</span>
+<span class="nc" id="L315">                    i = Integer.valueOf(((String)o));</span>
+
+<span class="nc bnc" id="L317" title="All 2 branches missed.">                if (i != null) {</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">                    if (type == Integer.class)</span>
+<span class="nc" id="L319">                        return i;</span>
+<span class="nc" id="L320">                    num = true;</span>
+                }
+<span class="nc bnc" id="L322" title="All 4 branches missed.">            } else if (o instanceof String &amp;&amp; isJDBCTemporalSyntax(o.toString())) {</span>
+                try {
+<span class="nc" id="L324">                    Object temporal = parseJDBCTemporalSyntax(o.toString());</span>
+<span class="nc bnc" id="L325" title="All 4 branches missed.">                    if (temporal != null &amp;&amp; type.isAssignableFrom(temporal.getClass()))</span>
+<span class="nc" id="L326">                        return temporal;</span>
+<span class="nc" id="L327">                } catch (IllegalArgumentException e) {</span>
+
+<span class="nc" id="L329">                }</span>
+<span class="nc bnc" id="L330" title="All 4 branches missed.">            } else if (o instanceof String &amp;&amp; type.isEnum()) {</span>
+<span class="nc" id="L331">                return Enum.valueOf((Class&lt;Enum&gt;)type, o.toString());</span>
+            }
+        }
+<span class="nc bnc" id="L334" title="All 2 branches missed.">        if (!num)</span>
+<span class="nc" id="L335">            throw new ClassCastException(_loc.get(&quot;cant-convert&quot;, o,</span>
+<span class="nc" id="L336">                o.getClass(), type).getMessage());</span>
+
+<span class="nc bnc" id="L338" title="All 4 branches missed.">        if (type == Integer.class &amp;&amp; allowNumericConversion(o.getClass(), type, strictNumericConversion)) {</span>
+<span class="nc" id="L339">            return ((Number) o).intValue();</span>
+<span class="nc bnc" id="L340" title="All 4 branches missed.">        } else if (type == Float.class &amp;&amp; allowNumericConversion(o.getClass(), type, strictNumericConversion)) {</span>
+<span class="nc" id="L341">            return Float.valueOf(((Number) o).floatValue());</span>
+<span class="nc bnc" id="L342" title="All 2 branches missed.">        } else if (type == Double.class) {</span>
+<span class="nc" id="L343">            return Double.valueOf(((Number) o).doubleValue());</span>
+<span class="nc bnc" id="L344" title="All 4 branches missed.">        } else if (type == Long.class &amp;&amp; allowNumericConversion(o.getClass(), type, strictNumericConversion)) {</span>
+<span class="nc" id="L345">            return ((Number) o).longValue();</span>
+<span class="nc bnc" id="L346" title="All 2 branches missed.">        } else if (type == BigDecimal.class) {</span>
+            // the BigDecimal constructor doesn't handle the
+            // &quot;NaN&quot; string version of Double.NaN and Float.NaN, nor
+            // does it handle infinity; we need to instead use the Double
+            // and Float versions, despite wanting to cast it to BigDecimal
+<span class="nc" id="L351">            double dval = ((Number) o).doubleValue();</span>
+<span class="nc bnc" id="L352" title="All 4 branches missed.">            if (Double.isNaN(dval) || Double.isInfinite(dval))</span>
+<span class="nc" id="L353">                return Double.valueOf(dval);</span>
+
+<span class="nc" id="L355">            float fval = ((Number) o).floatValue();</span>
+<span class="nc bnc" id="L356" title="All 4 branches missed.">            if (Float.isNaN(fval) || Float.isInfinite(fval))</span>
+<span class="nc" id="L357">                return Float.valueOf(fval);</span>
+
+<span class="nc" id="L359">            return new BigDecimal(o.toString());</span>
+<span class="nc bnc" id="L360" title="All 2 branches missed.">        } else if (type == BigInteger.class) {</span>
+<span class="nc" id="L361">            return new BigInteger(o.toString());</span>
+<span class="nc bnc" id="L362" title="All 4 branches missed.">        } else if (type == Short.class &amp;&amp; allowNumericConversion(o.getClass(), type, strictNumericConversion)) {</span>
+<span class="nc" id="L363">            return Short.valueOf(((Number) o).shortValue());</span>
+<span class="nc bnc" id="L364" title="All 4 branches missed.">        } else if (type == Byte.class &amp;&amp; allowNumericConversion(o.getClass(), type, strictNumericConversion)) {</span>
+<span class="nc" id="L365">            return Byte.valueOf(((Number) o).byteValue());</span>
+<span class="nc bnc" id="L366" title="All 2 branches missed.">        } else if (type == Character.class) {</span>
+<span class="nc" id="L367">        	return (char) ((Number) o).intValue();</span>
+<span class="nc bnc" id="L368" title="All 2 branches missed.">        } else if (!strictNumericConversion) {</span>
+<span class="nc" id="L369">            return ((Number) o).intValue();</span>
+        } else {
+<span class="nc" id="L371">            throw new ClassCastException(_loc.get(&quot;cant-convert&quot;, o, o.getClass(), type).getMessage());</span>
+        }
+    }
+
+    private static boolean allowNumericConversion(Class&lt;?&gt; actual, Class&lt;?&gt; target, boolean strict) {
+<span class="nc bnc" id="L376" title="All 4 branches missed.">        if (!strict || actual == target)</span>
+<span class="nc" id="L377">            return true;</span>
+<span class="nc bnc" id="L378" title="All 2 branches missed.">        if (actual == Byte.class)    return false;</span>
+<span class="nc bnc" id="L379" title="All 4 branches missed.">        if (actual == Double.class)  return target == Float.class;</span>
+<span class="nc bnc" id="L380" title="All 4 branches missed.">        if (actual == Float.class)   return target == Double.class;</span>
+<span class="nc bnc" id="L381" title="All 6 branches missed.">        if (actual == Integer.class) return target == Long.class || target == Short.class;</span>
+<span class="nc bnc" id="L382" title="All 6 branches missed.">        if (actual == Long.class)    return target == Integer.class || target == Short.class;</span>
+<span class="nc bnc" id="L383" title="All 6 branches missed.">        if (actual == Short.class)   return target == Long.class || target == Integer.class;</span>
+<span class="nc" id="L384">        return false;</span>
+    }
+
+    /**
+     * Add the given values.
+     */
+    public static Object add(Object o1, Class&lt;?&gt; c1, Object o2, Class&lt;?&gt; c2) {
+<span class="nc" id="L391">        return op(o1, c1, o2, c2, OP_ADD);</span>
+    }
+
+    /**
+     * Subtract the given values.
+     */
+    public static Object subtract(Object o1, Class&lt;?&gt; c1, Object o2, Class&lt;?&gt; c2) {
+<span class="nc" id="L398">        return op(o1, c1, o2, c2, OP_SUBTRACT);</span>
+    }
+
+    /**
+     * Multiply the given values.
+     */
+    public static Object multiply(Object o1, Class&lt;?&gt; c1, Object o2, Class&lt;?&gt; c2) {
+<span class="nc" id="L405">        return op(o1, c1, o2, c2, OP_MULTIPLY);</span>
+    }
+
+    /**
+     * Divide the given values.
+     */
+    public static Object divide(Object o1, Class&lt;?&gt; c1, Object o2, Class&lt;?&gt; c2) {
+<span class="nc" id="L412">        return op(o1, c1, o2, c2, OP_DIVIDE);</span>
+    }
+
+    /**
+     * Mod the given values.
+     */
+    public static Object mod(Object o1, Class&lt;?&gt; c1, Object o2, Class&lt;?&gt; c2) {
+<span class="nc" id="L419">        return op(o1, c1, o2, c2, OP_MOD);</span>
+    }
+
+    /**
+     * Perform the given operation on two numbers.
+     */
+    private static Object op(Object o1, Class&lt;?&gt; c1, Object o2, Class&lt;?&gt; c2, int op) {
+<span class="nc" id="L426">        Class&lt;?&gt; promote = promote(c1, c2);</span>
+<span class="nc bnc" id="L427" title="All 2 branches missed.">        if (promote == int.class) {</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">            int n1 = (o1 == null) ? 0 : ((Number) o1).intValue();</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">            int n2 = (o2 == null) ? 0 : ((Number) o2).intValue();</span>
+<span class="nc" id="L430">            return op(n1, n2, op);</span>
+        }
+<span class="nc bnc" id="L432" title="All 2 branches missed.">        if (promote == float.class) {</span>
+<span class="nc bnc" id="L433" title="All 2 branches missed.">            float n1 = (o1 == null) ? 0F : ((Number) o1).floatValue();</span>
+<span class="nc bnc" id="L434" title="All 2 branches missed.">            float n2 = (o2 == null) ? 0F : ((Number) o2).floatValue();</span>
+<span class="nc" id="L435">            return op(n1, n2, op);</span>
+        }
+<span class="nc bnc" id="L437" title="All 2 branches missed.">        if (promote == double.class) {</span>
+<span class="nc bnc" id="L438" title="All 2 branches missed.">            double n1 = (o1 == null) ? 0D : ((Number) o1).doubleValue();</span>
+<span class="nc bnc" id="L439" title="All 2 branches missed.">            double n2 = (o2 == null) ? 0D : ((Number) o2).doubleValue();</span>
+<span class="nc" id="L440">            return op(n1, n2, op);</span>
+        }
+<span class="nc bnc" id="L442" title="All 2 branches missed.">        if (promote == long.class) {</span>
+<span class="nc bnc" id="L443" title="All 2 branches missed.">            long n1 = (o1 == null) ? 0L : ((Number) o1).longValue();</span>
+<span class="nc bnc" id="L444" title="All 2 branches missed.">            long n2 = (o2 == null) ? 0L : ((Number) o2).longValue();</span>
+<span class="nc" id="L445">            return op(n1, n2, op);</span>
+        }
+<span class="nc bnc" id="L447" title="All 2 branches missed.">        if (promote == BigDecimal.class) {</span>
+<span class="nc bnc" id="L448" title="All 2 branches missed.">            BigDecimal n1 = (o1 == null) ? ZERO_BIGDECIMAL</span>
+<span class="nc" id="L449">                : (BigDecimal) convert(o1, promote);</span>
+<span class="nc bnc" id="L450" title="All 2 branches missed.">            BigDecimal n2 = (o2 == null) ? ZERO_BIGDECIMAL</span>
+<span class="nc" id="L451">                : (BigDecimal) convert(o2, promote);</span>
+<span class="nc" id="L452">            return op(n1, n2, op);</span>
+        }
+<span class="nc bnc" id="L454" title="All 2 branches missed.">        if (promote == BigInteger.class) {</span>
+<span class="nc bnc" id="L455" title="All 2 branches missed.">            BigInteger n1 = (o1 == null) ? ZERO_BIGINTEGER</span>
+<span class="nc" id="L456">                : (BigInteger) convert(o1, promote);</span>
+<span class="nc bnc" id="L457" title="All 2 branches missed.">            BigInteger n2 = (o2 == null) ? ZERO_BIGINTEGER</span>
+<span class="nc" id="L458">                : (BigInteger) convert(o2, promote);</span>
+<span class="nc" id="L459">            return op(n1, n2, op);</span>
+        }
+        // default to int
+<span class="nc bnc" id="L462" title="All 2 branches missed.">        int n1 = (o1 == null) ? 0 : ((Number) o1).intValue();</span>
+<span class="nc bnc" id="L463" title="All 2 branches missed.">        int n2 = (o2 == null) ? 0 : ((Number) o2).intValue();</span>
+<span class="nc" id="L464">        return op(n1, n2, op);</span>
+    }
+
+    /**
+     * Return the result of a mathematical operation.
+     */
+    private static Object op(int n1, int n2, int op) {
+        int tot;
+<span class="nc bnc" id="L472" title="All 6 branches missed.">        switch (op) {</span>
+            case OP_ADD:
+<span class="nc" id="L474">                tot = n1 + n2;</span>
+<span class="nc" id="L475">                break;</span>
+            case OP_SUBTRACT:
+<span class="nc" id="L477">                tot = n1 - n2;</span>
+<span class="nc" id="L478">                break;</span>
+            case OP_MULTIPLY:
+<span class="nc" id="L480">                tot = n1 * n2;</span>
+<span class="nc" id="L481">                break;</span>
+            case OP_DIVIDE:
+<span class="nc" id="L483">                tot = n1 / n2;</span>
+<span class="nc" id="L484">                break;</span>
+            case OP_MOD:
+<span class="nc" id="L486">                tot = n1 % n2;</span>
+<span class="nc" id="L487">                break;</span>
+            default:
+<span class="nc" id="L489">                throw new InternalException();</span>
+        }
+<span class="nc" id="L491">        return tot;</span>
+    }
+
+    /**
+     * Return the result of a mathematical operation.
+     */
+    private static Object op(float n1, float n2, int op) {
+        float tot;
+<span class="nc bnc" id="L499" title="All 6 branches missed.">        switch (op) {</span>
+            case OP_ADD:
+<span class="nc" id="L501">                tot = n1 + n2;</span>
+<span class="nc" id="L502">                break;</span>
+            case OP_SUBTRACT:
+<span class="nc" id="L504">                tot = n1 - n2;</span>
+<span class="nc" id="L505">                break;</span>
+            case OP_MULTIPLY:
+<span class="nc" id="L507">                tot = n1 * n2;</span>
+<span class="nc" id="L508">                break;</span>
+            case OP_DIVIDE:
+<span class="nc" id="L510">                tot = n1 / n2;</span>
+<span class="nc" id="L511">                break;</span>
+            case OP_MOD:
+<span class="nc" id="L513">                tot = n1 % n2;</span>
+<span class="nc" id="L514">                break;</span>
+            default:
+<span class="nc" id="L516">                throw new InternalException();</span>
+        }
+<span class="nc" id="L518">        return Float.valueOf(tot);</span>
+    }
+
+    /**
+     * Return the result of a mathematical operation.
+     */
+    private static Object op(double n1, double n2, int op) {
+        double tot;
+<span class="nc bnc" id="L526" title="All 6 branches missed.">        switch (op) {</span>
+            case OP_ADD:
+<span class="nc" id="L528">                tot = n1 + n2;</span>
+<span class="nc" id="L529">                break;</span>
+            case OP_SUBTRACT:
+<span class="nc" id="L531">                tot = n1 - n2;</span>
+<span class="nc" id="L532">                break;</span>
+            case OP_MULTIPLY:
+<span class="nc" id="L534">                tot = n1 * n2;</span>
+<span class="nc" id="L535">                break;</span>
+            case OP_DIVIDE:
+<span class="nc" id="L537">                tot = n1 / n2;</span>
+<span class="nc" id="L538">                break;</span>
+            case OP_MOD:
+<span class="nc" id="L540">                tot = n1 % n2;</span>
+<span class="nc" id="L541">                break;</span>
+            default:
+<span class="nc" id="L543">                throw new InternalException();</span>
+        }
+<span class="nc" id="L545">        return Double.valueOf(tot);</span>
+    }
+
+    /**
+     * Return the result of a mathematical operation.
+     */
+    private static Object op(long n1, long n2, int op) {
+        long tot;
+<span class="nc bnc" id="L553" title="All 6 branches missed.">        switch (op) {</span>
+            case OP_ADD:
+<span class="nc" id="L555">                tot = n1 + n2;</span>
+<span class="nc" id="L556">                break;</span>
+            case OP_SUBTRACT:
+<span class="nc" id="L558">                tot = n1 - n2;</span>
+<span class="nc" id="L559">                break;</span>
+            case OP_MULTIPLY:
+<span class="nc" id="L561">                tot = n1 * n2;</span>
+<span class="nc" id="L562">                break;</span>
+            case OP_DIVIDE:
+<span class="nc" id="L564">                tot = n1 / n2;</span>
+<span class="nc" id="L565">                break;</span>
+            case OP_MOD:
+<span class="nc" id="L567">                tot = n1 % n2;</span>
+<span class="nc" id="L568">                break;</span>
+            default:
+<span class="nc" id="L570">                throw new InternalException();</span>
+        }
+<span class="nc" id="L572">        return tot;</span>
+    }
+
+    /**
+     * Return the result of a mathematical operation.
+     */
+    private static Object op(BigDecimal n1, BigDecimal n2, int op) {
+<span class="nc bnc" id="L579" title="All 6 branches missed.">        switch (op) {</span>
+            case OP_ADD:
+<span class="nc" id="L581">                return n1.add(n2);</span>
+            case OP_SUBTRACT:
+<span class="nc" id="L583">                return n1.subtract(n2);</span>
+            case OP_MULTIPLY:
+<span class="nc" id="L585">                return n1.multiply(n2);</span>
+            case OP_DIVIDE:
+<span class="nc" id="L587">                int scale = Math.max(n1.scale(), n2.scale());</span>
+<span class="nc" id="L588">                return n1.divide(n2, scale, BigDecimal.ROUND_HALF_UP);</span>
+            case OP_MOD:
+<span class="nc" id="L590">                throw new UserException(_loc.get(&quot;mod-bigdecimal&quot;));</span>
+            default:
+<span class="nc" id="L592">                throw new InternalException();</span>
+        }
+    }
+
+    /**
+     * Return the result of a mathematical operation.
+     */
+    private static Object op(BigInteger n1, BigInteger n2, int op) {
+<span class="nc bnc" id="L600" title="All 5 branches missed.">        switch (op) {</span>
+            case OP_ADD:
+<span class="nc" id="L602">                return n1.add(n2);</span>
+            case OP_SUBTRACT:
+<span class="nc" id="L604">                return n1.subtract(n2);</span>
+            case OP_MULTIPLY:
+<span class="nc" id="L606">                return n1.multiply(n2);</span>
+            case OP_DIVIDE:
+<span class="nc" id="L608">                return n1.divide(n2);</span>
+            default:
+<span class="nc" id="L610">                throw new InternalException();</span>
+        }
+    }
+
+    /**
+     * Parses the given declarations into a list of type, name, type, name...
+     * Returns null if no declarations. Assumes declaration is not an empty
+     * string and is already trimmed (valid assumptions given the checks made
+     * in our setters).
+     *
+     * @param decType the type of declaration being parsed, for use in
+     * error messages
+     */
+    public static List&lt;String&gt; parseDeclaration(String dec, char split, String decType) {
+<span class="nc bnc" id="L624" title="All 2 branches missed.">        if (dec == null)</span>
+<span class="nc" id="L625">            return null;</span>
+
+        // watch for common mixups between commas and semis
+<span class="nc" id="L628">        char bad = (char) 0;</span>
+<span class="nc bnc" id="L629" title="All 2 branches missed.">        if (split == ',')</span>
+<span class="nc" id="L630">            bad = ';';</span>
+<span class="nc bnc" id="L631" title="All 2 branches missed.">        else if (split == ';')</span>
+<span class="nc" id="L632">            bad = ',';</span>
+
+<span class="nc" id="L634">        char sentinal = ' ';</span>
+        char cur;
+<span class="nc" id="L636">        int start = 0;</span>
+<span class="nc" id="L637">        boolean skipSpace = false;</span>
+<span class="nc" id="L638">        List&lt;String&gt; results = new ArrayList&lt;&gt;(6);</span>
+<span class="nc bnc" id="L639" title="All 2 branches missed.">        for (int i = 0; i &lt; dec.length(); i++) {</span>
+<span class="nc" id="L640">            cur = dec.charAt(i);</span>
+<span class="nc bnc" id="L641" title="All 2 branches missed.">            if (cur == bad)</span>
+<span class="nc" id="L642">                throw new UserException(_loc.get(&quot;bad-dec&quot;, dec, decType));</span>
+<span class="nc bnc" id="L643" title="All 4 branches missed.">            if (cur == ' ' &amp;&amp; skipSpace) {</span>
+<span class="nc" id="L644">                start++;</span>
+<span class="nc" id="L645">                continue;</span>
+            }
+
+<span class="nc" id="L648">            skipSpace = false;</span>
+<span class="nc bnc" id="L649" title="All 2 branches missed.">            if (cur != sentinal)</span>
+<span class="nc" id="L650">                continue;</span>
+
+            // if looking for spaces, look for split char, or vice versa
+<span class="nc bnc" id="L653" title="All 2 branches missed.">            sentinal = (sentinal == ' ') ? split : ' ';</span>
+<span class="nc" id="L654">            results.add(dec.substring(start, i).trim());</span>
+<span class="nc" id="L655">            start = i + 1;</span>
+<span class="nc" id="L656">            skipSpace = true;</span>
+        }
+
+        // add last token, if any
+<span class="nc bnc" id="L660" title="All 2 branches missed.">        if (start &lt; dec.length())</span>
+<span class="nc" id="L661">            results.add(dec.substring(start));</span>
+
+        // if not an even number of elements, something is wrong
+<span class="nc bnc" id="L664" title="All 4 branches missed.">        if (results.isEmpty() || results.size() % 2 != 0)</span>
+<span class="nc" id="L665">            throw new UserException(_loc.get(&quot;bad-dec&quot;, dec, decType));</span>
+
+<span class="nc" id="L667">        return results;</span>
+    }
+
+    /**
+     * Split the given expression list into distinct expressions. Assumes the
+     * given string is not null or of zero length and is already trimmed
+     * (valid assumptions given the checks in our setters and before
+     * this method call).
+     */
+    public static List&lt;String&gt; splitExpressions(String str, char split, int expected) {
+<span class="nc bnc" id="L677" title="All 2 branches missed.">        if (str == null)</span>
+<span class="nc" id="L678">            return null;</span>
+
+<span class="nc" id="L680">        List&lt;String&gt; exps = null;</span>
+<span class="nc" id="L681">        int parenDepth = 0;</span>
+<span class="nc" id="L682">        int begin = 0, pos = 0;</span>
+<span class="nc" id="L683">        boolean escape = false;</span>
+<span class="nc" id="L684">        boolean string = false;</span>
+<span class="nc" id="L685">        boolean nonspace = false;</span>
+<span class="nc" id="L686">        char quote = 0;</span>
+<span class="nc bnc" id="L687" title="All 2 branches missed.">        for (char c; pos &lt; str.length(); pos++) {</span>
+<span class="nc" id="L688">            c = str.charAt(pos);</span>
+<span class="nc bnc" id="L689" title="All 2 branches missed.">            if (c == '\\') {</span>
+<span class="nc bnc" id="L690" title="All 2 branches missed.">                escape = !escape;</span>
+<span class="nc" id="L691">                continue;</span>
+            }
+<span class="nc bnc" id="L693" title="All 2 branches missed.">            if (escape) {</span>
+<span class="nc" id="L694">                escape = false;</span>
+<span class="nc" id="L695">                continue;</span>
+            }
+
+<span class="nc bnc" id="L698" title="All 5 branches missed.">            switch (c) {</span>
+                case '\'':
+                case '&quot;':
+<span class="nc bnc" id="L701" title="All 4 branches missed.">                    if (string &amp;&amp; quote == c)</span>
+<span class="nc" id="L702">                        string = false;</span>
+<span class="nc bnc" id="L703" title="All 2 branches missed.">                    else if (!string) {</span>
+<span class="nc" id="L704">                        quote = c;</span>
+<span class="nc" id="L705">                        string = true;</span>
+                    }
+<span class="nc" id="L707">                    nonspace = true;</span>
+<span class="nc" id="L708">                    break;</span>
+                case '(':
+<span class="nc bnc" id="L710" title="All 2 branches missed.">                    if (!string)</span>
+<span class="nc" id="L711">                        parenDepth++;</span>
+<span class="nc" id="L712">                    nonspace = true;</span>
+<span class="nc" id="L713">                    break;</span>
+                case ')':
+<span class="nc bnc" id="L715" title="All 2 branches missed.">                    if (!string)</span>
+<span class="nc" id="L716">                        parenDepth--;</span>
+<span class="nc" id="L717">                    nonspace = true;</span>
+<span class="nc" id="L718">                    break;</span>
+                case ' ':
+                case '\t':
+                case '\n':
+                case '\r':
+<span class="nc bnc" id="L723" title="All 8 branches missed.">                    if (c == split &amp;&amp; !string &amp;&amp; parenDepth == 0 &amp;&amp; nonspace) {</span>
+<span class="nc bnc" id="L724" title="All 2 branches missed.">                        if (exps == null)</span>
+<span class="nc" id="L725">                            exps = new ArrayList&lt;&gt;(expected);</span>
+<span class="nc" id="L726">                        exps.add(str.substring(begin, pos).trim());</span>
+<span class="nc" id="L727">                        begin = pos + 1;</span>
+<span class="nc" id="L728">                        nonspace = false;</span>
+                    }
+                    break;
+                default:
+<span class="nc bnc" id="L732" title="All 6 branches missed.">                    if (c == split &amp;&amp; !string &amp;&amp; parenDepth == 0) {</span>
+<span class="nc bnc" id="L733" title="All 2 branches missed.">                        if (exps == null)</span>
+<span class="nc" id="L734">                            exps = new ArrayList&lt;&gt;(expected);</span>
+<span class="nc" id="L735">                        exps.add(str.substring(begin, pos).trim());</span>
+<span class="nc" id="L736">                        begin = pos + 1;</span>
+                    }
+<span class="nc" id="L738">                    nonspace = true;</span>
+            }
+<span class="nc" id="L740">            escape = false;</span>
+        }
+
+<span class="nc bnc" id="L743" title="All 2 branches missed.">        if (exps == null) {</span>
+<span class="nc" id="L744">            exps = Collections.singletonList(str);</span>
+<span class="nc" id="L745">            return exps;</span>
+        }
+
+        // add last expression and return array
+<span class="nc" id="L749">        String last = str.substring(begin).trim();</span>
+<span class="nc bnc" id="L750" title="All 2 branches missed.">        if (last.length() &gt; 0)</span>
+<span class="nc" id="L751">            exps.add(last);</span>
+<span class="nc" id="L752">        return exps;</span>
+    }
+
+    /**
+     * Add the given access path metadatas to the full path list, making sure
+     * to maintain only base metadatas in the list. The given list may be null.
+     */
+    public static List&lt;ClassMetaData&gt; addAccessPathMetaDatas(List&lt;ClassMetaData&gt; metas, ClassMetaData[] path) {
+<span class="nc bnc" id="L760" title="All 4 branches missed.">        if (path == null || path.length == 0)</span>
+<span class="nc" id="L761">            return metas;</span>
+
+        // create set of base class metadatas in access path
+<span class="nc bnc" id="L764" title="All 2 branches missed.">        if (metas == null)</span>
+<span class="nc" id="L765">            metas = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L766">        int last = metas.size();</span>
+
+        // for every element in the path of this executor, compare it
+        // to already-gathered elements to see if it should replace
+        // a subclass in the list or should be added as a new base;
+        // at least it's n^2 of a small n...
+        ClassMetaData meta;
+        boolean add;
+<span class="nc bnc" id="L774" title="All 2 branches missed.">        for (int i = 0; i &lt; path.length; i++) {</span>
+<span class="nc" id="L775">            add = true;</span>
+<span class="nc bnc" id="L776" title="All 4 branches missed.">            for (int j = 0; add &amp;&amp; j &lt; last; j++) {</span>
+<span class="nc" id="L777">                meta = metas.get(j);</span>
+
+<span class="nc bnc" id="L779" title="All 2 branches missed.">                if (meta.getDescribedType().isAssignableFrom(path[i].getDescribedType())) {</span>
+                    // list already contains base class
+<span class="nc" id="L781">                    add = false;</span>
+<span class="nc bnc" id="L782" title="All 2 branches missed.">                } else if (path[i].getDescribedType().isAssignableFrom(meta.getDescribedType())) {</span>
+                    // this element replaces its subclass
+<span class="nc" id="L784">                    add = false;</span>
+<span class="nc" id="L785">                    metas.set(j, path[i]);</span>
+                }
+            }
+
+            // if no base class of current path element already in
+            // list and path element didn't replace a subclass in the
+            // list, then add it now as a new base
+<span class="nc bnc" id="L792" title="All 2 branches missed.">            if (add)</span>
+<span class="nc" id="L793">                metas.add(path[i]);</span>
+        }
+<span class="nc" id="L795">        return metas;</span>
+    }
+
+    /**
+     * Convert the user-given hint value to an aggregate listener.
+     * The hint can be an aggregate listener instance or class name.
+     */
+    public static AggregateListener hintToAggregateListener(Object hint, ClassLoader loader) {
+<span class="nc bnc" id="L803" title="All 2 branches missed.">        if (hint == null)</span>
+<span class="nc" id="L804">            return null;</span>
+<span class="nc bnc" id="L805" title="All 2 branches missed.">        if (hint instanceof AggregateListener)</span>
+<span class="nc" id="L806">            return (AggregateListener) hint;</span>
+
+<span class="nc" id="L808">        Exception cause = null;</span>
+<span class="nc bnc" id="L809" title="All 2 branches missed.">        if (hint instanceof String) {</span>
+            try {
+<span class="nc" id="L811">                return (AggregateListener) AccessController.doPrivileged(</span>
+<span class="nc" id="L812">                    J2DoPrivHelper.newInstanceAction(Class.forName((String) hint, true, loader)));</span>
+<span class="nc" id="L813">            } catch (Exception e) {</span>
+<span class="nc bnc" id="L814" title="All 2 branches missed.">                if (e instanceof PrivilegedActionException)</span>
+<span class="nc" id="L815">                    e = ((PrivilegedActionException) e).getException();</span>
+<span class="nc" id="L816">                cause = e;</span>
+            }
+        }
+<span class="nc" id="L819">        throw new UserException(_loc.get(&quot;bad-agg-listener-hint&quot;, hint,</span>
+<span class="nc" id="L820">            hint.getClass())).setCause(cause);</span>
+    }
+
+    /**
+     * Convert the user-given hint value to an array of aggregate listeners.
+     * The hint can be an aggregate listener, aggregate listener array,
+     * collection, or comma-separated class names.
+     */
+    public static AggregateListener[] hintToAggregateListeners(Object hint, ClassLoader loader) {
+<span class="nc bnc" id="L829" title="All 2 branches missed.">        if (hint == null)</span>
+<span class="nc" id="L830">            return null;</span>
+<span class="nc bnc" id="L831" title="All 2 branches missed.">        if (hint instanceof AggregateListener[])</span>
+<span class="nc" id="L832">            return (AggregateListener[]) hint;</span>
+<span class="nc bnc" id="L833" title="All 2 branches missed.">        if (hint instanceof AggregateListener)</span>
+<span class="nc" id="L834">            return new AggregateListener[]{ (AggregateListener) hint };</span>
+<span class="nc bnc" id="L835" title="All 2 branches missed.">        if (hint instanceof Collection) {</span>
+<span class="nc" id="L836">            Collection&lt;AggregateListener&gt; c = (Collection&lt;AggregateListener&gt;) hint;</span>
+<span class="nc" id="L837">            return c.toArray(new AggregateListener[c.size()]);</span>
+        }
+
+<span class="nc" id="L840">        Exception cause = null;</span>
+<span class="nc bnc" id="L841" title="All 2 branches missed.">        if (hint instanceof String) {</span>
+<span class="nc" id="L842">            String[] clss = StringUtil.split((String) hint, &quot;,&quot;, 0);</span>
+<span class="nc" id="L843">            AggregateListener[] aggs = new AggregateListener[clss.length];</span>
+            try {
+<span class="nc bnc" id="L845" title="All 2 branches missed.">                for (int i = 0; i &lt; clss.length; i++)</span>
+<span class="nc" id="L846">                    aggs[i] = (AggregateListener) AccessController.doPrivileged(</span>
+<span class="nc" id="L847">                        J2DoPrivHelper.newInstanceAction(</span>
+<span class="nc" id="L848">                            Class.forName(clss[i], true, loader)));</span>
+<span class="nc" id="L849">                return aggs;</span>
+<span class="nc" id="L850">            } catch (Exception e) {</span>
+<span class="nc bnc" id="L851" title="All 2 branches missed.">                if (e instanceof PrivilegedActionException)</span>
+<span class="nc" id="L852">                    e = ((PrivilegedActionException) e).getException();</span>
+<span class="nc" id="L853">                cause = e;</span>
+            }
+        }
+<span class="nc" id="L856">        throw new UserException(_loc.get(&quot;bad-agg-listener-hint&quot;, hint,</span>
+<span class="nc" id="L857">            hint.getClass())).setCause(cause);</span>
+    }
+
+    /**
+     * Convert the user-given hint value to a filter listener.
+     * The hint can be a filter listener instance or class name.
+     */
+    public static FilterListener hintToFilterListener(Object hint, ClassLoader loader) {
+<span class="nc bnc" id="L865" title="All 2 branches missed.">        if (hint == null)</span>
+<span class="nc" id="L866">            return null;</span>
+<span class="nc bnc" id="L867" title="All 2 branches missed.">        if (hint instanceof FilterListener)</span>
+<span class="nc" id="L868">            return (FilterListener) hint;</span>
+
+<span class="nc" id="L870">        Exception cause = null;</span>
+<span class="nc bnc" id="L871" title="All 2 branches missed.">        if (hint instanceof String) {</span>
+            try {
+<span class="nc" id="L873">                return (FilterListener) AccessController.doPrivileged(</span>
+<span class="nc" id="L874">                    J2DoPrivHelper.newInstanceAction(</span>
+<span class="nc" id="L875">                        Class.forName((String) hint, true, loader)));</span>
+<span class="nc" id="L876">            } catch (Exception e) {</span>
+<span class="nc bnc" id="L877" title="All 2 branches missed.">                if (e instanceof PrivilegedActionException)</span>
+<span class="nc" id="L878">                    e = ((PrivilegedActionException) e).getException();</span>
+<span class="nc" id="L879">                cause = e;</span>
+            }
+        }
+<span class="nc" id="L882">        throw new UserException(_loc.get(&quot;bad-filter-listener-hint&quot;, hint,</span>
+<span class="nc" id="L883">            hint.getClass())).setCause(cause);</span>
+    }
+
+    /**
+     * Convert the user-given hint value to an array of filter listeners.
+     * The hint can be a filter listener, filter listener array,
+     * collection, or comma-separated class names.
+     */
+    public static FilterListener[] hintToFilterListeners(Object hint, ClassLoader loader) {
+<span class="nc bnc" id="L892" title="All 2 branches missed.">        if (hint == null)</span>
+<span class="nc" id="L893">            return null;</span>
+<span class="nc bnc" id="L894" title="All 2 branches missed.">        if (hint instanceof FilterListener[])</span>
+<span class="nc" id="L895">            return (FilterListener[]) hint;</span>
+<span class="nc bnc" id="L896" title="All 2 branches missed.">        if (hint instanceof FilterListener)</span>
+<span class="nc" id="L897">            return new FilterListener[]{ (FilterListener) hint };</span>
+<span class="nc bnc" id="L898" title="All 2 branches missed.">        if (hint instanceof Collection) {</span>
+<span class="nc" id="L899">            Collection&lt;FilterListener&gt; c = (Collection&lt;FilterListener&gt;) hint;</span>
+<span class="nc" id="L900">            return c.toArray(new FilterListener[c.size()]);</span>
+        }
+
+<span class="nc" id="L903">        Exception cause = null;</span>
+<span class="nc bnc" id="L904" title="All 2 branches missed.">        if (hint instanceof String) {</span>
+<span class="nc" id="L905">            String[] clss = StringUtil.split((String) hint, &quot;,&quot;, 0);</span>
+<span class="nc" id="L906">            FilterListener[] filts = new FilterListener[clss.length];</span>
+            try {
+<span class="nc bnc" id="L908" title="All 2 branches missed.">                for (int i = 0; i &lt; clss.length; i++)</span>
+<span class="nc" id="L909">                    filts[i] = (FilterListener) AccessController.doPrivileged(</span>
+<span class="nc" id="L910">                        J2DoPrivHelper.newInstanceAction(</span>
+<span class="nc" id="L911">                            Class.forName(clss[i], true, loader)));</span>
+<span class="nc" id="L912">                return filts;</span>
+<span class="nc" id="L913">            } catch (Exception e) {</span>
+<span class="nc bnc" id="L914" title="All 2 branches missed.">                if (e instanceof PrivilegedActionException)</span>
+<span class="nc" id="L915">                    e = ((PrivilegedActionException) e).getException();</span>
+<span class="nc" id="L916">                cause = e;</span>
+            }
+        }
+<span class="nc" id="L919">        throw new UserException(_loc.get(&quot;bad-filter-listener-hint&quot;, hint,</span>
+<span class="nc" id="L920">            hint.getClass())).setCause(cause);</span>
+    }
+
+    /**
+     * Return the value of the property named by the hint key.
+     */
+    public static Object hintToGetter(Object target, String hintKey) {
+<span class="nc bnc" id="L927" title="All 4 branches missed.">        if (target == null || hintKey == null)</span>
+<span class="nc" id="L928">            return null;</span>
+
+<span class="nc" id="L930">        Method getter = Reflection.findGetter(target.getClass(), hintKey, true);</span>
+<span class="nc" id="L931">        return Reflection.get(target, getter);</span>
+    }
+
+    /**
+     * Set the value of the property named by the hint key.
+     */
+    public static void hintToSetter(Object target, String hintKey, Object value) {
+<span class="nc bnc" id="L938" title="All 4 branches missed.">        if (target == null || hintKey == null)</span>
+<span class="nc" id="L939">            return;</span>
+
+<span class="nc" id="L941">        Method setter = Reflection.findSetter(target.getClass(), hintKey, true);</span>
+<span class="nc bnc" id="L942" title="All 2 branches missed.">        if (value instanceof String) {</span>
+<span class="nc bnc" id="L943" title="All 2 branches missed.">            if (&quot;null&quot;.equals(value))</span>
+<span class="nc" id="L944">                value = null;</span>
+            else {
+                try {
+<span class="nc" id="L947">                    value = StringUtil.parse((String) value, setter.getParameterTypes()[0]);</span>
+<span class="nc" id="L948">                } catch (Exception e) {</span>
+<span class="nc" id="L949">                    throw new UserException(_loc.get(&quot;bad-setter-hint-arg&quot;,</span>
+<span class="nc" id="L950">                        hintKey, value, setter.getParameterTypes()[0])).</span>
+<span class="nc" id="L951">                        setCause(e);</span>
+<span class="nc" id="L952">                }</span>
+            }
+        }
+<span class="nc" id="L955">        Reflection.set(target, setter, value);</span>
+<span class="nc" id="L956">    }</span>
+
+    /**
+     * Parses the given string assuming it is a JDBC key expression. Extracts the
+     * data portion and based on the key, calls static java.sql.Date/Time/Timestamp.valueOf(String)
+     * method to convert to a java.sql.Date/Time/Timestamp instance.
+     */
+    public static Object parseJDBCTemporalSyntax(String s) {
+<span class="nc" id="L964">        s = clip(s.trim(), &quot;{&quot;, &quot;}&quot;, true);</span>
+<span class="nc bnc" id="L965" title="All 2 branches missed.">        if (s.startsWith(&quot;ts&quot;)) {</span>
+<span class="nc" id="L966">            return java.sql.Timestamp.valueOf(clip(s.substring(2).trim(), &quot;'&quot;, &quot;'&quot;, false));</span>
+<span class="nc bnc" id="L967" title="All 2 branches missed.">        } else if (s.startsWith(&quot;d&quot;)) {</span>
+<span class="nc" id="L968">            return java.sql.Date.valueOf(clip(s.substring(1).trim(), &quot;'&quot;, &quot;'&quot;, false));</span>
+<span class="nc bnc" id="L969" title="All 2 branches missed.">        } else if (s.startsWith(&quot;t&quot;)) {</span>
+<span class="nc" id="L970">            return java.sql.Time.valueOf(clip(s.substring(2).trim(), &quot;'&quot;, &quot;'&quot;, false));</span>
+        } else {
+<span class="nc" id="L972">            return null;</span>
+        }
+    }
+
+    /**
+     * Affirms if the given String is enclosed in {}.
+     *
+     */
+    public static boolean isJDBCTemporalSyntax(String s) {
+<span class="nc bnc" id="L981" title="All 2 branches missed.">        if (s != null) {</span>
+<span class="nc" id="L982">            s = s.trim();</span>
+        }
+<span class="nc bnc" id="L984" title="All 6 branches missed.">        return s != null &amp;&amp; s.startsWith(&quot;{&quot;) &amp;&amp; s.endsWith(&quot;}&quot;);</span>
+    }
+
+    /**
+     * Removes the first and last string if they are the terminal sequence in the given string.
+     *
+     * @param s a string to be examined
+     * @param first the characters in the beginning of the given string
+     * @param last the characters in the end of the given string
+     * @param fail if true throws exception if the given string does not have the given terminal sequences.
+     * @return the string with terminal sequences removed.
+     */
+    public static String clip(String s, String first, String last, boolean fail) {
+<span class="nc bnc" id="L997" title="All 2 branches missed.">        if (s == null)</span>
+<span class="nc" id="L998">            return s;</span>
+<span class="nc bnc" id="L999" title="All 4 branches missed.">        if (s.startsWith(first) &amp;&amp; s.endsWith(last)) {</span>
+<span class="nc" id="L1000">            return s.substring(first.length(), s.length()-last.length()).trim();</span>
+        }
+<span class="nc bnc" id="L1002" title="All 2 branches missed.">        if (fail) {</span>
+<span class="nc" id="L1003">            throw new IllegalArgumentException(s + &quot; is not valid escape syntax for JDBC&quot;);</span>
+        }
+<span class="nc" id="L1005">        return s;</span>
+    }
+
+    /**
+     * Affirms if the given class is Data, Time or Timestamp.
+     */
+    public static boolean isTemporalType(Class&lt;?&gt; c) {
+<span class="nc bnc" id="L1012" title="All 2 branches missed.">        return c != null</span>
+<span class="nc bnc" id="L1013" title="All 2 branches missed.">            &amp;&amp; (Date.class.isAssignableFrom(c)</span>
+<span class="nc bnc" id="L1014" title="All 2 branches missed.">             || Time.class.isAssignableFrom(c)</span>
+<span class="nc bnc" id="L1015" title="All 2 branches missed.">             || Timestamp.class.isAssignableFrom(c)</span>
+<span class="nc bnc" id="L1016" title="All 2 branches missed.">             || Calendar.class.isAssignableFrom(c));</span>
+    }
+
+    public static Object getDefaultForNull(Class&lt;?&gt; nType) {
+<span class="nc bnc" id="L1020" title="All 2 branches missed.">        if (nType == Long.class)</span>
+<span class="nc" id="L1021">            return Long.valueOf(0);</span>
+<span class="nc bnc" id="L1022" title="All 2 branches missed.">        if (nType == Integer.class)</span>
+<span class="nc" id="L1023">            return Integer.valueOf(0);</span>
+<span class="nc bnc" id="L1024" title="All 2 branches missed.">        if (nType == Double.class)</span>
+<span class="nc" id="L1025">            return Double.valueOf(0.0);</span>
+<span class="nc bnc" id="L1026" title="All 2 branches missed.">        if (nType == Float.class)</span>
+<span class="nc" id="L1027">            return new Float(0.0);</span>
+<span class="nc bnc" id="L1028" title="All 2 branches missed.">        if (nType == Short.class)</span>
+<span class="nc" id="L1029">            return Short.valueOf((short)0);</span>
+<span class="nc" id="L1030">        return null;</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

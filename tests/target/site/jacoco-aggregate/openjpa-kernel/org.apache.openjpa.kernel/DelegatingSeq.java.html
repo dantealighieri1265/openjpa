@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>DelegatingSeq.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">DelegatingSeq.java</span></div><h1>DelegatingSeq.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.util.RuntimeExceptionTranslator;
+
+///////////////////////////////////////////////////////////////
+// NOTE: when adding a public API method, be sure to add it to
+// JDO and JPA facades!
+///////////////////////////////////////////////////////////////
+
+/**
+ * Delegating sequence that can also perform exception translation for use
+ * in facades.
+ *
+ * @author Abe White
+ */
+public class DelegatingSeq
+    implements Seq {
+
+    private final Seq _seq;
+    private final DelegatingSeq _del;
+    private final RuntimeExceptionTranslator _trans;
+
+    /**
+     * Constructor; supply delegate.
+     */
+    public DelegatingSeq(Seq seq) {
+<span class="nc" id="L46">        this(seq, null);</span>
+<span class="nc" id="L47">    }</span>
+
+    /**
+     * Constructor; supply delegate and exception translator.
+     */
+<span class="nc" id="L52">    public DelegatingSeq(Seq seq, RuntimeExceptionTranslator trans) {</span>
+<span class="nc" id="L53">        _seq = seq;</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">        if (seq instanceof DelegatingSeq)</span>
+<span class="nc" id="L55">            _del = (DelegatingSeq) seq;</span>
+        else
+<span class="nc" id="L57">            _del = null;</span>
+<span class="nc" id="L58">        _trans = trans;</span>
+<span class="nc" id="L59">    }</span>
+
+    /**
+     * Return the direct delegate.
+     */
+    public Seq getDelegate() {
+<span class="nc" id="L65">        return _seq;</span>
+    }
+
+    /**
+     * Return the native delegate.
+     */
+    public Seq getInnermostDelegate() {
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        return (_del == null) ? _seq : _del.getInnermostDelegate();</span>
+    }
+
+    @Override
+    public int hashCode() {
+<span class="nc" id="L77">        return getInnermostDelegate().hashCode();</span>
+    }
+
+    @Override
+    public boolean equals(Object other) {
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (other == this)</span>
+<span class="nc" id="L83">            return true;</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">        if (other instanceof DelegatingSeq)</span>
+<span class="nc" id="L85">            other = ((DelegatingSeq) other).getInnermostDelegate();</span>
+<span class="nc" id="L86">        return getInnermostDelegate().equals(other);</span>
+    }
+
+    /**
+     * Translate the OpenJPA exception.
+     */
+    protected RuntimeException translate(RuntimeException re) {
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        return (_trans == null) ? re : _trans.translate(re);</span>
+    }
+
+    @Override
+    public void setType(int type) {
+        try {
+<span class="nc" id="L99">            _seq.setType(type);</span>
+<span class="nc" id="L100">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L101">            throw translate(re);</span>
+<span class="nc" id="L102">        }</span>
+<span class="nc" id="L103">    }</span>
+
+    @Override
+    public Object next(StoreContext ctx, ClassMetaData meta) {
+        try {
+<span class="nc" id="L108">            return _seq.next(ctx, meta);</span>
+<span class="nc" id="L109">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L110">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public Object current(StoreContext ctx, ClassMetaData meta) {
+        try {
+<span class="nc" id="L117">            return _seq.current(ctx, meta);</span>
+<span class="nc" id="L118">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L119">            throw translate(re);</span>
+        }
+    }
+
+    @Override
+    public void allocate(int additional, StoreContext ctx, ClassMetaData meta) {
+        try {
+<span class="nc" id="L126">            _seq.allocate(additional, ctx, meta);</span>
+<span class="nc" id="L127">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L128">            throw translate(re);</span>
+<span class="nc" id="L129">        }</span>
+<span class="nc" id="L130">    }</span>
+
+    @Override
+    public void close() {
+        try {
+<span class="nc" id="L135">            _seq.close();</span>
+<span class="nc" id="L136">        } catch (RuntimeException re) {</span>
+<span class="nc" id="L137">            throw translate(re);</span>
+<span class="nc" id="L138">		}</span>
+<span class="nc" id="L139">	}</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

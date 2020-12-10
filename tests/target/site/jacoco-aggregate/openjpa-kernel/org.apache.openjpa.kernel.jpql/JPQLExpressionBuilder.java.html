@@ -1,0 +1,2511 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JPQLExpressionBuilder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel.jpql</a> &gt; <span class="el_source">JPQLExpressionBuilder.java</span></div><h1>JPQLExpressionBuilder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel.jpql;
+
+import java.io.PrintStream;
+import java.io.Serializable;
+import java.lang.reflect.Field;
+import java.math.BigDecimal;
+import java.security.AccessController;
+import java.sql.Time;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.Stack;
+import java.util.TreeSet;
+
+import org.apache.openjpa.conf.Compatibility;
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.kernel.BrokerFactory;
+import org.apache.openjpa.kernel.ExpressionStoreQuery;
+import org.apache.openjpa.kernel.FillStrategy;
+import org.apache.openjpa.kernel.QueryContext;
+import org.apache.openjpa.kernel.QueryOperations;
+import org.apache.openjpa.kernel.ResultShape;
+import org.apache.openjpa.kernel.StoreContext;
+import org.apache.openjpa.kernel.exps.AbstractExpressionBuilder;
+import org.apache.openjpa.kernel.exps.Context;
+import org.apache.openjpa.kernel.exps.Expression;
+import org.apache.openjpa.kernel.exps.ExpressionFactory;
+import org.apache.openjpa.kernel.exps.Literal;
+import org.apache.openjpa.kernel.exps.Parameter;
+import org.apache.openjpa.kernel.exps.Path;
+import org.apache.openjpa.kernel.exps.QueryExpressions;
+import org.apache.openjpa.kernel.exps.Resolver;
+import org.apache.openjpa.kernel.exps.Subquery;
+import org.apache.openjpa.kernel.exps.Value;
+import org.apache.openjpa.lib.log.Log;
+import org.apache.openjpa.lib.util.J2DoPrivHelper;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.Localizer.Message;
+import org.apache.openjpa.lib.util.OrderedMap;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.FieldMetaData;
+import org.apache.openjpa.meta.JavaTypes;
+import org.apache.openjpa.meta.MetaDataRepository;
+import org.apache.openjpa.meta.ValueMetaData;
+import org.apache.openjpa.util.InternalException;
+import org.apache.openjpa.util.UserException;
+
+
+/**
+ * Builder for JPQL expressions. This class takes the query parsed
+ * in {@link JPQL} and converts it to an expression tree using
+ * an {@link ExpressionFactory}. Public for unit testing purposes.
+ *
+ * @author Marc Prud'hommeaux
+ * @author Patrick Linskey
+ */
+public class JPQLExpressionBuilder
+    extends AbstractExpressionBuilder
+    implements JPQLTreeConstants {
+
+    private static final int VAR_PATH = 1;
+    private static final int VAR_ERROR = 2;
+
+<span class="nc" id="L88">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L89">        (JPQLExpressionBuilder.class);</span>
+
+<span class="nc" id="L91">    private final Stack&lt;Context&gt; contexts = new Stack&lt;&gt;();</span>
+    private OrderedMap&lt;Object, Class&lt;?&gt;&gt; parameterTypes;
+<span class="nc" id="L93">    private int aliasCount = 0;</span>
+<span class="nc" id="L94">    private boolean inAssignSubselectProjection = false;</span>
+<span class="nc" id="L95">    private boolean hasParameterizedInExpression = false;</span>
+
+    /**
+     * Constructor.
+     *
+     * @param factory the expression factory to use
+     * @param query used to resolve variables, parameters,
+     * and class names used in the query
+     * @param parsedQuery the parsed query
+     */
+    public JPQLExpressionBuilder(ExpressionFactory factory,
+        ExpressionStoreQuery query, Object parsedQuery) {
+<span class="nc" id="L107">        super(factory, query.getResolver());</span>
+
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        contexts.push(new Context(parsedQuery instanceof ParsedJPQL</span>
+<span class="nc" id="L110">            ? (ParsedJPQL) parsedQuery</span>
+<span class="nc bnc" id="L111" title="All 2 branches missed.">            : parsedQuery instanceof String</span>
+<span class="nc" id="L112">            ? getParsedQuery((String) parsedQuery)</span>
+<span class="nc" id="L113">            : null, null, null));</span>
+
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (ctx().parsed == null)</span>
+<span class="nc" id="L116">            throw new InternalException(parsedQuery + &quot;&quot;);</span>
+<span class="nc" id="L117">    }</span>
+
+    @Override
+    protected Localizer getLocalizer() {
+<span class="nc" id="L121">        return _loc;</span>
+    }
+
+    @Override
+    protected ClassLoader getClassLoader() {
+        // we don't resolve in the context of anything but ourselves
+<span class="nc" id="L127">        return getClass().getClassLoader();</span>
+    }
+
+    protected ParsedJPQL getParsedQuery() {
+<span class="nc" id="L131">        return ctx().parsed;</span>
+    }
+
+    protected ParsedJPQL getParsedQuery(String jpql) {
+<span class="nc" id="L135">        return new ParsedJPQL(jpql);</span>
+    }
+
+    private void setCandidate(ClassMetaData cmd, String schemaAlias) {
+<span class="nc" id="L139">        addAccessPath(cmd);</span>
+
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (cmd != null)</span>
+<span class="nc" id="L142">            ctx().meta = cmd;</span>
+
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (schemaAlias != null)</span>
+<span class="nc" id="L145">            ctx().schemaAlias = schemaAlias;</span>
+<span class="nc" id="L146">    }</span>
+
+    private String nextAlias() {
+<span class="nc" id="L149">        return &quot;jpqlalias&quot; + (++aliasCount);</span>
+    }
+
+    protected ClassMetaData resolveClassMetaData(JPQLNode node) {
+        // handle looking up alias names
+<span class="nc" id="L154">        String schemaName = assertSchemaName(node);</span>
+<span class="nc" id="L155">        ClassMetaData cmd = getClassMetaData(schemaName, false);</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">        if (cmd != null)</span>
+<span class="nc" id="L157">            return cmd;</span>
+
+        // we might be referencing a collection field of a subquery's parent
+<span class="nc bnc" id="L160" title="All 2 branches missed.">        if (isPath(node)) {</span>
+<span class="nc" id="L161">            Path path = getPath(node);</span>
+<span class="nc" id="L162">            FieldMetaData fmd = path.last();</span>
+<span class="nc" id="L163">            cmd = getFieldType(fmd);</span>
+<span class="nc bnc" id="L164" title="All 4 branches missed.">            if (cmd == null &amp;&amp; fmd.isElementCollection())</span>
+<span class="nc" id="L165">                cmd = fmd.getDefiningMetaData();</span>
+<span class="nc" id="L166">            return cmd;</span>
+        }
+
+        // now run again to throw the correct exception
+<span class="nc" id="L170">        return getClassMetaData(schemaName, true);</span>
+    }
+
+    private ClassMetaData getClassMetaData(String alias, boolean assertValid) {
+<span class="nc" id="L174">        ClassLoader loader = getClassLoader();</span>
+<span class="nc" id="L175">        MetaDataRepository repos = resolver.getConfiguration().</span>
+<span class="nc" id="L176">            getMetaDataRepositoryInstance();</span>
+
+        // first check for the alias
+<span class="nc" id="L179">        ClassMetaData cmd = repos.getMetaData(alias, loader, false);</span>
+
+<span class="nc bnc" id="L181" title="All 2 branches missed.">        if (cmd != null)</span>
+<span class="nc" id="L182">            return cmd;</span>
+
+        // now check for the class name; this is not technically permitted
+        // by the JPA spec, but is required in order to be able to execute
+        // JPQL queries from other facades (like JDO) that do not have
+        // the concept of entity names or aliases
+<span class="nc" id="L188">        Class&lt;?&gt; c = resolver.classForName(alias, null);</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        if (c != null)</span>
+<span class="nc" id="L190">            cmd = repos.getMetaData(c, loader, assertValid);</span>
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        else if (assertValid)</span>
+<span class="nc" id="L192">            cmd = repos.getMetaData(alias, loader, false);</span>
+
+<span class="nc bnc" id="L194" title="All 4 branches missed.">        if (cmd == null &amp;&amp; assertValid) {</span>
+<span class="nc" id="L195">            String close = repos.getClosestAliasName(alias);</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">            if (close != null)</span>
+<span class="nc" id="L197">                throw parseException(EX_USER, &quot;not-schema-name-hint&quot;,</span>
+<span class="nc" id="L198">                    new Object[]{ alias, close, repos.getAliasNames() }, null);</span>
+            else
+<span class="nc" id="L200">                throw parseException(EX_USER, &quot;not-schema-name&quot;,</span>
+<span class="nc" id="L201">                    new Object[]{ alias, repos.getAliasNames() }, null);</span>
+        }
+
+<span class="nc" id="L204">        return cmd;</span>
+    }
+
+    private Class&lt;?&gt; getCandidateType() {
+<span class="nc" id="L208">        return getCandidateMetaData().getDescribedType();</span>
+    }
+
+    private ClassMetaData getCandidateMetaData() {
+<span class="nc bnc" id="L212" title="All 2 branches missed.">        if (ctx().meta != null)</span>
+<span class="nc" id="L213">            return ctx().meta;</span>
+
+<span class="nc" id="L215">        ClassMetaData cls = getCandidateMetaData(root());</span>
+<span class="nc bnc" id="L216" title="All 2 branches missed.">        if (cls == null)</span>
+<span class="nc" id="L217">            throw parseException(EX_USER, &quot;not-schema-name&quot;,</span>
+<span class="nc" id="L218">                new Object[]{ root() }, null);</span>
+
+<span class="nc" id="L220">        setCandidate(cls, null);</span>
+<span class="nc" id="L221">        return cls;</span>
+    }
+
+    protected ClassMetaData getCandidateMetaData(JPQLNode node) {
+        // examing the node to find the candidate query
+        // ### this should actually be the primary SELECT instance
+        // resolved against the from variable declarations
+<span class="nc" id="L228">        JPQLNode from = node.findChildByID(JJTFROMITEM, true);</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">        if (from == null) {</span>
+            // OPENJPA-15 allow subquery without a FROMITEM
+<span class="nc bnc" id="L231" title="All 2 branches missed.">            if (node.id == JJTSUBSELECT) {</span>
+<span class="nc" id="L232">                from = node.findChildByID(JJTFROM, true);</span>
+            }
+            else {
+<span class="nc" id="L235">                throw parseException(EX_USER, &quot;no-from-clause&quot;, null, null);</span>
+            }
+        }
+
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        for (int i = 0; i &lt; from.children.length; i++) {</span>
+<span class="nc" id="L240">            JPQLNode n = from.children[i];</span>
+
+<span class="nc bnc" id="L242" title="All 2 branches missed.">            if (n.id == JJTABSTRACTSCHEMANAME) {</span>
+                // we simply return the first abstract schema child
+                // as resolved into a class
+<span class="nc" id="L245">                ClassMetaData cmd = resolveClassMetaData(n);</span>
+
+<span class="nc bnc" id="L247" title="All 2 branches missed.">                if (cmd != null)</span>
+<span class="nc" id="L248">                    return cmd;</span>
+
+                // not a schema: treat it as a class
+<span class="nc" id="L251">                String cls = assertSchemaName(n);</span>
+<span class="nc bnc" id="L252" title="All 2 branches missed.">                if (cls == null)</span>
+<span class="nc" id="L253">                    throw parseException(EX_USER, &quot;not-schema-name&quot;,</span>
+<span class="nc" id="L254">                        new Object[]{ root() }, null);</span>
+
+<span class="nc" id="L256">                return getClassMetaData(cls, true);</span>
+            }
+            // OPENJPA-15 support subquery's from clause do not start with
+            // identification_variable_declaration()
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            if (node.id == JJTSUBSELECT) {</span>
+<span class="nc bnc" id="L261" title="All 2 branches missed.">                if (n.id == JJTINNERJOIN) {</span>
+<span class="nc" id="L262">                    n = n.getChild(0);</span>
+                }
+<span class="nc bnc" id="L264" title="All 2 branches missed.">                if (n.id == JJTPATH) {</span>
+<span class="nc" id="L265">                    Path path = getPath(n);</span>
+<span class="nc" id="L266">                    FieldMetaData fmd = path.last();</span>
+<span class="nc" id="L267">                    ClassMetaData cmd = getFieldType(fmd);</span>
+<span class="nc bnc" id="L268" title="All 4 branches missed.">                    if (cmd == null &amp;&amp; fmd.isElementCollection())</span>
+<span class="nc" id="L269">                        cmd = fmd.getDefiningMetaData();</span>
+<span class="nc bnc" id="L270" title="All 2 branches missed.">                    if (cmd != null) {</span>
+<span class="nc" id="L271">                        return cmd;</span>
+                    }
+                    else {
+<span class="nc" id="L274">                        throw parseException(EX_USER, &quot;no-alias&quot;,</span>
+                                new Object[]{ n }, null);
+                    }
+                }
+            }
+        }
+
+<span class="nc" id="L281">        return null;</span>
+    }
+
+    @Override
+    protected String currentQuery() {
+<span class="nc bnc" id="L286" title="All 4 branches missed.">        return ctx().parsed == null || root().parser == null ? null</span>
+<span class="nc" id="L287">            : root().parser.jpql;</span>
+    }
+
+    QueryExpressions getQueryExpressions() {
+<span class="nc" id="L291">        QueryExpressions exps = new QueryExpressions();</span>
+<span class="nc" id="L292">        exps.setContexts(contexts);</span>
+
+<span class="nc" id="L294">        evalQueryOperation(exps);</span>
+
+<span class="nc" id="L296">        Expression filter = null;</span>
+<span class="nc" id="L297">        Expression from = ctx().from;</span>
+<span class="nc bnc" id="L298" title="All 2 branches missed.">        if (from == null)</span>
+<span class="nc bnc" id="L299" title="All 2 branches missed.">            from = evalFromClause(root().id == JJTSELECT);</span>
+<span class="nc" id="L300">        filter = and(from, filter);</span>
+<span class="nc" id="L301">        filter = and(evalWhereClause(), filter);</span>
+<span class="nc" id="L302">        filter = and(evalSelectClause(exps), filter);</span>
+
+<span class="nc bnc" id="L304" title="All 2 branches missed.">        exps.filter = filter == null ? factory.emptyExpression() : filter;</span>
+
+<span class="nc" id="L306">        evalGroupingClause(exps);</span>
+<span class="nc" id="L307">        evalHavingClause(exps);</span>
+<span class="nc" id="L308">        evalFetchJoins(exps);</span>
+<span class="nc" id="L309">        evalSetClause(exps);</span>
+<span class="nc" id="L310">        evalOrderingClauses(exps);</span>
+
+<span class="nc bnc" id="L312" title="All 2 branches missed.">        if (parameterTypes != null)</span>
+<span class="nc" id="L313">            exps.parameterTypes = parameterTypes;</span>
+
+<span class="nc" id="L315">        exps.accessPath = getAccessPath();</span>
+<span class="nc" id="L316">        exps.hasInExpression = this.hasParameterizedInExpression;</span>
+
+        // verify parameters are consistent.
+<span class="nc" id="L319">        validateParameters();</span>
+
+<span class="nc" id="L321">        return exps;</span>
+    }
+
+    private Expression and(Expression e1, Expression e2) {
+<span class="nc bnc" id="L325" title="All 4 branches missed.">        return e1 == null ? e2 : e2 == null ? e1 : factory.and(e1, e2);</span>
+    }
+
+    private static String assemble(JPQLNode node) {
+<span class="nc" id="L329">        return assemble(node, &quot;.&quot;, 0);</span>
+    }
+
+    /**
+     * Assemble the children of the specific node by appending each
+     * child, separated by the delimiter.
+     */
+    private static String assemble(JPQLNode node, String delimiter, int last) {
+<span class="nc" id="L337">        StringBuilder result = new StringBuilder();</span>
+<span class="nc" id="L338">        JPQLNode[] parts = node.children;</span>
+<span class="nc bnc" id="L339" title="All 4 branches missed.">        for (int i = 0; parts != null &amp;&amp; i &lt; parts.length - last; i++)</span>
+<span class="nc bnc" id="L340" title="All 2 branches missed.">            result.append(result.length() &gt; 0 ? delimiter : &quot;&quot;).</span>
+<span class="nc" id="L341">                append(parts[i].text);</span>
+
+<span class="nc" id="L343">        return result.toString();</span>
+    }
+
+    private Expression assignSubselectProjection(JPQLNode node,
+        QueryExpressions exps) {
+<span class="nc" id="L348">        inAssignSubselectProjection = true;</span>
+<span class="nc" id="L349">        exps.projections = new Value[1];</span>
+<span class="nc" id="L350">        exps.projectionClauses = new String[1];</span>
+<span class="nc" id="L351">        exps.projectionAliases = new String[1];</span>
+
+<span class="nc" id="L353">        Value val = getValue(node);</span>
+<span class="nc" id="L354">        exps.projections[0] = val;</span>
+<span class="nc" id="L355">        exps.projectionClauses[0] =</span>
+<span class="nc bnc" id="L356" title="All 2 branches missed.">            projectionClause(node.id == JJTSCALAREXPRESSION ?</span>
+<span class="nc" id="L357">                firstChild(node) : node);</span>
+<span class="nc" id="L358">        inAssignSubselectProjection = false;</span>
+<span class="nc" id="L359">        return null;</span>
+    }
+
+    /**
+     * Assign projections for NEW contructor in selection list.
+     *     Example:  SELECT NEW Person(p.name) FROM Person p WHERE ...
+     */
+    private Expression assignProjections(JPQLNode parametersNode,
+        QueryExpressions exps, List&lt;Value&gt; projections,
+        List&lt;String&gt; projectionClauses, List&lt;String&gt; projectionAliases) {
+<span class="nc" id="L369">        int count = parametersNode.getChildCount();</span>
+
+<span class="nc" id="L371">        Expression exp = null;</span>
+<span class="nc bnc" id="L372" title="All 2 branches missed.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="nc" id="L373">            JPQLNode parent = parametersNode.getChild(i);</span>
+<span class="nc" id="L374">            JPQLNode node = firstChild(parent);</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">            JPQLNode aliasNode = parent.children.length &gt; 1 ? right(parent)</span>
+<span class="nc" id="L376">                : null;</span>
+<span class="nc" id="L377">            Value proj = getValue(node);</span>
+<span class="nc bnc" id="L378" title="All 2 branches missed.">            String alias = aliasNode != null ? aliasNode.text :</span>
+<span class="nc bnc" id="L379" title="All 2 branches missed.">                projectionClause(node.id == JJTSCALAREXPRESSION ?</span>
+<span class="nc" id="L380">                        firstChild(node) : node);</span>
+<span class="nc bnc" id="L381" title="All 2 branches missed.">            if (aliasNode != null)</span>
+<span class="nc" id="L382">                proj.setAlias(alias);</span>
+<span class="nc" id="L383">            projections.add(proj);</span>
+<span class="nc" id="L384">            projectionClauses.add(alias);</span>
+<span class="nc" id="L385">            projectionAliases.add(alias);</span>
+        }
+<span class="nc" id="L387">        return exp;</span>
+    }
+
+    private void evalProjectionsResultShape(JPQLNode selectionsNode,
+        QueryExpressions exps,
+        List&lt;Value&gt; projections,
+        List&lt;String&gt; projectionClauses,
+        List&lt;String&gt; projectionAliases) {
+<span class="nc" id="L395">        int count = selectionsNode.getChildCount();</span>
+<span class="nc" id="L396">        Class&lt;?&gt; resultClass = null;</span>
+<span class="nc" id="L397">        ResultShape&lt;?&gt; resultShape = null;</span>
+<span class="nc bnc" id="L398" title="All 2 branches missed.">        if (count &gt; 1) {</span>
+            // muti-selection
+<span class="nc" id="L400">            resultClass = Object[].class;</span>
+<span class="nc" id="L401">            resultShape = new ResultShape(resultClass, new FillStrategy.Array&lt;&gt;(Object[].class));</span>
+        }
+
+<span class="nc bnc" id="L404" title="All 2 branches missed.">        for (int i = 0; i &lt; count; i++) {</span>
+<span class="nc" id="L405">            JPQLNode parent = selectionsNode.getChild(i);</span>
+<span class="nc" id="L406">            JPQLNode node = firstChild(parent);</span>
+<span class="nc bnc" id="L407" title="All 2 branches missed.">            if (node.id == JJTCONSTRUCTOR) {</span>
+                // build up the fully-qualified result class name by
+                // appending together the components of the children
+<span class="nc" id="L410">                String resultClassName = assemble(left(node));</span>
+<span class="nc" id="L411">                Class&lt;?&gt; constructor = resolver.classForName(resultClassName, null);</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">                if (constructor == null) {</span>
+                    // try resolve it again using simple name
+<span class="nc" id="L414">                    int n = left(node).getChildCount();</span>
+<span class="nc" id="L415">                    String baseName = left(node).getChild(n-1).text;</span>
+<span class="nc" id="L416">                    constructor = resolver.classForName(baseName, null);</span>
+                }
+
+<span class="nc bnc" id="L419" title="All 4 branches missed.">                if (constructor == null &amp;&amp; resolver.getConfiguration().getUseTCCLinSelectNew()) {</span>
+                    try {
+<span class="nc bnc" id="L421" title="All 2 branches missed.">                        if (System.getSecurityManager() != null) {</span>
+<span class="nc" id="L422">                            constructor = AccessController.doPrivileged(</span>
+<span class="nc" id="L423">                                    J2DoPrivHelper.getForNameAction(resultClassName, false,</span>
+<span class="nc" id="L424">                                        AccessController.doPrivileged(J2DoPrivHelper.getContextClassLoaderAction())));</span>
+                        }
+                        else {
+<span class="nc" id="L427">                            constructor = Thread.currentThread().getContextClassLoader().loadClass(resultClassName);</span>
+                        }
+<span class="nc" id="L429">                    } catch (Exception e) {</span>
+                        // ignore
+<span class="nc" id="L431">                    }</span>
+                }
+
+<span class="nc bnc" id="L434" title="All 2 branches missed.">                if (constructor == null)</span>
+<span class="nc" id="L435">                    throw parseException(EX_USER, &quot;no-constructor&quot;,</span>
+                            new Object[]{ resultClassName }, null);
+
+<span class="nc" id="L438">                List&lt;Value&gt; terms = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L439">                List&lt;String&gt; aliases = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L440">                List&lt;String&gt; clauses = new ArrayList&lt;&gt;();</span>
+                // now assign the arguments to the select clause as the projections
+<span class="nc" id="L442">                assignProjections(right(node), exps, terms, aliases, clauses);</span>
+<span class="nc" id="L443">                FillStrategy fill = new FillStrategy.NewInstance(constructor);</span>
+<span class="nc" id="L444">                ResultShape&lt;?&gt; cons = new ResultShape(constructor, fill);</span>
+<span class="nc bnc" id="L445" title="All 2 branches missed.">                for (Value val : terms) {</span>
+<span class="nc" id="L446">                    Class&lt;?&gt; type = val.getType();</span>
+<span class="nc" id="L447">                    cons.nest(new ResultShape(type, new FillStrategy.Assign(), type.isPrimitive()));</span>
+<span class="nc" id="L448">                }</span>
+<span class="nc bnc" id="L449" title="All 2 branches missed.">                if (count == 1) {</span>
+<span class="nc" id="L450">                    resultClass = constructor;</span>
+<span class="nc" id="L451">                    resultShape = cons;</span>
+                }
+                else
+<span class="nc" id="L454">                    resultShape.nest(cons);</span>
+<span class="nc" id="L455">                projections.addAll(terms);</span>
+<span class="nc" id="L456">                projectionAliases.addAll(aliases);</span>
+<span class="nc" id="L457">                projectionClauses.addAll(clauses);</span>
+
+<span class="nc" id="L459">            } else {</span>
+<span class="nc bnc" id="L460" title="All 2 branches missed.">                JPQLNode aliasNode = parent.children.length &gt; 1 ? right(parent)</span>
+<span class="nc" id="L461">                        : null;</span>
+<span class="nc" id="L462">                Value proj = getValue(node);</span>
+<span class="nc bnc" id="L463" title="All 2 branches missed.">                String alias = aliasNode != null ? aliasNode.text :</span>
+<span class="nc bnc" id="L464" title="All 2 branches missed.">                    projectionClause(node.id == JJTSCALAREXPRESSION ?</span>
+<span class="nc" id="L465">                            firstChild(node) : node);</span>
+<span class="nc bnc" id="L466" title="All 2 branches missed.">                if (aliasNode != null)</span>
+<span class="nc" id="L467">                    proj.setAlias(alias);</span>
+<span class="nc" id="L468">                projections.add(proj);</span>
+<span class="nc" id="L469">                projectionClauses.add(alias);</span>
+<span class="nc" id="L470">                projectionAliases.add(alias);</span>
+<span class="nc" id="L471">                Class&lt;?&gt; type = proj.getType();</span>
+<span class="nc" id="L472">                ResultShape&lt;?&gt; projShape = new ResultShape(type, new FillStrategy.Assign(), type.isPrimitive());</span>
+
+<span class="nc bnc" id="L474" title="All 2 branches missed.">                if (count == 1)</span>
+<span class="nc" id="L475">                    resultShape = projShape;</span>
+                else
+<span class="nc" id="L477">                    resultShape.nest(projShape);</span>
+            }
+        }
+<span class="nc" id="L480">        exps.shape = resultShape;</span>
+<span class="nc" id="L481">        exps.resultClass = resultClass;</span>
+<span class="nc" id="L482">    }</span>
+
+    private String projectionClause(JPQLNode node) {
+<span class="nc bnc" id="L485" title="All 2 branches missed.">        switch (node.id) {</span>
+        case JJTTYPE:
+<span class="nc" id="L487">            return projectionClause(firstChild(node));</span>
+        default:
+<span class="nc" id="L489">            return assemble(node);</span>
+        }
+    }
+
+    private void evalQueryOperation(QueryExpressions exps) {
+        // determine whether we want to select, delete, or update
+<span class="nc bnc" id="L495" title="All 4 branches missed.">        if (root().id == JJTSELECT || root().id == JJTSUBSELECT)</span>
+<span class="nc" id="L496">            exps.operation = QueryOperations.OP_SELECT;</span>
+<span class="nc bnc" id="L497" title="All 2 branches missed.">        else if (root().id == JJTDELETE)</span>
+<span class="nc" id="L498">            exps.operation = QueryOperations.OP_DELETE;</span>
+<span class="nc bnc" id="L499" title="All 2 branches missed.">        else if (root().id == JJTUPDATE)</span>
+<span class="nc" id="L500">            exps.operation = QueryOperations.OP_UPDATE;</span>
+        else
+<span class="nc" id="L502">            throw parseException(EX_UNSUPPORTED, &quot;unrecognized-operation&quot;,</span>
+<span class="nc" id="L503">                new Object[]{ root() }, null);</span>
+<span class="nc" id="L504">    }</span>
+
+    private void evalGroupingClause(QueryExpressions exps) {
+        // handle GROUP BY clauses
+<span class="nc" id="L508">        JPQLNode groupByNode = root().findChildByID(JJTGROUPBY, false);</span>
+
+<span class="nc bnc" id="L510" title="All 2 branches missed.">        if (groupByNode == null)</span>
+<span class="nc" id="L511">            return;</span>
+
+<span class="nc" id="L513">        int groupByCount = groupByNode.getChildCount();</span>
+
+<span class="nc" id="L515">        exps.grouping = new Value[groupByCount];</span>
+
+<span class="nc bnc" id="L517" title="All 2 branches missed.">        for (int i = 0; i &lt; groupByCount; i++) {</span>
+<span class="nc" id="L518">            JPQLNode node = groupByNode.getChild(i);</span>
+<span class="nc" id="L519">            Value val = getValue(node);</span>
+<span class="nc bnc" id="L520" title="All 2 branches missed.">            if (val instanceof Path) {</span>
+<span class="nc" id="L521">                FieldMetaData fmd = ((Path) val).last();</span>
+<span class="nc bnc" id="L522" title="All 6 branches missed.">                if (fmd != null &amp;&amp; fmd.getValue().getTypeMetaData() != null &amp;&amp; fmd.getValue().isEmbedded())</span>
+<span class="nc" id="L523">                    throw parseException(EX_USER, &quot;cant-groupby-embeddable&quot;,</span>
+<span class="nc bnc" id="L524" title="All 2 branches missed.">                        new Object[]{ node.getChildCount() &gt; 1 ? assemble(node) : node.text }, null);</span>
+            }
+<span class="nc" id="L526">            exps.grouping[i] = val;</span>
+        }
+<span class="nc" id="L528">    }</span>
+
+    private void evalHavingClause(QueryExpressions exps) {
+        // handle HAVING clauses
+<span class="nc" id="L532">        JPQLNode havingNode = root().findChildByID(JJTHAVING, false);</span>
+
+<span class="nc bnc" id="L534" title="All 2 branches missed.">        if (havingNode == null)</span>
+<span class="nc" id="L535">            return;</span>
+
+<span class="nc" id="L537">        exps.having = getExpression(onlyChild(havingNode));</span>
+<span class="nc" id="L538">    }</span>
+
+    private void evalOrderingClauses(QueryExpressions exps) {
+        // handle ORDER BY clauses
+<span class="nc" id="L542">        JPQLNode orderby = root().findChildByID(JJTORDERBY, false);</span>
+<span class="nc bnc" id="L543" title="All 2 branches missed.">        if (orderby != null) {</span>
+<span class="nc" id="L544">            int ordercount = orderby.getChildCount();</span>
+<span class="nc" id="L545">            exps.ordering = new Value[ordercount];</span>
+<span class="nc" id="L546">            exps.orderingClauses = new String[ordercount];</span>
+<span class="nc" id="L547">            exps.orderingAliases = new String[ordercount];</span>
+<span class="nc" id="L548">            exps.ascending = new boolean[ordercount];</span>
+<span class="nc bnc" id="L549" title="All 2 branches missed.">            for (int i = 0; i &lt; ordercount; i++) {</span>
+<span class="nc" id="L550">                JPQLNode node = orderby.getChild(i);</span>
+<span class="nc" id="L551">                JPQLNode firstChild = firstChild(node);</span>
+<span class="nc" id="L552">                exps.ordering[i] = getValue(firstChild);</span>
+<span class="nc" id="L553">                exps.orderingClauses[i] = assemble(firstChild);</span>
+<span class="nc" id="L554">                exps.orderingAliases[i] = firstChild.text;</span>
+
+                // ommission of ASC/DESC token implies ascending
+<span class="nc bnc" id="L557" title="All 2 branches missed.">                exps.ascending[i] = node.getChildCount() &lt;= 1 ||</span>
+<span class="nc bnc" id="L558" title="All 2 branches missed.">                    lastChild(node).id == JJTASCENDING ? true : false;</span>
+            }
+            // check if order by select item result alias
+<span class="nc bnc" id="L561" title="All 2 branches missed.">            for (int i = 0; i &lt; ordercount; i++) {</span>
+<span class="nc bnc" id="L562" title="All 2 branches missed.">                if (exps.orderingClauses[i] != null &amp;&amp;</span>
+<span class="nc bnc" id="L563" title="All 2 branches missed.">                    !exps.orderingClauses[i].equals(&quot;&quot;))</span>
+<span class="nc" id="L564">                    continue;</span>
+<span class="nc bnc" id="L565" title="All 2 branches missed.">                for (int j = 0; j &lt; exps.projections.length; j++) {</span>
+<span class="nc bnc" id="L566" title="All 2 branches missed.">                    if (exps.projectionAliases[j].equalsIgnoreCase(</span>
+                        exps.orderingAliases[i])) {
+<span class="nc" id="L568">                        exps.ordering[i] = exps.projections[j];</span>
+<span class="nc" id="L569">                        break;</span>
+                    }
+                }
+            }
+        }
+<span class="nc" id="L574">    }</span>
+
+    private Expression evalSelectClause(QueryExpressions exps) {
+<span class="nc bnc" id="L577" title="All 2 branches missed.">        if (exps.operation != QueryOperations.OP_SELECT)</span>
+<span class="nc" id="L578">            return null;</span>
+
+<span class="nc" id="L580">        JPQLNode selectNode = root();</span>
+
+<span class="nc" id="L582">        JPQLNode selectClause = selectNode.</span>
+<span class="nc" id="L583">            findChildByID(JJTSELECTCLAUSE, false);</span>
+<span class="nc bnc" id="L584" title="All 4 branches missed.">        if (selectClause != null &amp;&amp; selectClause.hasChildID(JJTDISTINCT))</span>
+<span class="nc" id="L585">            exps.distinct = QueryExpressions.DISTINCT_TRUE</span>
+                          | QueryExpressions.DISTINCT_AUTO;
+        else
+<span class="nc" id="L588">            exps.distinct = QueryExpressions.DISTINCT_FALSE;</span>
+
+        // handle SELECT clauses
+<span class="nc" id="L591">        JPQLNode expNode = selectNode.</span>
+<span class="nc" id="L592">        findChildByID(JJTSELECTEXPRESSIONS, true);</span>
+<span class="nc bnc" id="L593" title="All 2 branches missed.">        if (expNode == null) {</span>
+<span class="nc" id="L594">            return null;</span>
+        }
+
+<span class="nc" id="L597">        int selectCount = expNode.getChildCount();</span>
+<span class="nc" id="L598">        JPQLNode selectChild = firstChild(expNode);</span>
+
+<span class="nc bnc" id="L600" title="All 2 branches missed.">        if (selectClause.parent.id == JJTSUBSELECT) {</span>
+<span class="nc" id="L601">            exps.distinct &amp;= ~QueryExpressions.DISTINCT_AUTO;</span>
+<span class="nc" id="L602">            return assignSubselectProjection(onlyChild(selectChild), exps);</span>
+        }
+        // if we are selecting just one thing and that thing is the
+        // schema's alias, then do not treat it as a projection
+<span class="nc bnc" id="L606" title="All 4 branches missed.">        if (selectCount == 1 &amp;&amp; selectChild != null &amp;&amp;</span>
+<span class="nc bnc" id="L607" title="All 2 branches missed.">            selectChild.getChildCount() == 1 &amp;&amp;</span>
+<span class="nc bnc" id="L608" title="All 2 branches missed.">            onlyChild(selectChild) != null) {</span>
+<span class="nc" id="L609">            JPQLNode child = onlyChild(selectChild);</span>
+<span class="nc bnc" id="L610" title="All 2 branches missed.">            if (child.id == JJTSCALAREXPRESSION)</span>
+<span class="nc" id="L611">                child = onlyChild(child);</span>
+<span class="nc bnc" id="L612" title="All 2 branches missed.">            if (assertSchemaAlias().equalsIgnoreCase(child.text)) {</span>
+<span class="nc" id="L613">                return null;</span>
+            }
+        }
+        // JPQL does not filter relational joins for projections
+<span class="nc" id="L617">        exps.distinct &amp;= ~QueryExpressions.DISTINCT_AUTO;</span>
+<span class="nc" id="L618">        exps.projections = new Value[selectCount];</span>
+<span class="nc" id="L619">        List&lt;Value&gt; projections = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L620">        List&lt;String&gt; aliases = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L621">        List&lt;String&gt; clauses = new ArrayList&lt;&gt;();</span>
+<span class="nc" id="L622">        evalProjectionsResultShape(expNode, exps, projections, aliases, clauses);</span>
+<span class="nc" id="L623">        exps.projections = projections.toArray(new Value[projections.size()]);</span>
+<span class="nc" id="L624">        exps.projectionAliases = aliases.toArray(new String[aliases.size()]);</span>
+<span class="nc" id="L625">        exps.projectionClauses = clauses.toArray(new String[clauses.size()]);</span>
+<span class="nc" id="L626">        return null;</span>
+    }
+
+    private String assertSchemaAlias() {
+<span class="nc" id="L630">        String alias = ctx().schemaAlias;</span>
+
+<span class="nc bnc" id="L632" title="All 2 branches missed.">        if (alias == null)</span>
+<span class="nc" id="L633">            throw parseException(EX_USER, &quot;alias-required&quot;,</span>
+<span class="nc" id="L634">                new Object[]{ ctx().meta }, null);</span>
+
+<span class="nc" id="L636">        return alias;</span>
+    }
+
+    protected Expression evalFetchJoins(QueryExpressions exps) {
+<span class="nc" id="L640">        Expression filter = null;</span>
+
+        // handle JOIN FETCH
+<span class="nc" id="L643">        Set&lt;String&gt; joins = null;</span>
+<span class="nc" id="L644">        Set&lt;String&gt; innerJoins = null;</span>
+
+<span class="nc" id="L646">        JPQLNode[] outers = root().findChildrenByID(JJTOUTERFETCHJOIN);</span>
+<span class="nc bnc" id="L647" title="All 4 branches missed.">        for (int i = 0; outers != null &amp;&amp; i &lt; outers.length; i++)</span>
+<span class="nc bnc" id="L648" title="All 2 branches missed.">            (joins == null ? joins = new TreeSet&lt;&gt;() : joins).</span>
+<span class="nc" id="L649">                add(getPath(onlyChild(outers[i])).last().getFullName(false));</span>
+
+<span class="nc" id="L651">        JPQLNode[] inners = root().findChildrenByID(JJTINNERFETCHJOIN);</span>
+<span class="nc bnc" id="L652" title="All 4 branches missed.">        for (int i = 0; inners != null &amp;&amp; i &lt; inners.length; i++) {</span>
+<span class="nc" id="L653">            String path = getPath(onlyChild(inners[i])).last()</span>
+<span class="nc" id="L654">                .getFullName(false);</span>
+<span class="nc bnc" id="L655" title="All 2 branches missed.">            (joins == null ? joins = new TreeSet&lt;&gt;() : joins).add(path);</span>
+<span class="nc bnc" id="L656" title="All 2 branches missed.">            (innerJoins == null</span>
+<span class="nc" id="L657">                    ? innerJoins = new TreeSet&lt;&gt;()</span>
+<span class="nc" id="L658">                    : innerJoins).add(path);</span>
+        }
+
+<span class="nc bnc" id="L661" title="All 2 branches missed.">        if (joins != null)</span>
+<span class="nc" id="L662">            exps.fetchPaths = joins.</span>
+<span class="nc" id="L663">                toArray(new String[joins.size()]);</span>
+<span class="nc bnc" id="L664" title="All 2 branches missed.">        if (innerJoins != null)</span>
+<span class="nc" id="L665">            exps.fetchInnerPaths = innerJoins.</span>
+<span class="nc" id="L666">                toArray(new String[innerJoins.size()]);</span>
+
+<span class="nc" id="L668">        return filter;</span>
+    }
+
+    protected void evalSetClause(QueryExpressions exps) {
+        // handle SET field = value
+<span class="nc" id="L673">        JPQLNode[] nodes = root().findChildrenByID(JJTUPDATEITEM);</span>
+<span class="nc bnc" id="L674" title="All 4 branches missed.">        for (int i = 0; nodes != null &amp;&amp; i &lt; nodes.length; i++) {</span>
+<span class="nc" id="L675">            Path path = getPath(firstChild(nodes[i]));</span>
+<span class="nc bnc" id="L676" title="All 2 branches missed.">            if (path.last().getValue().getEmbeddedMetaData() != null)</span>
+<span class="nc" id="L677">                throw parseException(EX_USER, &quot;cant-bulk-update-embeddable&quot;,</span>
+<span class="nc" id="L678">                        new Object[]{assemble(firstChild(nodes[i]))}, null);</span>
+
+<span class="nc" id="L680">            JPQLNode lastChild = lastChild(nodes[i]);</span>
+<span class="nc bnc" id="L681" title="All 2 branches missed.">            Value val = (lastChild.children == null)</span>
+<span class="nc" id="L682">                      ? null : getValue(onlyChild(lastChild));</span>
+<span class="nc" id="L683">            exps.putUpdate(path, val);</span>
+        }
+<span class="nc" id="L685">    }</span>
+
+    private Expression evalWhereClause() {
+        // evaluate the WHERE clause
+<span class="nc" id="L689">        JPQLNode whereNode = root().findChildByID(JJTWHERE, false);</span>
+<span class="nc bnc" id="L690" title="All 2 branches missed.">        if (whereNode == null)</span>
+<span class="nc" id="L691">            return null;</span>
+<span class="nc" id="L692">        return (Expression) eval(whereNode);</span>
+    }
+
+    private Expression evalFromClause(boolean needsAlias) {
+        // build up the alias map in the FROM clause
+<span class="nc" id="L697">        JPQLNode from = root().findChildByID(JJTFROM, false);</span>
+<span class="nc bnc" id="L698" title="All 2 branches missed.">        if (from == null)</span>
+<span class="nc" id="L699">            throw parseException(EX_USER, &quot;no-from-clause&quot;, null, null);</span>
+<span class="nc" id="L700">        return evalFromClause(from, needsAlias);</span>
+    }
+
+    private Expression evalFromClause(JPQLNode from, boolean needsAlias) {
+<span class="nc" id="L704">        Expression exp = null;</span>
+
+<span class="nc bnc" id="L706" title="All 2 branches missed.">        for (int i = 0; i &lt; from.children.length; i++) {</span>
+<span class="nc" id="L707">            JPQLNode node = from.children[i];</span>
+
+<span class="nc bnc" id="L709" title="All 2 branches missed.">            if (node.id == JJTFROMITEM)</span>
+<span class="nc" id="L710">                exp = evalFromItem(exp, node, needsAlias);</span>
+<span class="nc bnc" id="L711" title="All 2 branches missed.">            else if (node.id == JJTOUTERJOIN)</span>
+<span class="nc" id="L712">                exp = addJoin(node, false, exp);</span>
+<span class="nc bnc" id="L713" title="All 2 branches missed.">            else if (node.id == JJTINNERJOIN)</span>
+<span class="nc" id="L714">                exp = addJoin(node, true, exp);</span>
+<span class="nc bnc" id="L715" title="All 2 branches missed.">            else if (node.id == JJTINNERFETCHJOIN)</span>
+<span class="nc" id="L716">                ; // we handle inner fetch joins in the evalFetchJoins() method</span>
+<span class="nc bnc" id="L717" title="All 2 branches missed.">            else if (node.id == JJTOUTERFETCHJOIN)</span>
+<span class="nc" id="L718">                ; // we handle outer fetch joins in the evalFetchJoins() method</span>
+            else
+<span class="nc" id="L720">                throw parseException(EX_USER, &quot;not-schema-name&quot;,</span>
+                    new Object[]{ node }, null);
+        }
+
+<span class="nc" id="L724">        return exp;</span>
+    }
+
+    private Expression getSubquery(String alias, Path path, Expression exp) {
+<span class="nc" id="L728">        Value var = getVariable(alias, true);</span>
+        // this bind is for validateMapPath to resolve alias
+<span class="nc" id="L730">        Expression bindVar = factory.bindVariable(var, path);</span>
+<span class="nc" id="L731">        FieldMetaData fmd = path.last();</span>
+<span class="nc" id="L732">        ClassMetaData candidate = getFieldType(fmd);</span>
+<span class="nc bnc" id="L733" title="All 4 branches missed.">        if (candidate == null &amp;&amp; fmd.isElementCollection())</span>
+<span class="nc" id="L734">            candidate = fmd.getDefiningMetaData();</span>
+
+<span class="nc" id="L736">        setCandidate(candidate, alias);</span>
+
+<span class="nc" id="L738">        Context subContext = ctx();</span>
+<span class="nc" id="L739">        Subquery subquery = ctx().getSubquery();</span>
+<span class="nc bnc" id="L740" title="All 2 branches missed.">        if (subquery == null){</span>
+<span class="nc" id="L741">            subquery = factory.newSubquery(candidate, true, alias);</span>
+<span class="nc" id="L742">            subContext.setSubquery(subquery);</span>
+        }
+        else {
+<span class="nc" id="L745">            subquery.setSubqAlias(alias);</span>
+        }
+
+<span class="nc" id="L748">        Path subpath = factory.newPath(subquery);</span>
+<span class="nc" id="L749">        subpath.setSchemaAlias(path.getCorrelationVar());</span>
+<span class="nc" id="L750">        subpath.setMetaData(candidate);</span>
+<span class="nc" id="L751">        subquery.setMetaData(candidate);</span>
+<span class="nc bnc" id="L752" title="All 2 branches missed.">        if (fmd.isElementCollection())</span>
+<span class="nc" id="L753">            exp = and(exp, bindVar);</span>
+        else
+<span class="nc" id="L755">            exp = and(exp, factory.equal(path, subpath));</span>
+
+<span class="nc" id="L757">        return exp;</span>
+    }
+
+    /**
+     * Adds a join condition to the given expression.
+     *
+     * @param node the node to check
+     * @param inner whether or not the join should be an inner join
+     * @param exp an existing expression to AND, or null if none
+     * @return the Expression with the join condition added
+     */
+    private Expression addJoin(JPQLNode node, boolean inner, Expression exp) {
+        // the type will be the declared type for the field
+<span class="nc" id="L770">        JPQLNode firstChild = firstChild(node);</span>
+<span class="nc" id="L771">        Path path = null;</span>
+<span class="nc bnc" id="L772" title="All 2 branches missed.">        if (firstChild.id == JJTQUALIFIEDPATH)</span>
+<span class="nc" id="L773">            path = getQualifiedPath(firstChild);</span>
+        else
+<span class="nc" id="L775">            path = getPath(firstChild, false, inner);</span>
+
+<span class="nc bnc" id="L777" title="All 2 branches missed.">        JPQLNode alias = node.getChildCount() &gt;= 2 ? right(node) : null;</span>
+        // OPENJPA-15 support subquery's from clause do not start with
+        // identification_variable_declaration()
+<span class="nc bnc" id="L780" title="All 6 branches missed.">        if (inner &amp;&amp; ctx().getParent() != null &amp;&amp; ctx().schemaAlias == null) {</span>
+<span class="nc" id="L781">            return getSubquery(alias.text, path, exp);</span>
+        }
+
+<span class="nc" id="L784">        return addJoin(path, alias, exp);</span>
+    }
+
+    private Expression addJoin(Path path, JPQLNode aliasNode,
+        Expression exp) {
+<span class="nc" id="L789">        FieldMetaData fmd = path.last();</span>
+
+<span class="nc bnc" id="L791" title="All 2 branches missed.">        if (fmd == null)</span>
+<span class="nc" id="L792">            throw parseException(EX_USER, &quot;path-no-meta&quot;,</span>
+                new Object[]{ path, null }, null);
+
+<span class="nc bnc" id="L795" title="All 2 branches missed.">        String alias = aliasNode != null ? aliasNode.text : nextAlias();</span>
+
+<span class="nc" id="L797">        Value var = getVariable(alias, true);</span>
+<span class="nc" id="L798">        var.setMetaData(getFieldType(fmd));</span>
+
+<span class="nc" id="L800">        Expression join = null;</span>
+
+        // if the variable is already bound, get the var's value and
+        // do a regular contains with that
+<span class="nc" id="L804">        boolean bound = isBound(var);</span>
+<span class="nc bnc" id="L805" title="All 2 branches missed.">        if (bound) {</span>
+<span class="nc" id="L806">            var = getValue(aliasNode, VAR_PATH);</span>
+        } else {
+<span class="nc" id="L808">            bind(var);</span>
+<span class="nc" id="L809">            join = and(join, factory.bindVariable(var, path));</span>
+        }
+
+<span class="nc bnc" id="L812" title="All 2 branches missed.">        if (!fmd.isTypePC()) // multi-valued relation</span>
+        {
+<span class="nc bnc" id="L814" title="All 2 branches missed.">            if (bound)</span>
+<span class="nc" id="L815">                join = and(join, factory.contains(path, var));</span>
+
+<span class="nc" id="L817">            setImplicitContainsTypes(path, var, CONTAINS_TYPE_ELEMENT);</span>
+        }
+
+<span class="nc" id="L820">        return and(exp, join);</span>
+    }
+
+    private Expression evalFromItem(Expression exp, JPQLNode node,
+        boolean needsAlias) {
+<span class="nc" id="L825">        ClassMetaData cmd = resolveClassMetaData(firstChild(node));</span>
+
+<span class="nc" id="L827">        String alias = null;</span>
+
+<span class="nc bnc" id="L829" title="All 2 branches missed.">        if (node.getChildCount() &lt; 2) {</span>
+<span class="nc bnc" id="L830" title="All 2 branches missed.">            if (needsAlias)</span>
+<span class="nc" id="L831">                throw parseException(EX_USER, &quot;alias-required&quot;,</span>
+                    new Object[]{ cmd }, null);
+        } else {
+<span class="nc" id="L834">            alias = right(node).text;</span>
+<span class="nc" id="L835">            JPQLNode left = left(node);</span>
+<span class="nc" id="L836">            addSchemaToContext(alias, cmd);</span>
+
+            // check to see if the we are referring to a path in the from
+            // clause, since we might be in a subquery against a collection
+<span class="nc bnc" id="L840" title="All 2 branches missed.">            if (isPath(left)) {</span>
+<span class="nc" id="L841">                Path path = getPath(left);</span>
+<span class="nc" id="L842">                return getSubquery(alias, path, exp);</span>
+            } else {
+                // we have an alias: bind it as a variable
+<span class="nc" id="L845">                Value var = getVariable(alias, true);</span>
+<span class="nc" id="L846">                var.setMetaData(cmd);</span>
+<span class="nc" id="L847">                bind(var);</span>
+            }
+        }
+
+        // ### we assign the first FROMITEM instance we see as
+        // the global candidate, which is incorrect: we should
+        // instead be mapping this to the SELECTITEM to see
+        // which is the desired candidate
+<span class="nc bnc" id="L855" title="All 2 branches missed.">        if (ctx().schemaAlias == null)</span>
+<span class="nc" id="L856">            setCandidate(cmd, alias);</span>
+        else
+<span class="nc" id="L858">            addAccessPath(cmd);</span>
+
+<span class="nc" id="L860">        return exp;</span>
+    }
+
+    @Override
+    protected boolean isDeclaredVariable(String name) {
+        // JPQL doesn't support declaring variables
+<span class="nc" id="L866">        return false;</span>
+    }
+
+    /**
+     * Check to see if the specific node is a path (vs. a schema name)
+     */
+    boolean isPath(JPQLNode node) {
+<span class="nc bnc" id="L873" title="All 2 branches missed.">        if (node.getChildCount() &lt; 2)</span>
+<span class="nc" id="L874">            return false;</span>
+
+<span class="nc" id="L876">        final String name = firstChild(node).text;</span>
+<span class="nc bnc" id="L877" title="All 2 branches missed.">        if (name == null)</span>
+<span class="nc" id="L878">            return false;</span>
+
+        // handle the case where the class name is the alias
+        // for the candidate (we don't use variables for this)
+<span class="nc bnc" id="L882" title="All 2 branches missed.">        if (getMetaDataForAlias(name) != null)</span>
+<span class="nc" id="L883">            return true;</span>
+
+<span class="nc bnc" id="L885" title="All 2 branches missed.">        if (!isSeenVariable(name))</span>
+<span class="nc" id="L886">            return false;</span>
+
+<span class="nc" id="L888">        final Value var = getVariable(name, false);</span>
+
+<span class="nc bnc" id="L890" title="All 2 branches missed.">        if (var != null)</span>
+<span class="nc" id="L891">            return isBound(var);</span>
+
+<span class="nc" id="L893">        return false;</span>
+    }
+
+    private static ClassMetaData getFieldType(FieldMetaData fmd) {
+<span class="nc bnc" id="L897" title="All 2 branches missed.">        if (fmd == null)</span>
+<span class="nc" id="L898">            return null;</span>
+
+<span class="nc" id="L900">        ClassMetaData cmd = null;</span>
+        ValueMetaData vmd;
+
+<span class="nc bnc" id="L903" title="All 2 branches missed.">        if ((vmd = fmd.getElement()) != null)</span>
+<span class="nc" id="L904">            cmd = vmd.getDeclaredTypeMetaData();</span>
+<span class="nc bnc" id="L905" title="All 2 branches missed.">        else if ((vmd = fmd.getKey()) != null)</span>
+<span class="nc" id="L906">            cmd = vmd.getDeclaredTypeMetaData();</span>
+<span class="nc bnc" id="L907" title="All 2 branches missed.">        else if ((vmd = fmd.getValue()) != null)</span>
+<span class="nc" id="L908">            cmd = vmd.getDeclaredTypeMetaData();</span>
+
+<span class="nc bnc" id="L910" title="All 4 branches missed.">        if (cmd == null || cmd.getDescribedType() == Object.class)</span>
+<span class="nc" id="L911">            cmd = fmd.getDeclaredTypeMetaData();</span>
+
+<span class="nc" id="L913">        return cmd;</span>
+    }
+
+    /**
+     * Identification variables in JPQL are case insensitive, so lower-case
+     * all variables we are going to bind.
+     */
+    @Override
+    protected Value getVariable(String id, boolean bind) {
+<span class="nc bnc" id="L922" title="All 2 branches missed.">        if (id == null)</span>
+<span class="nc" id="L923">            return null;</span>
+
+<span class="nc bnc" id="L925" title="All 4 branches missed.">        if (bind &amp;&amp; getDefinedVariable(id) == null)</span>
+<span class="nc" id="L926">            return createVariable(id, bind);</span>
+
+<span class="nc" id="L928">        return super.getVariable(id.toLowerCase(), bind);</span>
+    }
+
+    protected Value getDefinedVariable(String id) {
+<span class="nc" id="L932">        return ctx().getVariable(id);</span>
+    }
+
+    @Override
+    protected boolean isSeenVariable(String var) {
+<span class="nc" id="L937">        Context c = ctx().findContext(var);</span>
+<span class="nc bnc" id="L938" title="All 2 branches missed.">        if (c != null)</span>
+<span class="nc" id="L939">            return true;</span>
+<span class="nc" id="L940">        return false;</span>
+    }
+
+    /**
+     * Returns the class name using the children of the JPQLNode.
+     */
+    private String assertSchemaName(JPQLNode node) {
+<span class="nc bnc" id="L947" title="All 2 branches missed.">        if (node.id != JJTABSTRACTSCHEMANAME)</span>
+<span class="nc" id="L948">            throw parseException(EX_USER, &quot;not-identifer&quot;,</span>
+                new Object[]{ node }, null);
+
+<span class="nc" id="L951">        return assemble(node);</span>
+    }
+
+    private void checkEmbeddable(Value val) {
+<span class="nc" id="L955">        checkEmbeddable(val, currentQuery());</span>
+<span class="nc" id="L956">    }</span>
+
+    public static void checkEmbeddable(Value val, String currentQuery) {
+<span class="nc bnc" id="L959" title="All 2 branches missed.">        Path path = val instanceof Path ? (Path) val : null;</span>
+<span class="nc bnc" id="L960" title="All 2 branches missed.">        if (path == null)</span>
+<span class="nc" id="L961">            return;</span>
+
+<span class="nc" id="L963">        FieldMetaData fmd = path.last();</span>
+<span class="nc bnc" id="L964" title="All 2 branches missed.">        if (fmd == null)</span>
+<span class="nc" id="L965">            return;</span>
+
+<span class="nc bnc" id="L967" title="All 2 branches missed.">        ValueMetaData vm = fmd.isElementCollection() ? fmd.getElement()</span>
+<span class="nc" id="L968">            : fmd.getValue();</span>
+<span class="nc bnc" id="L969" title="All 2 branches missed.">        if (vm.getEmbeddedMetaData() != null) {</span>
+            //throw parseException(EX_USER, &quot;bad-predicate&quot;,
+            //    new Object[]{ currentQuery() }, null);
+<span class="nc" id="L972">            String argStr = _loc.get(&quot;bad-predicate&quot;,</span>
+<span class="nc" id="L973">                new Object[] {fmd.getName()}).getMessage();</span>
+<span class="nc" id="L974">            Message msg = _loc.get(&quot;parse-error&quot;, argStr, currentQuery);</span>
+<span class="nc" id="L975">            throw new UserException(msg, null);</span>
+        }
+<span class="nc" id="L977">    }</span>
+
+    /**
+     * Recursive helper method to evaluate the given node.
+     */
+    private Object eval(JPQLNode node) {
+<span class="nc" id="L983">        Value val1 = null;</span>
+<span class="nc" id="L984">        Value val2 = null;</span>
+<span class="nc" id="L985">        Value val3 = null;</span>
+
+<span class="nc" id="L987">        boolean not = node.not;</span>
+
+<span class="nc bnc" id="L989" title="All 78 branches missed.">        switch (node.id) {</span>
+            case JJTSCALAREXPRESSION:
+<span class="nc" id="L991">                return eval(onlyChild(node));</span>
+
+            case JJTTYPE:
+<span class="nc" id="L994">                return getType(onlyChild(node));</span>
+
+            case JJTTYPELITERAL:
+<span class="nc" id="L997">                return getTypeLiteral(node);</span>
+
+            case JJTCLASSNAME:
+<span class="nc" id="L1000">                return getPathOrConstant(node);</span>
+
+            case JJTCASE:
+<span class="nc" id="L1003">                return eval(onlyChild(node));</span>
+
+            case JJTSIMPLECASE:
+<span class="nc" id="L1006">                return getSimpleCaseExpression(node);</span>
+
+            case JJTGENERALCASE:
+<span class="nc" id="L1009">                return getGeneralCaseExpression(node);</span>
+
+            case JJTWHEN:
+<span class="nc" id="L1012">                return getWhenCondition(node);</span>
+
+            case JJTWHENSCALAR:
+<span class="nc" id="L1015">                return getWhenScalar(node);</span>
+
+            case JJTCOALESCE:
+<span class="nc" id="L1018">                return getCoalesceExpression(node);</span>
+
+            case JJTNULLIF:
+<span class="nc" id="L1021">                return getNullIfExpression(node);</span>
+
+            case JJTWHERE: // top-level WHERE clause
+<span class="nc" id="L1024">                return getExpression(onlyChild(node));</span>
+
+            case JJTBOOLEANLITERAL:
+<span class="nc" id="L1027">                return factory.newLiteral(&quot;true&quot;.equalsIgnoreCase</span>
+<span class="nc bnc" id="L1028" title="All 2 branches missed.">                    (node.text) ? Boolean.TRUE : Boolean.FALSE,</span>
+                    Literal.TYPE_BOOLEAN);
+
+            case JJTINTEGERLITERAL:
+                // use BigDecimal because it can handle parsing exponents
+<span class="nc" id="L1033">                BigDecimal intlit = new BigDecimal</span>
+<span class="nc bnc" id="L1034" title="All 4 branches missed.">                    (node.text.endsWith(&quot;l&quot;) || node.text.endsWith(&quot;L&quot;)</span>
+<span class="nc" id="L1035">                        ? node.text.substring(0, node.text.length() - 1)</span>
+<span class="nc" id="L1036">                        : node.text).</span>
+<span class="nc" id="L1037">                    multiply(new BigDecimal(negative(node)));</span>
+<span class="nc" id="L1038">                return factory.newLiteral(Long.valueOf(intlit.longValue()),</span>
+                    Literal.TYPE_NUMBER);
+
+            case JJTDECIMALLITERAL:
+<span class="nc" id="L1042">                BigDecimal declit = new BigDecimal</span>
+<span class="nc bnc" id="L1043" title="All 4 branches missed.">                    (node.text.endsWith(&quot;d&quot;) || node.text.endsWith(&quot;D&quot;) ||</span>
+<span class="nc bnc" id="L1044" title="All 4 branches missed.">                        node.text.endsWith(&quot;f&quot;) || node.text.endsWith(&quot;F&quot;)</span>
+<span class="nc" id="L1045">                        ? node.text.substring(0, node.text.length() - 1)</span>
+<span class="nc" id="L1046">                        : node.text).</span>
+<span class="nc" id="L1047">                    multiply(new BigDecimal(negative(node)));</span>
+<span class="nc" id="L1048">                return factory.newLiteral(declit, Literal.TYPE_NUMBER);</span>
+
+            case JJTSTRINGLITERAL:
+            case JJTTRIMCHARACTER:
+            case JJTESCAPECHARACTER:
+<span class="nc" id="L1053">                return factory.newLiteral(trimQuotes(node.text),</span>
+                    Literal.TYPE_SQ_STRING);
+
+            case JJTSTRINGLITERAL2:
+<span class="nc" id="L1057">                return factory.newLiteral(trimDoubleQuotes(node.text),</span>
+                    Literal.TYPE_SQ_STRING);
+
+            case JJTPATTERNVALUE:
+<span class="nc" id="L1061">                return eval(firstChild(node));</span>
+
+            case JJTNAMEDINPUTPARAMETER:
+<span class="nc" id="L1064">                return getParameter(onlyChild(node).text, false, false);</span>
+
+            case JJTPOSITIONALINPUTPARAMETER:
+<span class="nc" id="L1067">                return getParameter(node.text, true, false);</span>
+
+            case JJTCOLLECTIONPARAMETER:
+<span class="nc" id="L1070">                JPQLNode child = onlyChild(node);</span>
+<span class="nc bnc" id="L1071" title="All 2 branches missed.">                boolean positional = child.id == JJTPOSITIONALINPUTPARAMETER;</span>
+<span class="nc bnc" id="L1072" title="All 2 branches missed.">                if (!positional)</span>
+<span class="nc" id="L1073">                    child = onlyChild(child);</span>
+<span class="nc" id="L1074">                return getParameter(child.text,</span>
+                    positional, true);
+
+            case JJTOR: // x OR y
+<span class="nc" id="L1078">                return factory.or(getExpression(left(node)),</span>
+<span class="nc" id="L1079">                    getExpression(right(node)));</span>
+
+            case JJTAND: // x AND y
+<span class="nc" id="L1082">                return and(getExpression(left(node)),</span>
+<span class="nc" id="L1083">                    getExpression(right(node)));</span>
+
+            case JJTEQUALS: // x = y
+<span class="nc" id="L1086">                val1 = getValue(left(node));</span>
+<span class="nc" id="L1087">                val2 = getValue(right(node));</span>
+<span class="nc" id="L1088">                setImplicitTypes(val1, val2, null);</span>
+<span class="nc" id="L1089">                return factory.equal(val1, val2);</span>
+
+            case JJTNOTEQUALS: // x &lt;&gt; y
+<span class="nc" id="L1092">                val1 = getValue(left(node));</span>
+<span class="nc" id="L1093">                val2 = getValue(right(node));</span>
+<span class="nc" id="L1094">                setImplicitTypes(val1, val2, null);</span>
+<span class="nc" id="L1095">                return factory.notEqual(val1, val2);</span>
+
+            case JJTLESSTHAN: // x &lt; y
+<span class="nc" id="L1098">                val1 = getValue(left(node));</span>
+<span class="nc" id="L1099">                val2 = getValue(right(node));</span>
+<span class="nc" id="L1100">                setImplicitTypes(val1, val2, null);</span>
+<span class="nc" id="L1101">                return factory.lessThan(val1, val2);</span>
+
+            case JJTLESSOREQUAL: // x &lt;= y
+<span class="nc" id="L1104">                val1 = getValue(left(node));</span>
+<span class="nc" id="L1105">                val2 = getValue(right(node));</span>
+<span class="nc" id="L1106">                setImplicitTypes(val1, val2, null);</span>
+<span class="nc" id="L1107">                return factory.lessThanEqual(val1, val2);</span>
+
+            case JJTGREATERTHAN: // x &gt; y
+<span class="nc" id="L1110">                val1 = getValue(left(node));</span>
+<span class="nc" id="L1111">                val2 = getValue(right(node));</span>
+<span class="nc" id="L1112">                setImplicitTypes(val1, val2, null);</span>
+<span class="nc" id="L1113">                return factory.greaterThan(val1, val2);</span>
+
+            case JJTGREATEROREQUAL: // x &gt;= y
+<span class="nc" id="L1116">                val1 = getValue(left(node));</span>
+<span class="nc" id="L1117">                val2 = getValue(right(node));</span>
+<span class="nc" id="L1118">                setImplicitTypes(val1, val2, null);</span>
+<span class="nc" id="L1119">                return factory.greaterThanEqual(val1, val2);</span>
+
+            case JJTADD: // x + y
+<span class="nc" id="L1122">                val1 = getValue(left(node));</span>
+<span class="nc" id="L1123">                val2 = getValue(right(node));</span>
+<span class="nc" id="L1124">                setImplicitTypes(val1, val2, TYPE_NUMBER);</span>
+<span class="nc" id="L1125">                return factory.add(val1, val2);</span>
+
+            case JJTSUBTRACT: // x - y
+<span class="nc" id="L1128">                val1 = getValue(left(node));</span>
+<span class="nc" id="L1129">                val2 = getValue(right(node));</span>
+<span class="nc" id="L1130">                setImplicitTypes(val1, val2, TYPE_NUMBER);</span>
+<span class="nc" id="L1131">                return factory.subtract(val1, val2);</span>
+
+            case JJTMULTIPLY: // x * y
+<span class="nc" id="L1134">                val1 = getValue(left(node));</span>
+<span class="nc" id="L1135">                val2 = getValue(right(node));</span>
+<span class="nc" id="L1136">                setImplicitTypes(val1, val2, TYPE_NUMBER);</span>
+<span class="nc" id="L1137">                return factory.multiply(val1, val2);</span>
+
+            case JJTDIVIDE: // x / y
+<span class="nc" id="L1140">                val1 = getValue(left(node));</span>
+<span class="nc" id="L1141">                val2 = getValue(right(node));</span>
+<span class="nc" id="L1142">                setImplicitTypes(val1, val2, TYPE_NUMBER);</span>
+<span class="nc" id="L1143">                return factory.divide(val1, val2);</span>
+
+            case JJTBETWEEN: // x.field [NOT] BETWEEN 5 AND 10
+<span class="nc" id="L1146">                val1 = getValue(child(node, 0, 3));</span>
+<span class="nc" id="L1147">                val2 = getValue(child(node, 1, 3));</span>
+<span class="nc" id="L1148">                val3 = getValue(child(node, 2, 3));</span>
+<span class="nc" id="L1149">                setImplicitTypes(val1, val2, null);</span>
+<span class="nc" id="L1150">                setImplicitTypes(val1, val3, null);</span>
+<span class="nc" id="L1151">                return evalNot(not, and(factory.greaterThanEqual(val1, val2),</span>
+<span class="nc" id="L1152">                    factory.lessThanEqual(val1, val3)));</span>
+
+            case JJTIN: // x.field [NOT] IN ('a', 'b', 'c')
+                        // TYPE(x...) [NOT] IN (entityTypeLiteral1,...)
+<span class="nc" id="L1156">                Expression inExp = null;</span>
+<span class="nc" id="L1157">                Iterator&lt;JPQLNode&gt; inIterator = node.iterator();</span>
+                // the first child is the path
+<span class="nc" id="L1159">                JPQLNode first = inIterator.next();</span>
+<span class="nc" id="L1160">                val1 = getValue(first);</span>
+<span class="nc bnc" id="L1161" title="All 2 branches missed.">                while (inIterator.hasNext()) {</span>
+<span class="nc" id="L1162">                    JPQLNode next = inIterator.next();</span>
+<span class="nc bnc" id="L1163" title="All 4 branches missed.">                    if (first.id == JJTTYPE &amp;&amp; next.id == JJTTYPELITERAL)</span>
+<span class="nc" id="L1164">                        val2 = getTypeLiteral(next);</span>
+                    else
+<span class="nc" id="L1166">                        val2 = getValue(next);</span>
+<span class="nc bnc" id="L1167" title="All 2 branches missed.">                    if (val2 instanceof Parameter) {</span>
+<span class="nc" id="L1168">                        hasParameterizedInExpression = true;</span>
+                    }
+                    // special case for &lt;value&gt; IN (&lt;subquery&gt;) or
+                    // &lt;value&gt; IN (&lt;single value&gt;)
+<span class="nc bnc" id="L1172" title="All 2 branches missed.">                    if (useContains(not, val1, val2, node))</span>
+<span class="nc" id="L1173">                        return evalNot(not, factory.contains(val2, val1));</span>
+
+                    // this is currently a sequence of OR expressions, since we
+                    // do not have support for IN expressions
+<span class="nc" id="L1177">                    setImplicitTypes(val1, val2, null);</span>
+<span class="nc bnc" id="L1178" title="All 4 branches missed.">                    if (isVerticalTypeInExpr(val1, node) &amp;&amp; not) {</span>
+<span class="nc bnc" id="L1179" title="All 2 branches missed.">                        if (inExp == null)</span>
+<span class="nc" id="L1180">                            inExp = factory.notEqual(val1, val2);</span>
+                        else
+<span class="nc" id="L1182">                            inExp = factory.and(inExp, factory.notEqual(val1, val2));</span>
+                    } else {
+<span class="nc bnc" id="L1184" title="All 2 branches missed.">                        if (inExp == null)</span>
+<span class="nc" id="L1185">                            inExp = factory.equal(val1, val2);</span>
+                        else
+<span class="nc" id="L1187">                            inExp = factory.or(inExp, factory.equal(val1, val2));</span>
+                    }
+<span class="nc" id="L1189">                }</span>
+
+
+                // we additionally need to add in a &quot;NOT NULL&quot; clause, since
+                // the IN behavior that is expected by the CTS also expects
+                // to filter our NULLs
+<span class="nc bnc" id="L1195" title="All 2 branches missed.">                if (isVerticalTypeInExpr(val1, node))</span>
+<span class="nc" id="L1196">                    return inExp;</span>
+                else
+<span class="nc" id="L1198">                    return and(evalNot(not, inExp),</span>
+<span class="nc" id="L1199">                            factory.notEqual(val1, factory.getNull()));</span>
+
+            case JJTISNULL: // x.field IS [NOT] NULL
+<span class="nc" id="L1202">                val1 = getValue(onlyChild(node));</span>
+<span class="nc" id="L1203">                checkEmbeddable(val1);</span>
+<span class="nc bnc" id="L1204" title="All 2 branches missed.">                if (not)</span>
+<span class="nc" id="L1205">                    return factory.notEqual</span>
+<span class="nc" id="L1206">                        (val1, factory.getNull());</span>
+                else
+<span class="nc" id="L1208">                    return factory.equal</span>
+<span class="nc" id="L1209">                        (val1, factory.getNull());</span>
+
+            case JJTPATH:
+<span class="nc" id="L1212">                return getPathOrConstant(node);</span>
+
+            case JJTIDENTIFIER:
+            case JJTIDENTIFICATIONVARIABLE:
+<span class="nc" id="L1216">                return getIdentifier(node);</span>
+
+            case JJTQUALIFIEDPATH:
+<span class="nc" id="L1219">                return getQualifiedPath(node);</span>
+
+            case JJTQUALIFIEDIDENTIFIER:
+                // KEY(e), VALUE(e), ENTRY(e)
+<span class="nc" id="L1223">                return getQualifiedIdentifier(node);</span>
+
+            case JJTGENERALIDENTIFIER:
+                // KEY(e), VALUE(e)
+<span class="nc bnc" id="L1227" title="All 4 branches missed.">                if (node.parent.parent.id == JJTWHERE || node.parent.id == JJTGROUPBY)</span>
+<span class="nc" id="L1228">                    return getGeneralIdentifier(onlyChild(node), true);</span>
+<span class="nc" id="L1229">                return getQualifiedIdentifier(onlyChild(node));</span>
+
+            case JJTNOT:
+<span class="nc" id="L1232">                return factory.not(getExpression(onlyChild(node)));</span>
+
+            case JJTLIKE: // field LIKE '%someval%'
+<span class="nc" id="L1235">                val1 = getValue(left(node));</span>
+<span class="nc" id="L1236">                val2 = getValue(right(node));</span>
+
+<span class="nc" id="L1238">                setImplicitType(val1, TYPE_STRING);</span>
+<span class="nc" id="L1239">                setImplicitType(val2, TYPE_STRING);</span>
+
+                // look for an escape character beneath the node
+<span class="nc" id="L1242">                String escape = null;</span>
+<span class="nc" id="L1243">                JPQLNode escapeNode = right(node).</span>
+<span class="nc" id="L1244">                    findChildByID(JJTESCAPECHARACTER, true);</span>
+<span class="nc bnc" id="L1245" title="All 2 branches missed.">                if (escapeNode != null)</span>
+<span class="nc" id="L1246">                    escape = trimQuotes(onlyChild(escapeNode).text);</span>
+
+<span class="nc bnc" id="L1248" title="All 2 branches missed.">                if (not)</span>
+<span class="nc" id="L1249">                    return factory.notMatches(val1, val2, &quot;_&quot;, &quot;%&quot;, escape);</span>
+                else
+<span class="nc" id="L1251">                    return factory.matches(val1, val2, &quot;_&quot;, &quot;%&quot;, escape);</span>
+
+            case JJTISEMPTY:
+<span class="nc" id="L1254">                return evalNot(not,</span>
+<span class="nc" id="L1255">                    factory.isEmpty(getValue(onlyChild(node))));</span>
+
+            case JJTSIZE:
+<span class="nc" id="L1258">                return factory.size(getValue(onlyChild(node)));</span>
+
+            case JJTINDEX:
+<span class="nc" id="L1261">                return factory.index(getValue(onlyChild(node)));</span>
+
+            case JJTUPPER:
+<span class="nc" id="L1264">                val1 = getValue(onlyChild(node));</span>
+<span class="nc" id="L1265">                setImplicitType(val1, TYPE_STRING);</span>
+<span class="nc" id="L1266">                return factory.toUpperCase(val1);</span>
+
+            case JJTLOWER:
+<span class="nc" id="L1269">                return factory.toLowerCase(getStringValue(onlyChild(node)));</span>
+
+            case JJTLENGTH:
+<span class="nc" id="L1272">                return factory.stringLength(getStringValue(onlyChild(node)));</span>
+
+            case JJTABS:
+<span class="nc" id="L1275">                return factory.abs(getNumberValue(onlyChild(node)));</span>
+
+            case JJTSQRT:
+<span class="nc" id="L1278">                return factory.sqrt(getNumberValue(onlyChild(node)));</span>
+
+            case JJTMOD:
+<span class="nc" id="L1281">                val1 = getValue(left(node));</span>
+<span class="nc" id="L1282">                val2 = getValue(right(node));</span>
+<span class="nc" id="L1283">                setImplicitTypes(val1, val2, TYPE_NUMBER);</span>
+<span class="nc" id="L1284">                return factory.mod(val1, val2);</span>
+
+            case JJTTRIM: // TRIM([[where] [char] FROM] field)
+<span class="nc" id="L1287">                val1 = getValue(lastChild(node));</span>
+<span class="nc" id="L1288">                setImplicitType(val1, TYPE_STRING);</span>
+
+<span class="nc" id="L1290">                Boolean trimWhere = null;</span>
+
+<span class="nc" id="L1292">                JPQLNode firstTrimChild = firstChild(node);</span>
+
+<span class="nc bnc" id="L1294" title="All 2 branches missed.">                if (node.getChildCount() &gt; 1) {</span>
+                    trimWhere =
+<span class="nc bnc" id="L1296" title="All 2 branches missed.">                        firstTrimChild.id == JJTTRIMLEADING ? Boolean.TRUE</span>
+                            :
+<span class="nc bnc" id="L1298" title="All 2 branches missed.">                            firstTrimChild.id == JJTTRIMTRAILING ? Boolean.FALSE</span>
+<span class="nc" id="L1299">                                : null;</span>
+                }
+
+                Value trimChar;
+
+                // if there are 3 children, then we know the trim
+                // char is the second node
+<span class="nc bnc" id="L1306" title="All 2 branches missed.">                if (node.getChildCount() == 3)</span>
+<span class="nc" id="L1307">                    trimChar = getValue(secondChild(node));</span>
+                    // if there are two children, then we need to check to see
+                    // if the first child is a leading/trailing/both node,
+                    // or the trim character node
+<span class="nc bnc" id="L1311" title="All 8 branches missed.">                else if (node.getChildCount() == 2</span>
+                    &amp;&amp; firstTrimChild.id != JJTTRIMLEADING
+                    &amp;&amp; firstTrimChild.id != JJTTRIMTRAILING
+                    &amp;&amp; firstTrimChild.id != JJTTRIMBOTH)
+<span class="nc" id="L1315">                    trimChar = getValue(firstChild(node));</span>
+                    // othwerwise, we default to trimming the space character
+                else
+<span class="nc" id="L1318">                    trimChar = factory.newLiteral(&quot; &quot;, Literal.TYPE_STRING);</span>
+
+<span class="nc" id="L1320">                return factory.trim(val1, trimChar, trimWhere);</span>
+
+            case JJTCONCAT:
+<span class="nc bnc" id="L1323" title="All 2 branches missed.">                if (node.children.length &lt; 2)</span>
+<span class="nc" id="L1324">                	throw parseException(EX_USER, &quot;less-child-count&quot;,</span>
+<span class="nc" id="L1325">                        new Object[]{ Integer.valueOf(2), node,</span>
+<span class="nc" id="L1326">                            Arrays.asList(node.children) }, null);</span>
+
+<span class="nc" id="L1328">                val1 = getValue(firstChild(node));</span>
+<span class="nc" id="L1329">                val2 = getValue(secondChild(node));</span>
+<span class="nc" id="L1330">                setImplicitType(val1, TYPE_STRING);</span>
+<span class="nc" id="L1331">                setImplicitType(val2, TYPE_STRING);</span>
+<span class="nc" id="L1332">                Value concat = factory.concat(val1, val2);</span>
+<span class="nc bnc" id="L1333" title="All 2 branches missed.">                for (int i = 2; i &lt; node.children.length; i++) {</span>
+<span class="nc" id="L1334">                	val2 = getValue(node.children[i]);</span>
+<span class="nc" id="L1335">                    setImplicitType(val2, TYPE_STRING);</span>
+<span class="nc" id="L1336">                	concat = factory.concat(concat, val2);</span>
+                }
+<span class="nc" id="L1338">                return concat;</span>
+
+            case JJTSUBSTRING:
+                // Literals are forced to be Integers because PostgreSQL rejects Longs in SUBSTRING parameters.
+                // This however does not help if an expression like 1+1 is passed as parameter.
+<span class="nc" id="L1343">                val1 = getValue(firstChild(node));</span>
+<span class="nc" id="L1344">                JPQLNode child2 = secondChild(node);</span>
+<span class="nc bnc" id="L1345" title="All 2 branches missed.">                if (child2.id == JJTINTEGERLITERAL) {</span>
+<span class="nc" id="L1346">                    val2 = getIntegerValue(child2);</span>
+                } else {
+<span class="nc" id="L1348">                    val2 = getValue(child2);</span>
+                }
+<span class="nc bnc" id="L1350" title="All 2 branches missed.">                if (node.getChildCount() == 3) {</span>
+<span class="nc" id="L1351">                    JPQLNode child3 = thirdChild(node);</span>
+<span class="nc bnc" id="L1352" title="All 2 branches missed.">                    if (child3.id == JJTINTEGERLITERAL) {</span>
+<span class="nc" id="L1353">                        val3 = getIntegerValue(child3);</span>
+                    } else {
+<span class="nc" id="L1355">                        val3 = getValue(child3);</span>
+                    }
+                }
+<span class="nc" id="L1358">                setImplicitType(val1, TYPE_STRING);</span>
+<span class="nc" id="L1359">                setImplicitType(val2, Integer.TYPE);</span>
+<span class="nc bnc" id="L1360" title="All 2 branches missed.">                if (node.children.length == 3)</span>
+<span class="nc" id="L1361">                    setImplicitType(val3, Integer.TYPE);</span>
+
+<span class="nc" id="L1363">                return convertSubstringArguments(factory, val1, val2, val3);</span>
+
+            case JJTLOCATE:
+<span class="nc" id="L1366">                Value locatePath = getValue(firstChild(node));</span>
+<span class="nc" id="L1367">                Value locateSearch = getValue(secondChild(node));</span>
+<span class="nc" id="L1368">                Value locateFromIndex = null;</span>
+                // Literals are forced to be Integers because PostgreSQL rejects Longs in POSITION parameters.
+                // This however does not help if an expression like 1+1 is passed as parameter.
+<span class="nc bnc" id="L1371" title="All 2 branches missed.">                if (node.getChildCount() &gt; 2) { // optional start index arg</span>
+<span class="nc" id="L1372">                    JPQLNode child3 = thirdChild(node);</span>
+<span class="nc bnc" id="L1373" title="All 2 branches missed.">                    if (child3.id == JJTINTEGERLITERAL) {</span>
+<span class="nc" id="L1374">                        locateFromIndex = getIntegerValue(child3);</span>
+                    } else
+<span class="nc" id="L1376">                        locateFromIndex = getValue(child3);</span>
+                }
+<span class="nc" id="L1378">                setImplicitType(locatePath, TYPE_STRING);</span>
+<span class="nc" id="L1379">                setImplicitType(locateSearch, TYPE_STRING);</span>
+
+<span class="nc bnc" id="L1381" title="All 2 branches missed.">                if (locateFromIndex != null)</span>
+<span class="nc" id="L1382">                    setImplicitType(locateFromIndex, Integer.TYPE);</span>
+
+<span class="nc" id="L1384">                return factory.indexOf(locateSearch,</span>
+<span class="nc bnc" id="L1385" title="All 2 branches missed.">                    locateFromIndex == null ? locatePath</span>
+<span class="nc" id="L1386">                        : factory.newArgumentList(locatePath, locateFromIndex));</span>
+
+            case JJTAGGREGATE:
+                // simply pass-through while asserting a single child
+<span class="nc" id="L1390">                return eval(onlyChild(node));</span>
+
+            case JJTCOUNT:
+<span class="nc" id="L1393">                JPQLNode c = lastChild(node);</span>
+<span class="nc bnc" id="L1394" title="All 2 branches missed.">                if (c.id == JJTIDENTIFIER)</span>
+                    // count(e)
+<span class="nc" id="L1396">                    return factory.count(getPath(node, false, true));</span>
+<span class="nc" id="L1397">                return factory.count(getValue(c));</span>
+
+            case JJTMAX:
+<span class="nc" id="L1400">                return factory.max(getNumberValue(onlyChild(node)));</span>
+
+            case JJTMIN:
+<span class="nc" id="L1403">                return factory.min(getNumberValue(onlyChild(node)));</span>
+
+            case JJTSUM:
+<span class="nc" id="L1406">                return factory.sum(getNumberValue(onlyChild(node)));</span>
+
+            case JJTAVERAGE:
+<span class="nc" id="L1409">                return factory.avg(getNumberValue(onlyChild(node)));</span>
+
+            case JJTDISTINCTPATH:
+<span class="nc" id="L1412">                return factory.distinct(getValue(onlyChild(node)));</span>
+
+            case JJTEXISTS:
+<span class="nc" id="L1415">                return factory.isNotEmpty((Value) eval(onlyChild(node)));</span>
+
+            case JJTANY:
+<span class="nc" id="L1418">                return factory.any((Value) eval(onlyChild(node)));</span>
+
+            case JJTALL:
+<span class="nc" id="L1421">                return factory.all((Value) eval(onlyChild(node)));</span>
+
+            case JJTSUBSELECT:
+<span class="nc" id="L1424">                return getSubquery(node);</span>
+
+            case JJTMEMBEROF:
+<span class="nc" id="L1427">                val1 = getValue(left(node), VAR_PATH);</span>
+<span class="nc" id="L1428">                val2 = getValue(right(node), VAR_PATH);</span>
+<span class="nc" id="L1429">                checkEmbeddable(val2);</span>
+<span class="nc" id="L1430">                setImplicitContainsTypes(val2, val1, CONTAINS_TYPE_ELEMENT);</span>
+<span class="nc" id="L1431">                return evalNot(not, factory.contains(val2, val1));</span>
+
+            case JJTCURRENTDATE:
+<span class="nc" id="L1434">                return factory.getCurrentDate(Date.class);</span>
+
+            case JJTCURRENTTIME:
+<span class="nc" id="L1437">                return factory.getCurrentTime(Time.class);</span>
+
+            case JJTCURRENTTIMESTAMP:
+<span class="nc" id="L1440">                return factory.getCurrentTimestamp(Timestamp.class);</span>
+
+            case JJTSELECTEXTENSION:
+<span class="nc" id="L1443">                assertQueryExtensions(&quot;SELECT&quot;);</span>
+<span class="nc" id="L1444">                return eval(onlyChild(node));</span>
+
+            case JJTGROUPBYEXTENSION:
+<span class="nc" id="L1447">                assertQueryExtensions(&quot;GROUP BY&quot;);</span>
+<span class="nc" id="L1448">                return eval(onlyChild(node));</span>
+
+            case JJTORDERBYEXTENSION:
+<span class="nc" id="L1451">                assertQueryExtensions(&quot;ORDER BY&quot;);</span>
+<span class="nc" id="L1452">                return eval(onlyChild(node));</span>
+
+            case JJTDATELITERAL:
+<span class="nc" id="L1455">                return factory.newLiteral(node.text, Literal.TYPE_DATE);</span>
+
+            case JJTTIMELITERAL:
+<span class="nc" id="L1458">                return factory.newLiteral(node.text, Literal.TYPE_TIME);</span>
+
+            case JJTTIMESTAMPLITERAL:
+<span class="nc" id="L1461">                return factory.newLiteral(node.text, Literal.TYPE_TIMESTAMP);</span>
+
+            default:
+<span class="nc" id="L1464">                throw parseException(EX_FATAL, &quot;bad-tree&quot;,</span>
+                    new Object[]{ node }, null);
+        }
+    }
+
+    private boolean useContains(boolean not, Value val1, Value val2, JPQLNode node) {
+<span class="nc bnc" id="L1470" title="All 4 branches missed.">        if (isVerticalTypeInExpr(val1, node) &amp;&amp; not)</span>
+<span class="nc" id="L1471">            return false;</span>
+        else
+<span class="nc bnc" id="L1473" title="All 4 branches missed.">            return (!(val2 instanceof Literal) &amp;&amp; node.getChildCount() == 2);</span>
+    }
+
+    private boolean isVerticalTypeInExpr(Value val, JPQLNode node) {
+<span class="nc bnc" id="L1477" title="All 2 branches missed.">        if (node.id != JJTIN)</span>
+<span class="nc" id="L1478">            return false;</span>
+<span class="nc" id="L1479">        return factory.isVerticalType(val);</span>
+    }
+
+    private Value getIntegerValue(JPQLNode node) {
+<span class="nc" id="L1483">        BigDecimal bigdec = new BigDecimal</span>
+<span class="nc bnc" id="L1484" title="All 4 branches missed.">        (node.text.endsWith(&quot;l&quot;) || node.text.endsWith(&quot;L&quot;)</span>
+<span class="nc" id="L1485">            ? node.text.substring(0, node.text.length() - 1)</span>
+<span class="nc" id="L1486">            : node.text).</span>
+<span class="nc" id="L1487">        multiply(new BigDecimal(negative(node)));</span>
+<span class="nc" id="L1488">        return factory.newLiteral(Integer.valueOf(bigdec.intValue()),</span>
+                Literal.TYPE_NUMBER);
+    }
+
+    /**
+     * Converts JPQL substring() function to OpenJPA ExpressionFactory
+     * substring() arguments.
+     *
+     * @param val1 the original String
+     * @param val2 the 1-based start index as per JPQL substring() semantics
+     * @param val3 the length of the returned string as per JPQL semantics
+     *
+     */
+    public static Value convertSubstringArguments(ExpressionFactory factory,
+    		Value val1, Value val2, Value val3) {
+<span class="nc bnc" id="L1503" title="All 2 branches missed.">        if (val3 != null)</span>
+<span class="nc" id="L1504">            return factory.substring(val1, factory.newArgumentList(val2, val3));</span>
+        else
+<span class="nc" id="L1506">            return factory.substring(val1, val2);</span>
+    }
+    private void assertQueryExtensions(String clause) {
+<span class="nc" id="L1509">        OpenJPAConfiguration conf = resolver.getConfiguration();</span>
+<span class="nc bnc" id="L1510" title="All 4 branches missed.">        switch(conf.getCompatibilityInstance().getJPQL()) {</span>
+            case Compatibility.JPQL_WARN:
+                // check if we've already warned for this query-factory combo
+<span class="nc" id="L1513">                StoreContext ctx = resolver.getQueryContext().getStoreContext();</span>
+<span class="nc" id="L1514">                String query = currentQuery();</span>
+<span class="nc bnc" id="L1515" title="All 4 branches missed.">                if (ctx.getBroker() != null &amp;&amp; query != null) {</span>
+<span class="nc" id="L1516">                    String key = getClass().getName() + &quot;:&quot; + query;</span>
+<span class="nc" id="L1517">                    BrokerFactory factory = ctx.getBroker().getBrokerFactory();</span>
+<span class="nc" id="L1518">                    Object hasWarned = factory.getUserObject(key);</span>
+<span class="nc bnc" id="L1519" title="All 2 branches missed.">                    if (hasWarned != null)</span>
+<span class="nc" id="L1520">                        break;</span>
+                    else
+<span class="nc" id="L1522">                        factory.putUserObject(key, Boolean.TRUE);</span>
+                }
+<span class="nc" id="L1524">                Log log = conf.getLog(OpenJPAConfiguration.LOG_QUERY);</span>
+<span class="nc bnc" id="L1525" title="All 2 branches missed.">                if (log.isWarnEnabled())</span>
+<span class="nc" id="L1526">                    log.warn(_loc.get(&quot;query-extensions-warning&quot;, clause,</span>
+<span class="nc" id="L1527">                        currentQuery()));</span>
+                break;
+            case Compatibility.JPQL_STRICT:
+<span class="nc" id="L1530">                throw new ParseException(_loc.get(&quot;query-extensions-error&quot;,</span>
+<span class="nc" id="L1531">                    clause, currentQuery()).getMessage());</span>
+            case Compatibility.JPQL_EXTENDED:
+<span class="nc" id="L1533">                break;</span>
+            default:
+<span class="nc" id="L1535">                throw new IllegalStateException(</span>
+                    &quot;Compatibility.getJPQL() == &quot;
+<span class="nc" id="L1537">                        + conf.getCompatibilityInstance().getJPQL());</span>
+        }
+<span class="nc" id="L1539">    }</span>
+
+    @Override
+    public void setImplicitTypes(Value val1, Value val2,
+        Class&lt;?&gt; expected) {
+<span class="nc" id="L1544">        String currQuery = currentQuery();</span>
+<span class="nc" id="L1545">        setImplicitTypes(val1, val2, expected, resolver, parameterTypes,</span>
+            currQuery);
+<span class="nc" id="L1547">    }</span>
+
+
+    public static void setImplicitTypes(Value val1, Value val2,
+        Class&lt;?&gt; expected, Resolver resolver, OrderedMap&lt;Object,Class&lt;?&gt;&gt; parameterTypes,
+        String currentQuery) {
+<span class="nc" id="L1553">        AbstractExpressionBuilder.setImplicitTypes(val1, val2, expected,</span>
+            resolver);
+
+        // as well as setting the types for conversions, we also need to
+        // ensure that any parameters are declared with the correct type,
+        // since the JPA spec expects that these will be validated
+<span class="nc bnc" id="L1559" title="All 2 branches missed.">        Parameter param = val1 instanceof Parameter ? (Parameter) val1</span>
+<span class="nc bnc" id="L1560" title="All 2 branches missed.">            : val2 instanceof Parameter ? (Parameter) val2 : null;</span>
+<span class="nc bnc" id="L1561" title="All 2 branches missed.">        Path path = val1 instanceof Path ? (Path) val1</span>
+<span class="nc bnc" id="L1562" title="All 2 branches missed.">            : val2 instanceof Path ? (Path) val2 : null;</span>
+
+        // we only check for parameter-to-path comparisons
+<span class="nc bnc" id="L1565" title="All 6 branches missed.">        if (param == null || path == null || parameterTypes == null)</span>
+<span class="nc" id="L1566">            return;</span>
+
+<span class="nc" id="L1568">        FieldMetaData fmd = path.last();</span>
+<span class="nc bnc" id="L1569" title="All 2 branches missed.">        if (fmd == null)</span>
+<span class="nc" id="L1570">            return;</span>
+
+<span class="nc bnc" id="L1572" title="All 2 branches missed.">        if (expected == null)</span>
+<span class="nc" id="L1573">            checkEmbeddable(path, currentQuery);</span>
+
+<span class="nc" id="L1575">        Class&lt;?&gt; type = path.getType();</span>
+<span class="nc bnc" id="L1576" title="All 2 branches missed.">        if (type == null)</span>
+<span class="nc" id="L1577">            return;</span>
+
+<span class="nc" id="L1579">        Object paramKey = param.getParameterKey();</span>
+<span class="nc bnc" id="L1580" title="All 2 branches missed.">        if (paramKey == null)</span>
+<span class="nc" id="L1581">            return;</span>
+
+        // make sure we have already declared the parameter
+<span class="nc bnc" id="L1584" title="All 2 branches missed.">        if (parameterTypes.containsKey(paramKey))</span>
+<span class="nc" id="L1585">            parameterTypes.put(paramKey, type);</span>
+<span class="nc" id="L1586">    }</span>
+
+    private Value getStringValue(JPQLNode node) {
+<span class="nc" id="L1589">        return getTypeValue(node, TYPE_STRING);</span>
+    }
+
+    private Value getNumberValue(JPQLNode node) {
+<span class="nc" id="L1593">        return getTypeValue(node, TYPE_NUMBER);</span>
+    }
+
+    private Value getTypeValue(JPQLNode node, Class&lt;?&gt; implicitType) {
+<span class="nc" id="L1597">        Value val = getValue(node);</span>
+<span class="nc" id="L1598">        setImplicitType(val, implicitType);</span>
+<span class="nc" id="L1599">        return val;</span>
+    }
+
+    private Value getSubquery(JPQLNode node) {
+<span class="nc" id="L1603">        final boolean subclasses = true;</span>
+
+        // parse the subquery
+<span class="nc" id="L1606">        ParsedJPQL parsed = new ParsedJPQL(node.parser.jpql, node);</span>
+<span class="nc" id="L1607">        Context subContext = new Context(parsed, null, ctx());</span>
+<span class="nc" id="L1608">        contexts.push(subContext);</span>
+
+<span class="nc" id="L1610">        ClassMetaData candidate = getCandidateMetaData(node);</span>
+<span class="nc" id="L1611">        Subquery subq = subContext.getSubquery();</span>
+<span class="nc bnc" id="L1612" title="All 2 branches missed.">        if (subq == null) {</span>
+<span class="nc" id="L1613">            subq = factory.newSubquery(candidate, subclasses, nextAlias());</span>
+<span class="nc" id="L1614">            subContext.setSubquery(subq);</span>
+        }
+<span class="nc" id="L1616">        subq.setMetaData(candidate);</span>
+
+        // evaluate from clause for resolving variables defined in subquery
+<span class="nc" id="L1619">        JPQLNode from = node.getChild(1);</span>
+<span class="nc" id="L1620">        subContext.from = evalFromClause(from, true);</span>
+
+        try {
+<span class="nc" id="L1623">            QueryExpressions subexp = getQueryExpressions();</span>
+<span class="nc" id="L1624">            subq.setQueryExpressions(subexp);</span>
+<span class="nc bnc" id="L1625" title="All 2 branches missed.">            if (subexp.projections.length &gt; 0)</span>
+<span class="nc" id="L1626">                checkEmbeddable(subexp.projections[0]);</span>
+<span class="nc" id="L1627">            return subq;</span>
+        } finally {
+            // remove the subquery parse context
+<span class="nc" id="L1630">            contexts.pop();</span>
+        }
+    }
+
+    /**
+     * Creates and records the names and order of parameters. The parameters are
+     * identified by a key with its type preserved. The second argument
+     * determines whether the first argument is used as-is or converted to
+     * an Integer as parameter key.
+     *
+     * @param id the text as it appears in the parsed node
+     * @param positional if true the first argument is converted to an integer
+     * @param isCollectionValued true for collection-valued parameters
+     */
+    private Parameter getParameter(String id, boolean positional,
+        boolean isCollectionValued) {
+<span class="nc bnc" id="L1646" title="All 2 branches missed.">        if (parameterTypes == null)</span>
+<span class="nc" id="L1647">            parameterTypes = new OrderedMap&lt;&gt;();</span>
+<span class="nc bnc" id="L1648" title="All 2 branches missed.">        Object paramKey = positional ? Integer.parseInt(id) : id;</span>
+<span class="nc bnc" id="L1649" title="All 2 branches missed.">        if (!parameterTypes.containsKey(paramKey))</span>
+<span class="nc" id="L1650">            parameterTypes.put(paramKey, TYPE_OBJECT);</span>
+
+<span class="nc" id="L1652">        ClassMetaData meta = null;</span>
+        int index;
+<span class="nc bnc" id="L1654" title="All 2 branches missed.">        if (positional) {</span>
+            try {
+                // indexes in JPQL are 1-based, as opposed to 0-based in
+                // the core ExpressionFactory
+<span class="nc" id="L1658">                index = Integer.parseInt(id) - 1;</span>
+<span class="nc" id="L1659">            } catch (NumberFormatException e) {</span>
+<span class="nc" id="L1660">                throw parseException(EX_USER, &quot;bad-positional-parameter&quot;,</span>
+                    new Object[]{ id }, e);
+<span class="nc" id="L1662">            }</span>
+
+<span class="nc bnc" id="L1664" title="All 2 branches missed.">            if (index &lt; 0)</span>
+<span class="nc" id="L1665">                throw parseException(EX_USER, &quot;bad-positional-parameter&quot;,</span>
+                    new Object[]{ id }, null);
+        } else {
+<span class="nc" id="L1668">            index = parameterTypes.indexOf(id);</span>
+        }
+<span class="nc bnc" id="L1670" title="All 2 branches missed.">        Parameter param = isCollectionValued</span>
+<span class="nc" id="L1671">            ? factory.newCollectionValuedParameter(paramKey, TYPE_OBJECT)</span>
+<span class="nc" id="L1672">            : factory.newParameter(paramKey, TYPE_OBJECT);</span>
+<span class="nc" id="L1673">        param.setMetaData(meta);</span>
+<span class="nc" id="L1674">        param.setIndex(index);</span>
+
+<span class="nc" id="L1676">        return param;</span>
+    }
+
+    /**
+     * Checks to see if we should evaluate for a NOT expression.
+     */
+    private Expression evalNot(boolean not, Expression exp) {
+<span class="nc bnc" id="L1683" title="All 2 branches missed.">        return not ? factory.not(exp) : exp;</span>
+    }
+
+    /**
+     * Trim off leading and trailing single-quotes, and then
+     * replace any internal '' instances with ' (since repeating the
+     * quote is the JPQL mechanism of escaping a single quote).
+     */
+    private String trimQuotes(String str) {
+<span class="nc bnc" id="L1692" title="All 4 branches missed.">        if (str == null || str.length() &lt;= 1)</span>
+<span class="nc" id="L1693">            return str;</span>
+
+<span class="nc bnc" id="L1695" title="All 4 branches missed.">        if (str.startsWith(&quot;'&quot;) &amp;&amp; str.endsWith(&quot;'&quot;))</span>
+<span class="nc" id="L1696">            str = str.substring(1, str.length() - 1);</span>
+
+<span class="nc" id="L1698">        int index = -1;</span>
+
+<span class="nc bnc" id="L1700" title="All 2 branches missed.">        while ((index = str.indexOf(&quot;''&quot;, index + 1)) != -1)</span>
+<span class="nc" id="L1701">            str = str.substring(0, index + 1) + str.substring(index + 2);</span>
+
+<span class="nc" id="L1703">        return str;</span>
+    }
+
+    /**
+     * Trim off leading and trailing double-quotes.
+     */
+    private String trimDoubleQuotes(String str) {
+<span class="nc bnc" id="L1710" title="All 4 branches missed.">        if (str == null || str.length() &lt;= 1)</span>
+<span class="nc" id="L1711">            return str;</span>
+
+<span class="nc bnc" id="L1713" title="All 4 branches missed.">        if (str.startsWith(&quot;\&quot;&quot;) &amp;&amp; str.endsWith(&quot;\&quot;&quot;))</span>
+<span class="nc" id="L1714">            str = str.substring(1, str.length() - 1);</span>
+
+<span class="nc" id="L1716">        return str;</span>
+    }
+
+    /**
+     * An IntegerLiteral and DecimalLiteral node will
+     * have a child node of Negative if it is negative:
+     * if so, this method returns -1, else it returns 1.
+     */
+    private short negative(JPQLNode node) {
+<span class="nc bnc" id="L1725" title="All 4 branches missed.">        if (node.children != null &amp;&amp; node.children.length == 1</span>
+<span class="nc bnc" id="L1726" title="All 2 branches missed.">            &amp;&amp; firstChild(node).id == JJTNEGATIVE)</span>
+<span class="nc" id="L1727">            return -1;</span>
+        else
+<span class="nc" id="L1729">            return 1;</span>
+    }
+
+    private Value getIdentifier(JPQLNode node) {
+<span class="nc" id="L1733">        final String name = node.text;</span>
+<span class="nc" id="L1734">        final Value val = getVariable(name, false);</span>
+
+<span class="nc" id="L1736">        ClassMetaData cmd = getMetaDataForAlias(name);</span>
+
+<span class="nc bnc" id="L1738" title="All 2 branches missed.">        if (cmd != null) {</span>
+            // handle the case where the class name is the alias
+            // for the candidate (we don't use variables for this)
+<span class="nc" id="L1741">            Value thiz = null;</span>
+<span class="nc bnc" id="L1742" title="All 2 branches missed.">            if (ctx().subquery == null ||</span>
+<span class="nc bnc" id="L1743" title="All 2 branches missed.">                ctx().getSchema(name.toLowerCase()) == null) {</span>
+<span class="nc bnc" id="L1744" title="All 4 branches missed.">                if (ctx().subquery != null &amp;&amp; inAssignSubselectProjection)</span>
+<span class="nc" id="L1745">                    thiz = factory.newPath(ctx().subquery);</span>
+                else
+<span class="nc" id="L1747">                    thiz = factory.getThis();</span>
+            } else {
+<span class="nc" id="L1749">                thiz = factory.newPath(ctx().subquery);</span>
+            }
+<span class="nc" id="L1751">            ((Path)thiz).setSchemaAlias(name);</span>
+<span class="nc" id="L1752">            thiz.setMetaData(cmd);</span>
+<span class="nc" id="L1753">            return thiz;</span>
+<span class="nc bnc" id="L1754" title="All 2 branches missed.">        } else if (val instanceof Path) {</span>
+<span class="nc" id="L1755">            return val;</span>
+<span class="nc bnc" id="L1756" title="All 2 branches missed.">        } else if (val instanceof Value) {</span>
+<span class="nc bnc" id="L1757" title="All 2 branches missed.">            if (val.isVariable()) {</span>
+                // can be an entity type literal
+<span class="nc" id="L1759">                Class&lt;?&gt; c = resolver.classForName(name, null);</span>
+<span class="nc bnc" id="L1760" title="All 2 branches missed.">                if (c != null) {</span>
+<span class="nc" id="L1761">                    Value lit = factory.newTypeLiteral(c, Literal.TYPE_CLASS);</span>
+<span class="nc" id="L1762">                    Class&lt;?&gt; candidate = getCandidateType();</span>
+<span class="nc" id="L1763">                    ClassMetaData can = getClassMetaData(candidate.getName(),</span>
+                            false);
+<span class="nc" id="L1765">                    ClassMetaData meta = getClassMetaData(name, false);</span>
+<span class="nc bnc" id="L1766" title="All 2 branches missed.">                    if (candidate.isAssignableFrom(c))</span>
+<span class="nc" id="L1767">                        lit.setMetaData(meta);</span>
+                    else
+<span class="nc" id="L1769">                        lit.setMetaData(can);</span>
+<span class="nc" id="L1770">                    return lit;</span>
+                }
+            }
+<span class="nc" id="L1773">            return val;</span>
+        }
+
+<span class="nc" id="L1776">        throw parseException(EX_USER, &quot;unknown-identifier&quot;,</span>
+            new Object[]{ name }, null);
+    }
+
+    private Path validateMapPath(JPQLNode node, JPQLNode id) {
+<span class="nc" id="L1781">        Path path = (Path) getValue(id);</span>
+<span class="nc" id="L1782">        FieldMetaData fld = path.last();</span>
+
+<span class="nc bnc" id="L1784" title="All 4 branches missed.">        if (fld == null &amp;&amp; ctx().subquery != null) {</span>
+<span class="nc" id="L1785">            Value var = getVariable(id.text, false);</span>
+<span class="nc bnc" id="L1786" title="All 2 branches missed.">            if (var != null) {</span>
+<span class="nc" id="L1787">                path = factory.newPath(var);</span>
+<span class="nc" id="L1788">                fld = path.last();</span>
+            }
+        }
+
+<span class="nc bnc" id="L1792" title="All 2 branches missed.">        if (fld != null) {</span>
+            // validate the field is of type java.util.Map
+<span class="nc bnc" id="L1794" title="All 2 branches missed.">            if (fld.getDeclaredTypeCode() != JavaTypes.MAP) {</span>
+<span class="nc" id="L1795">                String oper = &quot;VALUE&quot;;</span>
+<span class="nc bnc" id="L1796" title="All 2 branches missed.">                if (node.id == JJTENTRY)</span>
+<span class="nc" id="L1797">                    oper = &quot;ENTRY&quot;;</span>
+<span class="nc bnc" id="L1798" title="All 2 branches missed.">                else if (node.id == JJTKEY)</span>
+<span class="nc" id="L1799">                    oper = &quot;KEY&quot;;</span>
+<span class="nc" id="L1800">                throw parseException(EX_USER, &quot;bad-qualified-identifier&quot;,</span>
+                    new Object[]{ id.text, oper}, null);
+            }
+        }
+        else
+<span class="nc" id="L1805">            throw parseException(EX_USER, &quot;unknown-type&quot;,</span>
+                new Object[]{ id.text}, null);
+
+<span class="nc" id="L1808">        return path;</span>
+    }
+
+    private Value getGeneralIdentifier(JPQLNode node, boolean verifyEmbeddable) {
+<span class="nc" id="L1812">        JPQLNode id = onlyChild(node);</span>
+<span class="nc" id="L1813">        Path path = validateMapPath(node, id);</span>
+
+<span class="nc bnc" id="L1815" title="All 2 branches missed.">        if (node.id == JJTKEY)</span>
+<span class="nc" id="L1816">            path = (Path) factory.getKey(path);</span>
+<span class="nc" id="L1817">        FieldMetaData fld = path.last();</span>
+<span class="nc" id="L1818">        ClassMetaData meta = fld.getKey().getTypeMetaData();</span>
+<span class="nc bnc" id="L1819" title="All 6 branches missed.">        if (verifyEmbeddable &amp;&amp;</span>
+<span class="nc bnc" id="L1820" title="All 4 branches missed.">            (node.id == JJTKEY &amp;&amp; meta != null &amp;&amp; fld.getKey().isEmbedded()) ||</span>
+<span class="nc bnc" id="L1821" title="All 2 branches missed.">            (node.id == JJTVALUE &amp;&amp; fld.isElementCollection() &amp;&amp;</span>
+<span class="nc bnc" id="L1822" title="All 2 branches missed.">                 fld.getElement().getEmbeddedMetaData() != null)) {</span>
+                 // check basic type
+<span class="nc bnc" id="L1824" title="All 2 branches missed.">            if (node.parent.parent.id == JJTGROUPBY)</span>
+<span class="nc" id="L1825">                throw parseException(EX_USER, &quot;cant-groupby-key-value-embeddable&quot;,</span>
+<span class="nc bnc" id="L1826" title="All 2 branches missed.">                    new Object[]{ node.id == JJTVALUE ? &quot;VALUE&quot; : &quot;KEY&quot;, id.text }, null);</span>
+            else
+<span class="nc" id="L1828">                throw parseException(EX_USER, &quot;bad-general-identifier&quot;,</span>
+<span class="nc bnc" id="L1829" title="All 2 branches missed.">                    new Object[]{ node.id == JJTVALUE ? &quot;VALUE&quot; : &quot;KEY&quot;, id.text }, null);</span>
+        }
+<span class="nc" id="L1831">        return path;</span>
+    }
+
+    private Value getQualifiedIdentifier(JPQLNode node) {
+<span class="nc" id="L1835">        JPQLNode id = onlyChild(node);</span>
+<span class="nc" id="L1836">        Path path = validateMapPath(node, id);</span>
+
+<span class="nc bnc" id="L1838" title="All 2 branches missed.">        if (node.id == JJTVALUE)</span>
+<span class="nc" id="L1839">            return path;</span>
+
+<span class="nc" id="L1841">        Value value = getValue(id);</span>
+<span class="nc bnc" id="L1842" title="All 2 branches missed.">        if (node.id == JJTKEY)</span>
+<span class="nc" id="L1843">            return factory.mapKey(path, value);</span>
+        else
+<span class="nc" id="L1845">            return factory.mapEntry(path, value);</span>
+    }
+
+    private Path getQualifiedPath(JPQLNode node) {
+<span class="nc" id="L1849">        return getQualifiedPath(node, false, true);</span>
+    }
+
+    private Path getQualifiedPath(JPQLNode node, boolean pcOnly, boolean inner)
+    {
+<span class="nc" id="L1854">        int nChild = node.getChildCount();</span>
+<span class="nc" id="L1855">        JPQLNode firstChild = firstChild(node);</span>
+<span class="nc bnc" id="L1856" title="All 2 branches missed.">        JPQLNode id = firstChild.id == JJTKEY ? onlyChild(firstChild) :</span>
+<span class="nc" id="L1857">               firstChild;</span>
+<span class="nc" id="L1858">        Path path = validateMapPath(firstChild, id);</span>
+
+<span class="nc bnc" id="L1860" title="All 2 branches missed.">        if (firstChild.id == JJTIDENTIFIER)</span>
+<span class="nc" id="L1861">            return getPath(node);</span>
+
+<span class="nc" id="L1863">        FieldMetaData fld = path.last();</span>
+<span class="nc" id="L1864">        path = (Path) factory.getKey(path);</span>
+<span class="nc" id="L1865">        ClassMetaData meta = fld.getKey().getTypeMetaData();</span>
+
+<span class="nc bnc" id="L1867" title="All 2 branches missed.">        if (meta == null)</span>
+<span class="nc" id="L1868">            throw parseException(EX_USER, &quot;bad-qualified-path&quot;,</span>
+                new Object[]{ id.text }, null);
+
+<span class="nc" id="L1871">        path.setMetaData(meta);</span>
+
+        // walk through the children and assemble the path
+<span class="nc bnc" id="L1874" title="All 2 branches missed.">        boolean allowNull = !inner;</span>
+<span class="nc bnc" id="L1875" title="All 2 branches missed.">        for (int i = 1; i &lt; nChild; i++) {</span>
+<span class="nc" id="L1876">            path = (Path) traversePath(path, node.children[i].text, pcOnly,</span>
+                allowNull);
+
+            // all traversals but the first one will always be inner joins
+<span class="nc" id="L1880">            allowNull = false;</span>
+        }
+<span class="nc" id="L1882">        return path;</span>
+    }
+
+    private Value getTypeLiteral(JPQLNode node) {
+<span class="nc" id="L1886">        JPQLNode type = onlyChild(node);</span>
+<span class="nc" id="L1887">        final String name = type.text;</span>
+<span class="nc" id="L1888">        final Value val = getVariable(name, false);</span>
+
+<span class="nc bnc" id="L1890" title="All 4 branches missed.">        if (val instanceof Value &amp;&amp; val.isVariable()) {</span>
+<span class="nc" id="L1891">            Class&lt;?&gt; c = resolver.classForName(name, null);</span>
+<span class="nc bnc" id="L1892" title="All 2 branches missed.">            if (c != null) {</span>
+<span class="nc" id="L1893">                Value typeLit = factory.newTypeLiteral(c, Literal.TYPE_CLASS);</span>
+<span class="nc" id="L1894">                typeLit.setMetaData(getClassMetaData(name, false));</span>
+<span class="nc" id="L1895">                return typeLit;</span>
+            }
+        }
+
+<span class="nc" id="L1899">        throw parseException(EX_USER, &quot;not-type-literal&quot;,</span>
+            new Object[]{ name }, null);
+    }
+
+    private Value getPathOrConstant(JPQLNode node) {
+        // first check to see if the path is an enum or static field, and
+        // if so, load it
+<span class="nc" id="L1906">        String className = assemble(node, &quot;.&quot;, 1);</span>
+<span class="nc" id="L1907">        Class&lt;?&gt; c = resolver.classForName(className, null);</span>
+<span class="nc bnc" id="L1908" title="All 2 branches missed.">        if (c != null) {</span>
+<span class="nc" id="L1909">            String fieldName = lastChild(node).text;</span>
+<span class="nc bnc" id="L1910" title="All 2 branches missed.">            int type = (c.isEnum() ? Literal.TYPE_ENUM : Literal.TYPE_UNKNOWN);</span>
+            try {
+<span class="nc" id="L1912">                Field field = c.getField(fieldName);</span>
+<span class="nc" id="L1913">                Object value = field.get(null);</span>
+<span class="nc" id="L1914">                return factory.newLiteral(value, type);</span>
+<span class="nc" id="L1915">            } catch (NoSuchFieldException nsfe) {</span>
+<span class="nc bnc" id="L1916" title="All 2 branches missed.">                if (node.inEnumPath)</span>
+<span class="nc" id="L1917">                    throw parseException(EX_USER, &quot;no-field&quot;,</span>
+<span class="nc" id="L1918">                        new Object[]{ c.getName(), fieldName }, nsfe);</span>
+                else
+<span class="nc" id="L1920">                    return getPath(node, false, true);</span>
+<span class="nc" id="L1921">            } catch (Exception e) {</span>
+<span class="nc" id="L1922">                throw parseException(EX_USER, &quot;unaccessible-field&quot;,</span>
+                    new Object[]{ className, fieldName }, e);
+            }
+        } else {
+<span class="nc" id="L1926">            return getPath(node, false, true);</span>
+        }
+    }
+
+    /**
+     * Process type_discriminator
+     *     type_discriminator ::=
+     *         TYPE(general_identification_variable |
+     *         single_valued_object_path_expression |
+     *         input_parameter )
+     */
+    private Value getType(JPQLNode node) {
+<span class="nc bnc" id="L1938" title="All 5 branches missed.">        switch (node.id) {</span>
+        case JJTIDENTIFIER:
+<span class="nc" id="L1940">            return factory.type(getValue(node));</span>
+
+        case JJTNAMEDINPUTPARAMETER:
+<span class="nc" id="L1943">            return factory.type(getParameter(node.text, false, false));</span>
+
+        case JJTPOSITIONALINPUTPARAMETER:
+<span class="nc" id="L1946">            return factory.type(getParameter(node.text, true, false));</span>
+
+        case JJTGENERALIDENTIFIER:
+<span class="nc" id="L1949">            return factory.type(getQualifiedIdentifier(onlyChild(node)));</span>
+
+        default:
+            // TODO: enforce jpa2.0 spec rules.
+            // A single_valued_object_field is designated by the name of
+            // an association field in a one-to-one or many-to-one relationship
+            // or a field of embeddable class type.
+            // The type of a single_valued_object_field is the abstract schema
+            // type of the related entity or embeddable class
+<span class="nc" id="L1958">            Value path = getPath(node, false, true);</span>
+<span class="nc" id="L1959">            return factory.type(path);</span>
+        }
+    }
+
+    private Path getPath(JPQLNode node) {
+<span class="nc" id="L1964">        return getPath(node, false, true);</span>
+    }
+
+    private Path getPath(JPQLNode node, boolean pcOnly, boolean inner) {
+        // resolve the first element against the aliases map ...
+        // i.e., the path &quot;SELECT x.id FROM SomeClass x where x.id &gt; 10&quot;
+        // will need to have &quot;x&quot; in the alias map in order to resolve
+<span class="nc" id="L1971">        Path path = null;</span>
+
+<span class="nc" id="L1973">        final String name = firstChild(node).text;</span>
+<span class="nc" id="L1974">        final Value val = getVariable(name, false);</span>
+
+        // handle the case where the class name is the alias
+        // for the candidate (we don't use variables for this)
+<span class="nc bnc" id="L1978" title="All 2 branches missed.">        if (name.equalsIgnoreCase(ctx().schemaAlias)) {</span>
+<span class="nc bnc" id="L1979" title="All 2 branches missed.">            if (ctx().subquery != null) {</span>
+<span class="nc" id="L1980">                path = factory.newPath(ctx().subquery);</span>
+<span class="nc" id="L1981">                path.setMetaData(ctx().subquery.getMetaData());</span>
+            } else {
+<span class="nc" id="L1983">                path = factory.newPath();</span>
+<span class="nc" id="L1984">                path.setMetaData(ctx().meta);</span>
+            }
+<span class="nc bnc" id="L1986" title="All 2 branches missed.">        } else if (getMetaDataForAlias(name) != null)</span>
+<span class="nc" id="L1987">            path = newPath(null, getMetaDataForAlias(name));</span>
+<span class="nc bnc" id="L1988" title="All 2 branches missed.">        else if (val instanceof Path)</span>
+<span class="nc" id="L1989">            path = (Path) val;</span>
+<span class="nc bnc" id="L1990" title="All 2 branches missed.">        else if (val.getMetaData() != null)</span>
+<span class="nc" id="L1991">            path = newPath(val, val.getMetaData());</span>
+        else
+<span class="nc" id="L1993">            throw parseException(EX_USER, &quot;path-invalid&quot;,</span>
+<span class="nc" id="L1994">                new Object[]{ assemble(node), name }, null);</span>
+
+<span class="nc" id="L1996">        path.setSchemaAlias(name);</span>
+
+        // walk through the children and assemble the path
+<span class="nc bnc" id="L1999" title="All 2 branches missed.">        boolean allowNull = !inner;</span>
+<span class="nc bnc" id="L2000" title="All 2 branches missed.">        for (int i = 1; i &lt; node.children.length; i++) {</span>
+<span class="nc bnc" id="L2001" title="All 2 branches missed.">            if (path.isXPath()) {</span>
+<span class="nc bnc" id="L2002" title="All 2 branches missed.">                for (int j = i; j &lt;node.children.length; j++)</span>
+<span class="nc" id="L2003">                    path = (Path) traverseXPath(path, node.children[j].text);</span>
+<span class="nc" id="L2004">                return path;</span>
+            }
+<span class="nc" id="L2006">            path = (Path) traversePath(path, node.children[i].text, pcOnly,</span>
+                allowNull);
+<span class="nc bnc" id="L2008" title="All 4 branches missed.">            if (ctx().getParent() != null &amp;&amp; ctx().getVariable(path.getSchemaAlias()) == null) {</span>
+<span class="nc" id="L2009">                path.setSubqueryContext(ctx(), name);</span>
+            }
+
+            // all traversals but the first one will always be inner joins
+<span class="nc" id="L2013">            allowNull = false;</span>
+        }
+
+<span class="nc" id="L2016">        return path;</span>
+    }
+
+    @Override
+    protected Class&lt;?&gt; getDeclaredVariableType(String name) {
+<span class="nc" id="L2021">        ClassMetaData cmd = getMetaDataForAlias(name);</span>
+<span class="nc bnc" id="L2022" title="All 2 branches missed.">        if (cmd != null)</span>
+<span class="nc" id="L2023">            return cmd.getDescribedType();</span>
+
+<span class="nc bnc" id="L2025" title="All 4 branches missed.">        if (name != null &amp;&amp; name.equals(ctx().schemaAlias))</span>
+<span class="nc" id="L2026">            return getCandidateType();</span>
+
+        // JPQL has no declared variables
+<span class="nc" id="L2029">        return null;</span>
+    }
+
+    /**
+     * Returns an Expression for the given node by eval'ing it.
+     */
+    private Expression getExpression(JPQLNode node) {
+<span class="nc" id="L2036">        Object exp = eval(node);</span>
+
+        // check for boolean values used as expressions
+<span class="nc bnc" id="L2039" title="All 2 branches missed.">        if (!(exp instanceof Expression))</span>
+<span class="nc" id="L2040">            return factory.asExpression((Value) exp);</span>
+<span class="nc" id="L2041">        return (Expression) exp;</span>
+    }
+
+    /**
+     * Returns a Simple Case Expression for the given node by eval'ing it.
+     */
+    private Value getSimpleCaseExpression(JPQLNode node) {
+<span class="nc" id="L2048">        Object caseOperand = eval(node.getChild(0));</span>
+<span class="nc" id="L2049">        int nChild = node.getChildCount();</span>
+
+<span class="nc" id="L2051">        Object val = eval(lastChild(node));</span>
+<span class="nc" id="L2052">        Object exp[] = new Expression[nChild - 2];</span>
+<span class="nc bnc" id="L2053" title="All 2 branches missed.">        for (int i = 1; i &lt; nChild - 1; i++)</span>
+<span class="nc" id="L2054">            exp[i-1] = eval(node.children[i]);</span>
+
+<span class="nc" id="L2056">        return factory.simpleCaseExpression((Value) caseOperand,</span>
+            (Expression[]) exp, (Value) val);
+    }
+
+    /**
+     * Returns a General Case Expression for the given node by eval'ing it.
+     */
+    private Value getGeneralCaseExpression(JPQLNode node) {
+<span class="nc" id="L2064">        int nChild = node.getChildCount();</span>
+
+<span class="nc" id="L2066">        Object val = eval(lastChild(node));</span>
+<span class="nc" id="L2067">        Object exp[] = new Expression[nChild - 1];</span>
+<span class="nc bnc" id="L2068" title="All 2 branches missed.">        for (int i = 0; i &lt; nChild - 1; i++)</span>
+<span class="nc" id="L2069">            exp[i] = eval(node.children[i]);</span>
+
+<span class="nc" id="L2071">        return factory.generalCaseExpression((Expression[]) exp, (Value) val);</span>
+    }
+
+    private Expression getWhenCondition(JPQLNode node) {
+<span class="nc" id="L2075">        Object exp = eval(firstChild(node));</span>
+<span class="nc" id="L2076">        Object val = eval(secondChild(node));</span>
+<span class="nc" id="L2077">        return factory.whenCondition((Expression) exp, (Value) val);</span>
+    }
+
+    private Expression getWhenScalar(JPQLNode node) {
+<span class="nc" id="L2081">        Object val1 = eval(firstChild(node));</span>
+<span class="nc" id="L2082">        Object val2 = eval(secondChild(node));</span>
+<span class="nc" id="L2083">        return factory.whenScalar((Value) val1, (Value) val2);</span>
+    }
+
+    private Value getCoalesceExpression(JPQLNode node) {
+<span class="nc" id="L2087">        int nChild = node.getChildCount();</span>
+
+<span class="nc" id="L2089">        Object vals[] = new Value[nChild];</span>
+<span class="nc bnc" id="L2090" title="All 2 branches missed.">        for (int i = 0; i &lt; nChild; i++)</span>
+<span class="nc" id="L2091">            vals[i] = eval(node.children[i]);</span>
+
+<span class="nc" id="L2093">        return factory.coalesceExpression((Value[]) vals);</span>
+    }
+
+    private Value getNullIfExpression(JPQLNode node) {
+<span class="nc" id="L2097">        Object val1 = eval(firstChild(node));</span>
+<span class="nc" id="L2098">        Object val2 = eval(secondChild(node));</span>
+
+<span class="nc" id="L2100">        return factory.nullIfExpression((Value) val1, (Value) val2);</span>
+    }
+
+    private Value getValue(JPQLNode node) {
+<span class="nc bnc" id="L2104" title="All 2 branches missed.">        if (node.id == JJTQUALIFIEDIDENTIFIER)</span>
+<span class="nc" id="L2105">            return getQualifiedIdentifier(onlyChild(node));</span>
+<span class="nc" id="L2106">        return getValue(node, VAR_PATH);</span>
+    }
+
+    private Path newPath(Value val, ClassMetaData meta) {
+<span class="nc bnc" id="L2110" title="All 2 branches missed.">        Path path = val == null ? factory.newPath() : factory.newPath(val);</span>
+<span class="nc bnc" id="L2111" title="All 2 branches missed.">        if (meta != null)</span>
+<span class="nc" id="L2112">            path.setMetaData(meta);</span>
+<span class="nc" id="L2113">        return path;</span>
+    }
+
+    /**
+     * Returns a Value for the given node by eval'ing it.
+     */
+    private Value getValue(JPQLNode node, int handleVar) {
+<span class="nc" id="L2120">        Value val = (Value) eval(node);</span>
+
+        // determined how to evaluate a variable
+<span class="nc bnc" id="L2123" title="All 2 branches missed.">        if (!val.isVariable())</span>
+<span class="nc" id="L2124">            return val;</span>
+<span class="nc bnc" id="L2125" title="All 4 branches missed.">        else if (handleVar == VAR_PATH &amp;&amp; !(val instanceof Path))</span>
+<span class="nc" id="L2126">            return newPath(val, val.getMetaData());</span>
+<span class="nc bnc" id="L2127" title="All 2 branches missed.">        else if (handleVar == VAR_ERROR)</span>
+<span class="nc" id="L2128">            throw parseException(EX_USER, &quot;unexpected-var&quot;,</span>
+                new Object[]{ node.text }, null);
+        else
+<span class="nc" id="L2131">            return val;</span>
+    }
+
+    ////////////////////////////
+    // Parse Context Management
+    ////////////////////////////
+
+    private Context ctx() {
+<span class="nc" id="L2139">        return  contexts.peek();</span>
+    }
+
+    private JPQLNode root() {
+<span class="nc" id="L2143">        return ctx().parsed.root;</span>
+    }
+
+    private ClassMetaData getMetaDataForAlias(String alias) {
+<span class="nc bnc" id="L2147" title="All 2 branches missed.">        for (int i = contexts.size() - 1; i &gt;= 0; i--) {</span>
+<span class="nc" id="L2148">            Context context =  contexts.get(i);</span>
+<span class="nc bnc" id="L2149" title="All 2 branches missed.">            if (alias.equalsIgnoreCase(context.schemaAlias))</span>
+<span class="nc" id="L2150">                return context.meta;</span>
+        }
+
+<span class="nc" id="L2153">        return null;</span>
+    }
+
+    @Override
+    protected void addSchemaToContext(String id, ClassMetaData meta) {
+<span class="nc" id="L2158">        ctx().addSchema(id.toLowerCase(), meta);</span>
+<span class="nc" id="L2159">    }</span>
+
+    @Override
+    protected void addVariableToContext(String id, Value var) {
+<span class="nc" id="L2163">        ctx().addVariable(id, var);</span>
+<span class="nc" id="L2164">    }</span>
+
+    @Override
+    protected Value getVariable(String var) {
+<span class="nc" id="L2168">        Context c = ctx();</span>
+<span class="nc" id="L2169">        Value v = c.getVariable(var);</span>
+<span class="nc bnc" id="L2170" title="All 2 branches missed.">        if (v != null)</span>
+<span class="nc" id="L2171">            return v;</span>
+<span class="nc bnc" id="L2172" title="All 2 branches missed.">        if (c.getParent() != null)</span>
+<span class="nc" id="L2173">            return c.getParent().findVariable(var);</span>
+
+<span class="nc" id="L2175">        return null;</span>
+    }
+
+    ////////////////////////////
+    // Node traversal utilities
+    ////////////////////////////
+
+    private JPQLNode onlyChild(JPQLNode node)
+        throws UserException {
+<span class="nc" id="L2184">        JPQLNode child = firstChild(node);</span>
+
+<span class="nc bnc" id="L2186" title="All 2 branches missed.">        if (node.children.length &gt; 1)</span>
+<span class="nc" id="L2187">            throw parseException(EX_USER, &quot;multi-children&quot;,</span>
+<span class="nc" id="L2188">                new Object[]{ node, Arrays.asList(node.children) }, null);</span>
+
+<span class="nc" id="L2190">        return child;</span>
+    }
+
+    /**
+     * Returns the left node (the first of the children), and asserts
+     * that there are exactly two children.
+     */
+    private JPQLNode left(JPQLNode node) {
+<span class="nc" id="L2198">        return child(node, 0, 2);</span>
+    }
+
+    /**
+     * Returns the right node (the second of the children), and asserts
+     * that there are exactly two children.
+     */
+    private JPQLNode right(JPQLNode node) {
+<span class="nc" id="L2206">        return child(node, 1, 2);</span>
+    }
+
+    private JPQLNode child(JPQLNode node, int childNum, int assertCount) {
+<span class="nc bnc" id="L2210" title="All 2 branches missed.">        if (node.children.length != assertCount)</span>
+<span class="nc" id="L2211">            throw parseException(EX_USER, &quot;wrong-child-count&quot;,</span>
+<span class="nc" id="L2212">                new Object[]{ Integer.valueOf(assertCount), node,</span>
+<span class="nc" id="L2213">                    Arrays.asList(node.children) }, null);</span>
+
+<span class="nc" id="L2215">        return node.children[childNum];</span>
+    }
+
+    private JPQLNode firstChild(JPQLNode node) {
+<span class="nc bnc" id="L2219" title="All 4 branches missed.">        if (node.children == null || node.children.length == 0)</span>
+<span class="nc" id="L2220">            throw parseException(EX_USER, &quot;no-children&quot;,</span>
+                new Object[]{ node }, null);
+<span class="nc" id="L2222">        return node.children[0];</span>
+    }
+
+    private static JPQLNode secondChild(JPQLNode node) {
+<span class="nc" id="L2226">        return node.children[1];</span>
+    }
+
+    private static JPQLNode thirdChild(JPQLNode node) {
+<span class="nc" id="L2230">        return node.children[2];</span>
+    }
+
+    private static JPQLNode lastChild(JPQLNode node) {
+<span class="nc" id="L2234">        return lastChild(node, 0);</span>
+    }
+
+    /**
+     * The Nth from the last child. E.g.,
+     * lastChild(1) will return the second-to-the-last child.
+     */
+    private static JPQLNode lastChild(JPQLNode node, int fromLast) {
+<span class="nc" id="L2242">        return node.children[node.children.length - (1 + fromLast)];</span>
+    }
+
+    /**
+     * Base node that will be generated by the JPQLExpressionBuilder; base
+     * class of the {@link SimpleNode} that is used by {@link JPQL}.
+     *
+     * @author Marc Prud'hommeaux
+     * @see Node
+     * @see SimpleNode
+     */
+    protected abstract static class JPQLNode
+        implements Node, Serializable {
+
+        private static final long serialVersionUID = 1L;
+        final int id;
+        final JPQL parser;
+        JPQLNode parent;
+        JPQLNode[] children;
+        String text;
+<span class="nc" id="L2262">        boolean not = false;</span>
+<span class="nc" id="L2263">        boolean inEnumPath = false;</span>
+
+<span class="nc" id="L2265">        public JPQLNode(JPQL parser, int id) {</span>
+<span class="nc" id="L2266">            this.id = id;</span>
+<span class="nc" id="L2267">            this.parser = parser;</span>
+<span class="nc" id="L2268">            this.inEnumPath = parser.inEnumPath;</span>
+<span class="nc" id="L2269">        }</span>
+
+        public void jjtOpen() {
+<span class="nc" id="L2272">        }</span>
+
+        public void jjtClose() {
+<span class="nc" id="L2275">        }</span>
+
+        JPQLNode[] findChildrenByID(int id) {
+<span class="nc" id="L2278">            Collection&lt;JPQLNode&gt; set = new LinkedHashSet&lt;&gt;();</span>
+<span class="nc" id="L2279">            findChildrenByID(id, set);</span>
+<span class="nc" id="L2280">            return set.toArray(new JPQLNode[set.size()]);</span>
+        }
+
+        private void findChildrenByID(int id, Collection&lt;JPQLNode&gt; set) {
+<span class="nc bnc" id="L2284" title="All 4 branches missed.">            for (int i = 0; children != null &amp;&amp; i &lt; children.length; i++) {</span>
+<span class="nc bnc" id="L2285" title="All 2 branches missed.">                if (children[i].id == id)</span>
+<span class="nc" id="L2286">                    set.add(children[i]);</span>
+
+<span class="nc" id="L2288">                children[i].findChildrenByID(id, set);</span>
+            }
+<span class="nc" id="L2290">        }</span>
+
+        boolean hasChildID(int id) {
+<span class="nc bnc" id="L2293" title="All 2 branches missed.">            return findChildByID(id, false) != null;</span>
+        }
+
+        JPQLNode findChildByID(int id, boolean recurse) {
+<span class="nc bnc" id="L2297" title="All 4 branches missed.">            for (int i = 0; children != null &amp;&amp; i &lt; children.length; i++) {</span>
+<span class="nc" id="L2298">                JPQLNode child = children[i];</span>
+
+<span class="nc bnc" id="L2300" title="All 2 branches missed.">                if (child.id == id)</span>
+<span class="nc" id="L2301">                    return children[i];</span>
+
+<span class="nc bnc" id="L2303" title="All 2 branches missed.">                if (recurse) {</span>
+<span class="nc" id="L2304">                    JPQLNode found = child.findChildByID(id, recurse);</span>
+<span class="nc bnc" id="L2305" title="All 2 branches missed.">                    if (found != null)</span>
+<span class="nc" id="L2306">                        return found;</span>
+                }
+            }
+
+            // not found
+<span class="nc" id="L2311">            return null;</span>
+        }
+
+        public void jjtSetParent(Node parent) {
+<span class="nc" id="L2315">            this.parent = (JPQLNode) parent;</span>
+<span class="nc" id="L2316">        }</span>
+
+        public Node jjtGetParent() {
+<span class="nc" id="L2319">            return this.parent;</span>
+        }
+
+        public void jjtAddChild(Node n, int i) {
+<span class="nc bnc" id="L2323" title="All 2 branches missed.">            if (children == null) {</span>
+<span class="nc" id="L2324">                children = new JPQLNode[i + 1];</span>
+<span class="nc bnc" id="L2325" title="All 2 branches missed.">            } else if (i &gt;= children.length) {</span>
+<span class="nc" id="L2326">                JPQLNode c[] = new JPQLNode[i + 1];</span>
+<span class="nc" id="L2327">                System.arraycopy(children, 0, c, 0, children.length);</span>
+<span class="nc" id="L2328">                children = c;</span>
+            }
+
+<span class="nc" id="L2331">            children[i] = (JPQLNode) n;</span>
+<span class="nc" id="L2332">        }</span>
+
+        public Node jjtGetChild(int i) {
+<span class="nc" id="L2335">            return children[i];</span>
+        }
+
+        public int getChildCount() {
+<span class="nc" id="L2339">            return jjtGetNumChildren();</span>
+        }
+
+        public JPQLNode getChild(int index) {
+<span class="nc" id="L2343">            return (JPQLNode) jjtGetChild(index);</span>
+        }
+
+        public Iterator&lt;JPQLNode&gt; iterator() {
+<span class="nc" id="L2347">            return Arrays.asList(children).iterator();</span>
+        }
+
+        public int jjtGetNumChildren() {
+<span class="nc bnc" id="L2351" title="All 2 branches missed.">            return (children == null) ? 0 : children.length;</span>
+        }
+
+        void setText(String text) {
+<span class="nc" id="L2355">            this.text = text;</span>
+<span class="nc" id="L2356">        }</span>
+
+        void setToken(Token t) {
+<span class="nc" id="L2359">            setText(t.image);</span>
+<span class="nc" id="L2360">        }</span>
+
+        @Override
+        public String toString() {
+<span class="nc" id="L2364">            return JPQLTreeConstants.jjtNodeName[this.id];</span>
+        }
+
+        public String toString(String prefix) {
+<span class="nc" id="L2368">            return prefix + toString();</span>
+        }
+
+        /**
+         * Debugging method.
+         *
+         * @see #dump(java.io.PrintStream,String)
+         */
+        public void dump(String prefix) {
+<span class="nc" id="L2377">            dump(System.out, prefix);</span>
+<span class="nc" id="L2378">        }</span>
+
+        public void dump() {
+<span class="nc" id="L2381">            dump(&quot; &quot;);</span>
+<span class="nc" id="L2382">        }</span>
+
+        /**
+         * Debugging method to output a parse tree.
+         *
+         * @param out the stream to which to write the debugging info
+         * @param prefix the prefix to write out before lines
+         */
+        public void dump(PrintStream out, String prefix) {
+<span class="nc" id="L2391">            dump(out, prefix, false);</span>
+<span class="nc" id="L2392">        }</span>
+
+        public void dump(PrintStream out, String prefix, boolean text) {
+<span class="nc" id="L2395">            out.println(toString(prefix)</span>
+<span class="nc bnc" id="L2396" title="All 4 branches missed.">                + (text &amp;&amp; this.text != null ? &quot; [&quot; + this.text + &quot;]&quot; : &quot;&quot;));</span>
+<span class="nc bnc" id="L2397" title="All 2 branches missed.">            if (children != null) {</span>
+<span class="nc bnc" id="L2398" title="All 2 branches missed.">                for (int i = 0; i &lt; children.length; ++i) {</span>
+<span class="nc" id="L2399">                    JPQLNode n = children[i];</span>
+<span class="nc bnc" id="L2400" title="All 2 branches missed.">                    if (n != null) {</span>
+<span class="nc" id="L2401">                        n.dump(out, prefix + &quot; &quot;, text);</span>
+                    }
+                }
+            }
+<span class="nc" id="L2405">        }</span>
+    }
+
+    /**
+     * Public for unit testing purposes.
+         */
+    public static class ParsedJPQL implements Serializable {
+        private static final long serialVersionUID = 1L;
+
+        // This is only ever used during parse; when ParsedJPQL instances
+        // are serialized, they will have already been parsed.
+        private final transient JPQLNode root;
+
+        private final String query;
+
+        // cache of candidate type data. This is stored here in case this
+        // parse tree is reused in a context that does not know what the
+        // candidate type is already.
+        private Class&lt;?&gt; _candidateType;
+
+        ParsedJPQL(String jpql) {
+<span class="nc" id="L2426">            this(jpql, parse(jpql));</span>
+<span class="nc" id="L2427">        }</span>
+
+<span class="nc" id="L2429">        ParsedJPQL(String query, JPQLNode root) {</span>
+<span class="nc" id="L2430">            this.root = root;</span>
+<span class="nc" id="L2431">            this.query = query;</span>
+<span class="nc" id="L2432">        }</span>
+
+        private static JPQLNode parse(String jpql) {
+<span class="nc bnc" id="L2435" title="All 2 branches missed.">            if (jpql == null)</span>
+<span class="nc" id="L2436">                jpql = &quot;&quot;;</span>
+
+            try {
+<span class="nc" id="L2439">                return (JPQLNode) new JPQL(jpql).parseQuery();</span>
+<span class="nc" id="L2440">            } catch (Error e) {</span>
+                // special handling for Error subclasses, which the
+                // parser may sometimes (unfortunately) throw
+<span class="nc" id="L2443">                throw new UserException(_loc.get(&quot;parse-error&quot;,</span>
+<span class="nc" id="L2444">                    new Object[]{ e.toString(), jpql }));</span>
+            }
+        }
+
+        void populate(ExpressionStoreQuery query) {
+<span class="nc" id="L2449">            QueryContext ctx = query.getContext();</span>
+
+            // if the owning query's context does not have
+            // any candidate class, then set it here
+<span class="nc bnc" id="L2453" title="All 2 branches missed.">            if (ctx.getCandidateType() == null) {</span>
+<span class="nc bnc" id="L2454" title="All 2 branches missed.">                if (_candidateType == null)</span>
+<span class="nc" id="L2455">                    _candidateType = new JPQLExpressionBuilder</span>
+<span class="nc" id="L2456">                        (null, query, this).getCandidateType();</span>
+<span class="nc" id="L2457">                ctx.setCandidateType(_candidateType, true);</span>
+            }
+<span class="nc" id="L2459">        }</span>
+
+        /**
+         * Public for unit testing purposes.
+         */
+        public Class&lt;?&gt; getCandidateType() {
+<span class="nc" id="L2465">            return _candidateType;</span>
+        }
+
+        @Override
+        public String toString ()
+		{
+<span class="nc" id="L2471">			return this.query;</span>
+		}
+	}
+
+
+    // throws an exception if there are numeric parameters which do not start with 1.
+    private void validateParameters() {
+<span class="nc bnc" id="L2478" title="All 4 branches missed.">        if (parameterTypes == null || parameterTypes.isEmpty()) {</span>
+<span class="nc" id="L2479">            return;</span>
+        }
+
+<span class="nc" id="L2482">        boolean numericParms = false;</span>
+<span class="nc" id="L2483">        boolean namedParms = false;</span>
+
+<span class="nc bnc" id="L2485" title="All 2 branches missed.">        for (Object key : parameterTypes.keySet()) {</span>
+
+<span class="nc bnc" id="L2487" title="All 2 branches missed.">            if (key instanceof Number) {</span>
+<span class="nc bnc" id="L2488" title="All 2 branches missed.">                if (namedParms) {</span>
+<span class="nc" id="L2489">                    throw new UserException(_loc.get(&quot;mixed-parameter-types&quot;, resolver.getQueryContext()</span>
+<span class="nc" id="L2490">                        .getQueryString(), parameterTypes.keySet().toString()));</span>
+                }
+<span class="nc" id="L2492">                numericParms = true;</span>
+            } else {
+<span class="nc bnc" id="L2494" title="All 2 branches missed.">                if (numericParms) {</span>
+<span class="nc" id="L2495">                    throw new UserException(_loc.get(&quot;mixed-parameter-types&quot;, resolver.getQueryContext()</span>
+<span class="nc" id="L2496">                        .getQueryString(), parameterTypes.keySet().toString()));</span>
+                }
+<span class="nc" id="L2498">                namedParms = true;</span>
+            }
+<span class="nc" id="L2500">        }</span>
+
+<span class="nc bnc" id="L2502" title="All 2 branches missed.">        if (numericParms) {</span>
+<span class="nc bnc" id="L2503" title="All 2 branches missed.">            if (!parameterTypes.keySet().contains(1)) {</span>
+<span class="nc" id="L2504">                throw new UserException(_loc.get(&quot;missing-positional-parameter&quot;, resolver.getQueryContext()</span>
+<span class="nc" id="L2505">                    .getQueryString(), parameterTypes.keySet().toString()));</span>
+            }
+        }
+<span class="nc" id="L2508">    }</span>
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

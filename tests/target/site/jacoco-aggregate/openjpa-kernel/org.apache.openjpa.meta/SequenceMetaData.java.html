@@ -1,0 +1,460 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SequenceMetaData.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.meta</a> &gt; <span class="el_source">SequenceMetaData.java</span></div><h1>SequenceMetaData.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.meta;
+
+import java.io.File;
+import java.io.Serializable;
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+
+import org.apache.openjpa.conf.SeqValue;
+import org.apache.openjpa.kernel.Seq;
+import org.apache.openjpa.lib.conf.Configurations;
+import org.apache.openjpa.lib.conf.PluginValue;
+import org.apache.openjpa.lib.meta.SourceTracker;
+import org.apache.openjpa.lib.util.Closeable;
+import org.apache.openjpa.lib.util.J2DoPrivHelper;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.StringUtil;
+import org.apache.openjpa.lib.xml.Commentable;
+import org.apache.openjpa.util.MetaDataException;
+import org.apache.openjpa.util.OpenJPAException;
+
+/**
+ * Metadata about a named sequence.
+ *
+ * @author Abe White
+ * @since 0.4.0
+ */
+public class SequenceMetaData
+    implements SourceTracker, MetaDataContext, Closeable, Commentable,
+    Serializable {
+
+    
+    private static final long serialVersionUID = 1L;
+
+    /**
+     * Sequence name that means to use the system default sequence.
+     */
+    public static final String NAME_SYSTEM = &quot;system&quot;;
+
+    /**
+     * Default plugin alias name; every back end should have some 'native'
+     * sequence implementation.
+     */
+    public static final String IMPL_NATIVE = &quot;native&quot;;
+
+    /**
+     * Time-based sequence values.
+     */
+    public static final String IMPL_TIME = &quot;time&quot;;
+
+    // plugin property names for standard props
+    private static final String PROP_SEQUENCE = &quot;Sequence&quot;;
+    private static final String PROP_INITIAL_VALUE = &quot;InitialValue&quot;;
+    private static final String PROP_ALLOCATE = &quot;Allocate&quot;;
+    private static final String PROP_INCREMENT = &quot;Increment&quot;;
+    private static final String PROP_SCHEMA = &quot;Schema&quot;;
+    private static final String PROP_CATALOG = &quot;Catalog&quot;;
+
+<span class="nc" id="L76">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L77">        (SequenceMetaData.class);</span>
+
+    private MetaDataRepository _repos;
+<span class="nc" id="L80">    private SequenceFactory _factory = null;</span>
+
+    private final String _name;
+<span class="nc" id="L83">    private int _type = Seq.TYPE_DEFAULT;</span>
+<span class="nc" id="L84">    private String _plugin = IMPL_NATIVE;</span>
+<span class="nc" id="L85">    private File _source = null;</span>
+<span class="nc" id="L86">    private Object _scope = null;</span>
+<span class="nc" id="L87">    private int _srcType = SRC_OTHER;</span>
+<span class="nc" id="L88">    private int _lineNum = 0;</span>
+<span class="nc" id="L89">    private int _colNum = 0;</span>
+<span class="nc" id="L90">    private String[] _comments = null;</span>
+<span class="nc" id="L91">    private String _sequence = null;</span>
+<span class="nc" id="L92">    private int _increment = -1;</span>
+<span class="nc" id="L93">    private int _allocate = -1;</span>
+<span class="nc" id="L94">    private int _initial = -1;</span>
+<span class="nc" id="L95">    private String _schema = null;</span>
+<span class="nc" id="L96">    private String _catalog = null;</span>
+
+    // instantiated lazily
+<span class="nc" id="L99">    private transient Seq _instance = null;</span>
+
+    /**
+     * Constructor; supply sequence name.
+     */
+<span class="nc" id="L104">    public SequenceMetaData(String name, MetaDataRepository repos) {</span>
+<span class="nc" id="L105">        _name = name;</span>
+<span class="nc" id="L106">        _repos = repos;</span>
+<span class="nc" id="L107">    }</span>
+
+    /**
+     * The owning repository.
+     */
+    @Override
+    public MetaDataRepository getRepository() {
+<span class="nc" id="L114">        return _repos;</span>
+    }
+
+    /**
+     * The sequence name.
+     */
+    public String getName() {
+<span class="nc" id="L121">        return _name;</span>
+    }
+
+    @Override
+    public File getSourceFile() {
+<span class="nc" id="L126">        return _source;</span>
+    }
+
+    @Override
+    public Object getSourceScope() {
+<span class="nc" id="L131">        return _scope;</span>
+    }
+
+    @Override
+    public int getSourceType() {
+<span class="nc" id="L136">        return _srcType;</span>
+    }
+
+    public void setSource(File file, Object scope, int srcType) {
+<span class="nc" id="L140">        _source = file;</span>
+<span class="nc" id="L141">        _scope = scope;</span>
+<span class="nc" id="L142">        _srcType = srcType;</span>
+<span class="nc" id="L143">    }</span>
+
+    @Override
+    public int getLineNumber() {
+<span class="nc" id="L147">        return _lineNum;</span>
+    }
+
+    public void setLineNumber(int lineNum) {
+<span class="nc" id="L151">        _lineNum = lineNum;</span>
+<span class="nc" id="L152">    }</span>
+
+    @Override
+    public int getColNumber() {
+<span class="nc" id="L156">        return _colNum;</span>
+    }
+
+    public void setColNumber(int colNum) {
+<span class="nc" id="L160">        _colNum = colNum;</span>
+<span class="nc" id="L161">    }</span>
+
+    @Override
+    public String getResourceName() {
+<span class="nc" id="L165">        return _name;</span>
+    }
+
+    /**
+     * The sequence type.
+     */
+    public int getType() {
+<span class="nc" id="L172">        return _type;</span>
+    }
+
+    /**
+     * The sequence type.
+     */
+    public void setType(int type) {
+<span class="nc" id="L179">        _type = type;</span>
+<span class="nc" id="L180">    }</span>
+
+    /**
+     * Native sequence name.
+     */
+    public String getSequence() {
+<span class="nc" id="L186">        return _sequence;</span>
+    }
+
+    /**
+     * Native sequence name.
+     */
+    public void setSequence(String sequence) {
+<span class="nc" id="L193">        _sequence = sequence;</span>
+<span class="nc" id="L194">    }</span>
+
+    /**
+     * Sequence increment, or -1 for default.
+     */
+    public int getIncrement() {
+<span class="nc" id="L200">        return _increment;</span>
+    }
+
+    /**
+     * Sequence increment, or -1 for default.
+     */
+    public void setIncrement(int increment) {
+<span class="nc" id="L207">        _increment = increment;</span>
+<span class="nc" id="L208">    }</span>
+
+    /**
+     * Sequence values to allocate, or -1 for default.
+     */
+    public int getAllocate() {
+<span class="nc" id="L214">        return _allocate;</span>
+    }
+
+    /**
+     * Sequence values to allocate, or -1 for default.
+     */
+    public void setAllocate(int allocate) {
+<span class="nc" id="L221">        _allocate = allocate;</span>
+<span class="nc" id="L222">    }</span>
+
+    /**
+     * Initial sequence value, or -1 for default.
+     */
+    public int getInitialValue() {
+<span class="nc" id="L228">        return _initial;</span>
+    }
+
+    /**
+     * Initial sequence value, or -1 for default.
+     */
+    public void setInitialValue(int initial) {
+<span class="nc" id="L235">        _initial = initial;</span>
+<span class="nc" id="L236">    }</span>
+
+    /**
+     * Plugin string describing the {@link Seq}.
+     */
+    public String getSequencePlugin() {
+<span class="nc" id="L242">        return _plugin;</span>
+    }
+
+    /**
+     * Plugin string describing the {@link Seq}.
+     */
+    public void setSequencePlugin(String plugin) {
+<span class="nc" id="L249">        _plugin = plugin;</span>
+<span class="nc" id="L250">    }</span>
+
+    /**
+     * A factory to transform spec sequences produced by user factories into
+     * the OpenJPA sequence type.
+     */
+    public SequenceFactory getSequenceFactory() {
+<span class="nc" id="L257">        return _factory;</span>
+    }
+
+    /**
+     * A factory to transform spec sequences produced by user factories into
+     * the OpenJPA sequence type.
+     */
+    public void setSequenceFactory(SequenceFactory factory) {
+<span class="nc" id="L265">        _factory = factory;</span>
+<span class="nc" id="L266">    }</span>
+
+    /**
+     * Return the initialized sequence instance.
+     */
+    public synchronized Seq getInstance(ClassLoader envLoader) {
+<span class="nc bnc" id="L272" title="All 2 branches missed.">        if (_instance == null)</span>
+<span class="nc" id="L273">            _instance = instantiate(envLoader);</span>
+<span class="nc" id="L274">        return _instance;</span>
+    }
+
+    /**
+     * Create a new uninitialized instance of this sequence.
+     */
+    protected Seq instantiate(ClassLoader envLoader) {
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        if (NAME_SYSTEM.equals(_name))</span>
+<span class="nc" id="L282">            return _repos.getConfiguration().getSequenceInstance();</span>
+
+        try {
+<span class="nc" id="L285">            PluginValue plugin = newPluginValue(&quot;sequence-plugin&quot;);</span>
+<span class="nc" id="L286">            plugin.setString(_plugin);</span>
+<span class="nc" id="L287">            String clsName = plugin.getClassName();</span>
+
+<span class="nc" id="L289">            Class cls = null;</span>
+            try {
+<span class="nc" id="L291">                cls = Class.forName(clsName, true,</span>
+<span class="nc" id="L292">                    AccessController.doPrivileged(J2DoPrivHelper.getClassLoaderAction(Seq.class)));</span>
+<span class="nc" id="L293">            } catch (ClassNotFoundException cnfe) {</span>
+                // Target sequence type is loaded by the ClassLoader responsible for OpenJPA classes.
+                // This can happen if the custom sequence implementation is a class that belongs to
+                // a child ClassLoader - a situation that can easily happen in a JEE environment.
+                // Fall back to the envLoader to try load the class.
+<span class="nc" id="L298">                cls = Class.forName(clsName, true, envLoader);</span>
+<span class="nc" id="L299">            }</span>
+
+<span class="nc" id="L301">            StringBuilder props = new StringBuilder();</span>
+<span class="nc bnc" id="L302" title="All 2 branches missed.">            if (plugin.getProperties() != null)</span>
+<span class="nc" id="L303">                props.append(plugin.getProperties());</span>
+<span class="nc" id="L304">            addStandardProperties(props);</span>
+
+            // allow user-class specification of either our sequence
+            // interface or a factory class
+            Seq seq;
+<span class="nc bnc" id="L309" title="All 2 branches missed.">            if (Seq.class.isAssignableFrom(cls)) {</span>
+<span class="nc" id="L310">                seq = (Seq) AccessController.doPrivileged(</span>
+<span class="nc" id="L311">                    J2DoPrivHelper.newInstanceAction(cls));</span>
+<span class="nc" id="L312">                Configurations.configureInstance(seq,</span>
+<span class="nc" id="L313">                    _repos.getConfiguration(), props.toString());</span>
+<span class="nc bnc" id="L314" title="All 2 branches missed.">                if(_type != Seq.TYPE_DEFAULT)</span>
+<span class="nc" id="L315">                    seq.setType(_type);</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">            } else if (_factory != null)</span>
+<span class="nc" id="L317">                seq = _factory.toSequence(cls, props.toString());</span>
+            else
+<span class="nc" id="L319">                throw new MetaDataException(_loc.get(&quot;not-seq-cls&quot;, _name,</span>
+                    cls));
+<span class="nc" id="L321">            return seq;</span>
+<span class="nc" id="L322">        } catch (OpenJPAException ke) {</span>
+<span class="nc" id="L323">            throw ke;</span>
+<span class="nc" id="L324">        } catch (Exception e) {</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">            if (e instanceof PrivilegedActionException)</span>
+<span class="nc" id="L326">                e = ((PrivilegedActionException) e).getException();</span>
+<span class="nc" id="L327">            throw new MetaDataException(_loc.get(&quot;cant-init-seq&quot;, _name)).</span>
+<span class="nc" id="L328">                setCause(e);</span>
+        }
+    }
+
+    /*
+     * Set/Get the schema name
+     */
+    public void setSchema(String schema) {
+        // If the schema name is empty, check to see if a system
+        // level default exists and if so use it.
+<span class="nc bnc" id="L338" title="All 4 branches missed.">        if (schema == null || &quot;&quot;.equals(schema)){</span>
+<span class="nc" id="L339">            String tmp = getRepository().getMetaDataFactory().getDefaults().getDefaultSchema();</span>
+<span class="nc bnc" id="L340" title="All 2 branches missed.">            schema = (tmp != null ? tmp : &quot;&quot;);</span>
+        }
+
+<span class="nc" id="L343">        this._schema = schema;</span>
+<span class="nc" id="L344">    }</span>
+
+    public String getSchema() {
+<span class="nc" id="L347">        return _schema;</span>
+    }
+
+    /*
+     * Set/Get the catalog name
+     */
+    public void setCatalog(String catalog) {
+<span class="nc" id="L354">        this._catalog = catalog;</span>
+<span class="nc" id="L355">    }</span>
+
+    public String getCatalog() {
+<span class="nc" id="L358">        return _catalog;</span>
+    }
+
+    /**
+     * Create a new plugin value for sequences. Returns a standard
+     * {@link SeqValue} by default.
+     */
+    protected PluginValue newPluginValue(String property) {
+<span class="nc" id="L366">        return new SeqValue(property);</span>
+    }
+
+    /**
+     * Add standard properties to the given properties buffer.
+     */
+    protected void addStandardProperties(StringBuilder props) {
+<span class="nc" id="L373">        appendProperty(props, PROP_SEQUENCE, wrapValue(_sequence));</span>
+<span class="nc" id="L374">        appendProperty(props, PROP_INITIAL_VALUE, _initial);</span>
+<span class="nc" id="L375">        appendProperty(props, PROP_ALLOCATE, _allocate);</span>
+<span class="nc" id="L376">        appendProperty(props, PROP_INCREMENT, _increment);</span>
+<span class="nc" id="L377">        appendProperty(props, PROP_SCHEMA, wrapValue(_schema));</span>
+<span class="nc" id="L378">        appendProperty(props, PROP_CATALOG, wrapValue(_catalog));</span>
+<span class="nc" id="L379">    }</span>
+
+    /**
+     * Wraps property values that may contain spaces or other special characters
+     * in double quotes so they are processed as a single valued argument.
+     */
+    protected String wrapValue(String value) {
+<span class="nc bnc" id="L386" title="All 2 branches missed.">        if (value != null) {</span>
+<span class="nc" id="L387">            return &quot;\&quot;&quot; + value + &quot;\&quot;&quot;;</span>
+        }
+<span class="nc" id="L389">        return value;</span>
+    }
+
+    /**
+     * Add a string property to the buffer. Nothing will be added if value
+     * is null or empty string.
+     */
+    protected void appendProperty(StringBuilder props, String name, String val) {
+<span class="nc bnc" id="L397" title="All 2 branches missed.">        if (StringUtil.isEmpty(val))</span>
+<span class="nc" id="L398">            return;</span>
+<span class="nc bnc" id="L399" title="All 2 branches missed.">        if (props.length() &gt; 0)</span>
+<span class="nc" id="L400">            props.append(&quot;,&quot;);</span>
+<span class="nc" id="L401">        props.append(name).append(&quot;=&quot;).append(val);</span>
+<span class="nc" id="L402">    }</span>
+
+    /**
+     * Add an int property to the buffer. Nothing will be added if value is -1.
+     */
+    protected void appendProperty(StringBuilder props, String name, int val) {
+<span class="nc bnc" id="L408" title="All 2 branches missed.">        if (val == -1)</span>
+<span class="nc" id="L409">            return;</span>
+<span class="nc bnc" id="L410" title="All 2 branches missed.">        if (props.length() &gt; 0)</span>
+<span class="nc" id="L411">            props.append(&quot;,&quot;);</span>
+<span class="nc" id="L412">        props.append(name).append(&quot;=&quot;).append(val);</span>
+<span class="nc" id="L413">    }</span>
+
+    /**
+     * Close user sequence instance.
+     */
+    @Override
+    public void close() {
+<span class="nc bnc" id="L420" title="All 4 branches missed.">        if (_instance != null &amp;&amp; !NAME_SYSTEM.equals(_name))</span>
+            try {
+<span class="nc" id="L422">                _instance.close();</span>
+<span class="nc" id="L423">            } catch (Exception e) {</span>
+<span class="nc" id="L424">            }</span>
+<span class="nc" id="L425">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L429">        return _name;</span>
+    }
+
+    ///////////////
+    // Commentable
+    ///////////////
+
+    @Override
+    public String[] getComments() {
+<span class="nc bnc" id="L438" title="All 2 branches missed.">        return (_comments == null) ? EMPTY_COMMENTS : _comments;</span>
+    }
+
+    @Override
+    public void setComments(String[] comments) {
+<span class="nc" id="L443">        _comments = comments;</span>
+<span class="nc" id="L444">    }</span>
+
+    /**
+     * Allow facades to supply adapters from a spec sequence type to the
+     * OpenJPA sequence type.
+     */
+    public interface SequenceFactory
+        extends Serializable {
+
+        /**
+         * Transform the given class named in metadata into a sequence.
+         */
+		Seq toSequence (Class cls, String props)
+			throws Exception;
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

@@ -1,0 +1,349 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ProxySetupStateManager.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.meta</a> &gt; <span class="el_source">ProxySetupStateManager.java</span></div><h1>ProxySetupStateManager.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.meta;
+
+import java.io.ObjectOutput;
+import java.util.Calendar;
+import java.util.SortedMap;
+import java.util.SortedSet;
+
+import org.apache.openjpa.enhance.PersistenceCapable;
+import org.apache.openjpa.enhance.StateManager;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.util.InternalException;
+
+/**
+ * Mostly-unimplemented state manager type whose sole purpose is to
+ * check the initial value of all SCO container fields for their initialized
+ * types and comparators.
+ *
+ * @author Abe White
+ */
+<span class="nc" id="L38">class ProxySetupStateManager</span>
+    implements StateManager {
+
+<span class="nc" id="L41">	private static final Localizer _loc = Localizer</span>
+<span class="nc" id="L42">		.forPackage(ProxySetupStateManager.class);</span>
+
+<span class="nc" id="L44">    private Object _object = null;</span>
+
+    public void setProxyData(PersistenceCapable pc, ClassMetaData meta) {
+<span class="nc" id="L47">        FieldMetaData[] fmds = meta.getFields();</span>
+<span class="nc bnc" id="L48" title="All 2 branches missed.">        for (int i = 0; i &lt; fmds.length; i++) {</span>
+            // This method only gets called for concrete types. We need to do this processing for fields that might
+            // not be owned by pc.
+
+<span class="nc bnc" id="L52" title="All 4 branches missed.">            switch (fmds[i].getDeclaredTypeCode()) {</span>
+                case JavaTypes.CALENDAR:
+<span class="nc" id="L54">                    pc.pcProvideField(fmds[i].getIndex());</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">                    if (_object != null) {</span>
+                        // specified timezone
+<span class="nc" id="L57">                        fmds[i]</span>
+<span class="nc" id="L58">                            .setInitializer(((Calendar) _object).getTimeZone());</span>
+                    }
+                    break;
+                case JavaTypes.COLLECTION:
+<span class="nc" id="L62">                    pc.pcProvideField(fmds[i].getIndex());</span>
+<span class="nc bnc" id="L63" title="All 2 branches missed.">                    if (_object != null) {</span>
+                        // more specific type?
+<span class="nc bnc" id="L65" title="All 2 branches missed.">                        if (_object.getClass() != fmds[i].getDeclaredType())</span>
+<span class="nc" id="L66">                            fmds[i].setProxyType(_object.getClass());</span>
+
+                        // custom comparator?
+<span class="nc bnc" id="L69" title="All 2 branches missed.">                        if (_object instanceof SortedSet)</span>
+<span class="nc" id="L70">                            fmds[i].setInitializer(((SortedSet) _object).</span>
+<span class="nc" id="L71">                                comparator());</span>
+                    }
+                    break;
+                case JavaTypes.MAP:
+<span class="nc" id="L75">                    pc.pcProvideField(fmds[i].getIndex());</span>
+<span class="nc bnc" id="L76" title="All 2 branches missed.">                    if (_object != null) {</span>
+                        // more specific type?
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                        if (_object.getClass() != fmds[i].getDeclaredType())</span>
+<span class="nc" id="L79">                            fmds[i].setProxyType(_object.getClass());</span>
+
+                        // custom comparator?
+<span class="nc bnc" id="L82" title="All 2 branches missed.">                        if (_object instanceof SortedMap)</span>
+<span class="nc" id="L83">                            fmds[i].setInitializer(((SortedMap) _object).</span>
+<span class="nc" id="L84">                                comparator());</span>
+                    }
+                    break;
+            }
+        }
+<span class="nc" id="L89">    }</span>
+
+    @Override
+    public Object getPCPrimaryKey(Object oid, int field) {
+<span class="nc" id="L93">        throw new UnsupportedOperationException();</span>
+    }
+
+    @Override
+    public StateManager replaceStateManager(StateManager sm) {
+<span class="nc" id="L98">        throw new InternalException();</span>
+    }
+
+    @Override
+    public boolean isDirty() {
+<span class="nc" id="L103">        throw new InternalException();</span>
+    }
+
+    @Override
+    public boolean isTransactional() {
+<span class="nc" id="L108">        throw new InternalException();</span>
+    }
+
+    @Override
+    public boolean isPersistent() {
+<span class="nc" id="L113">        throw new InternalException();</span>
+    }
+
+    @Override
+    public boolean isNew() {
+<span class="nc" id="L118">        throw new InternalException();</span>
+    }
+
+    @Override
+    public boolean isDeleted() {
+<span class="nc" id="L123">        throw new InternalException();</span>
+    }
+
+    @Override
+    public boolean isDetached() {
+<span class="nc" id="L128">        throw new InternalException();</span>
+    }
+
+    @Override
+    public Object getGenericContext() {
+<span class="nc" id="L133">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void dirty(String s) {
+<span class="nc" id="L138">        throw new InternalException();</span>
+    }
+
+    @Override
+    public Object fetchObjectId() {
+<span class="nc" id="L143">        throw new InternalException();</span>
+    }
+
+    @Override
+    public Object getVersion() {
+<span class="nc" id="L148">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void accessingField(int i) {
+<span class="nc" id="L153">        throw new InternalException();</span>
+    }
+
+    @Override
+    public boolean serializing() {
+<span class="nc" id="L158">        throw new InternalException();</span>
+    }
+
+    @Override
+    public boolean writeDetached(ObjectOutput out) {
+<span class="nc" id="L163">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void proxyDetachedDeserialized(int idx) {
+<span class="nc" id="L168">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void settingBooleanField(PersistenceCapable pc, int i, boolean b,
+        boolean b2, int set) {
+<span class="nc" id="L174">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void settingCharField(PersistenceCapable pc, int i, char c, char c2,
+        int set) {
+<span class="nc" id="L180">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void settingByteField(PersistenceCapable pc, int i, byte b, byte b2,
+        int set) {
+<span class="nc" id="L186">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void settingShortField(PersistenceCapable pc, int i, short s,
+        short s2, int set) {
+<span class="nc" id="L192">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void settingIntField(PersistenceCapable pc, int i, int i2, int i3,
+        int set) {
+<span class="nc" id="L198">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void settingLongField(PersistenceCapable pc, int i, long l, long l2,
+        int set) {
+<span class="nc" id="L204">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void settingFloatField(PersistenceCapable pc, int i, float f,
+        float f2, int set) {
+<span class="nc" id="L210">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void settingDoubleField(PersistenceCapable pc, int i, double d,
+        double d2, int set) {
+<span class="nc" id="L216">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void settingStringField(PersistenceCapable pc, int i, String s,
+        String s2, int set) {
+<span class="nc" id="L222">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void settingObjectField(PersistenceCapable pc, int i, Object o,
+        Object o2, int set) {
+<span class="nc" id="L228">        throw new InternalException();</span>
+    }
+
+    @Override
+    public void providedBooleanField(PersistenceCapable pc, int i, boolean b) {
+<span class="nc" id="L233">        throw new InternalException(_loc.get(</span>
+<span class="nc" id="L234">                &quot;unexpected_proxy_sm_attribute_type&quot;, pc.getClass().getName(),</span>
+				&quot;boolean&quot;));
+    }
+
+    @Override
+    public void providedCharField(PersistenceCapable pc, int i, char c) {
+<span class="nc" id="L240">        throw new InternalException(_loc.get(</span>
+<span class="nc" id="L241">                &quot;unexpected_proxy_sm_attribute_type&quot;, pc.getClass().getName(),</span>
+				&quot;char&quot;));
+    }
+
+    @Override
+    public void providedByteField(PersistenceCapable pc, int i, byte b) {
+<span class="nc" id="L247">        throw new InternalException(_loc.get(</span>
+<span class="nc" id="L248">                &quot;unexpected_proxy_sm_attribute_type&quot;, pc.getClass().getName(),</span>
+				&quot;byte&quot;));
+    }
+
+    @Override
+    public void providedShortField(PersistenceCapable pc, int i, short s) {
+<span class="nc" id="L254">        throw new InternalException(_loc.get(</span>
+<span class="nc" id="L255">                &quot;unexpected_proxy_sm_attribute_type&quot;, pc.getClass().getName(),</span>
+				&quot;short&quot;));
+    }
+
+    @Override
+    public void providedIntField(PersistenceCapable pc, int i, int i2) {
+<span class="nc" id="L261">        throw new InternalException(_loc.get(</span>
+<span class="nc" id="L262">                &quot;unexpected_proxy_sm_attribute_type&quot;, pc.getClass().getName(),</span>
+				&quot;int&quot;));
+    }
+
+    @Override
+    public void providedLongField(PersistenceCapable pc, int i, long l) {
+<span class="nc" id="L268">        throw new InternalException(_loc.get(</span>
+<span class="nc" id="L269">                &quot;unexpected_proxy_sm_attribute_type&quot;, pc.getClass().getName(),</span>
+				&quot;long&quot;));
+    }
+
+    @Override
+    public void providedFloatField(PersistenceCapable pc, int i, float f) {
+<span class="nc" id="L275">        throw new InternalException(_loc.get(</span>
+<span class="nc" id="L276">                &quot;unexpected_proxy_sm_attribute_type&quot;, pc.getClass().getName(),</span>
+				&quot;float&quot;));
+    }
+
+    @Override
+    public void providedDoubleField(PersistenceCapable pc, int i, double d) {
+<span class="nc" id="L282">        throw new InternalException(_loc.get(</span>
+<span class="nc" id="L283">                &quot;unexpected_proxy_sm_attribute_type&quot;, pc.getClass().getName(),</span>
+				&quot;double&quot;));
+    }
+
+    @Override
+    public void providedStringField(PersistenceCapable pc, int i, String s) {
+<span class="nc" id="L289">        throw new InternalException(_loc.get(</span>
+<span class="nc" id="L290">                &quot;unexpected_proxy_sm_attribute_type&quot;, pc.getClass().getName(),</span>
+				&quot;String&quot;));
+    }
+
+    @Override
+    public void providedObjectField(PersistenceCapable pc, int i, Object o) {
+<span class="nc" id="L296">        _object = o;</span>
+<span class="nc" id="L297">    }</span>
+
+    @Override
+    public boolean replaceBooleanField(PersistenceCapable pc, int i) {
+<span class="nc" id="L301">        throw new InternalException();</span>
+    }
+
+    @Override
+    public char replaceCharField(PersistenceCapable pc, int i) {
+<span class="nc" id="L306">        throw new InternalException();</span>
+    }
+
+    @Override
+    public byte replaceByteField(PersistenceCapable pc, int i) {
+<span class="nc" id="L311">        throw new InternalException();</span>
+    }
+
+    @Override
+    public short replaceShortField(PersistenceCapable pc, int i) {
+<span class="nc" id="L316">        throw new InternalException();</span>
+    }
+
+    @Override
+    public int replaceIntField(PersistenceCapable pc, int i) {
+<span class="nc" id="L321">        throw new InternalException();</span>
+    }
+
+    @Override
+    public long replaceLongField(PersistenceCapable pc, int i) {
+<span class="nc" id="L326">        throw new InternalException();</span>
+    }
+
+    @Override
+    public float replaceFloatField(PersistenceCapable pc, int i) {
+<span class="nc" id="L331">        throw new InternalException();</span>
+    }
+
+    @Override
+    public double replaceDoubleField(PersistenceCapable pc, int i) {
+<span class="nc" id="L336">        throw new InternalException();</span>
+    }
+
+    @Override
+    public String replaceStringField(PersistenceCapable pc, int i) {
+<span class="nc" id="L341">        throw new InternalException();</span>
+    }
+
+    @Override
+    public Object replaceObjectField(PersistenceCapable pc, int i) {
+<span class="nc" id="L346">        throw new InternalException();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

@@ -1,0 +1,918 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>SingleFieldManager.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">SingleFieldManager.java</span></div><h1>SingleFieldManager.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.io.IOException;
+import java.io.ObjectOutput;
+import java.io.Serializable;
+import java.sql.Timestamp;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.Date;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.TimeZone;
+
+import org.apache.openjpa.enhance.PersistenceCapable;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.meta.FieldMetaData;
+import org.apache.openjpa.meta.JavaTypes;
+import org.apache.openjpa.meta.ValueMetaData;
+import org.apache.openjpa.meta.ValueStrategies;
+import org.apache.openjpa.util.ChangeTracker;
+import org.apache.openjpa.util.Exceptions;
+import org.apache.openjpa.util.ImplHelper;
+import org.apache.openjpa.util.InvalidStateException;
+import org.apache.openjpa.util.LRSProxy;
+import org.apache.openjpa.util.MapChangeTracker;
+import org.apache.openjpa.util.ObjectId;
+import org.apache.openjpa.util.Proxies;
+import org.apache.openjpa.util.Proxy;
+import org.apache.openjpa.util.ProxyManager;
+import org.apache.openjpa.util.UserException;
+
+/**
+ * FieldManager type used to hold onto a single field value and then
+ * dispense it via the fetch methods. The manager can also perform actions
+ * on the held field.
+ */
+class SingleFieldManager extends TransferFieldManager implements Serializable {
+    
+    private static final long serialVersionUID = 1L;
+
+<span class="nc" id="L60">    private static final Localizer _loc = Localizer.forPackage(SingleFieldManager.class);</span>
+
+    private final StateManagerImpl _sm;
+    private final BrokerImpl _broker;
+    private final boolean _checkDbOnCascadePersist;
+
+<span class="nc" id="L66">    public SingleFieldManager(StateManagerImpl sm, BrokerImpl broker) {</span>
+<span class="nc" id="L67">        _sm = sm;</span>
+<span class="nc" id="L68">        _broker = broker;</span>
+<span class="nc" id="L69">        _checkDbOnCascadePersist =</span>
+<span class="nc" id="L70">            _broker.getConfiguration().getCompatibilityInstance().getCheckDatabaseForCascadePersistToDetachedEntity();</span>
+<span class="nc" id="L71">    }</span>
+
+    /**
+     * Proxy the held field if needed. Return true if the field needs to
+     * be replaced with the now-proxied instance.
+     */
+    public boolean proxy(boolean reset, boolean replaceNull) {
+<span class="nc" id="L78">        FieldMetaData fmd = _sm.getMetaData().getField(field);</span>
+<span class="nc" id="L79">        Proxy proxy = null;</span>
+<span class="nc" id="L80">        boolean ret = false;</span>
+<span class="nc bnc" id="L81" title="All 6 branches missed.">        switch (fmd.getDeclaredTypeCode()) {</span>
+            case JavaTypes.DATE:
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                if (objval == null)</span>
+<span class="nc" id="L84">                    return false;</span>
+<span class="nc" id="L85">                proxy = checkProxy(fmd);</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">                if (proxy == null) {</span>
+<span class="nc" id="L87">                    proxy = (Proxy) _sm.newFieldProxy(field);</span>
+<span class="nc" id="L88">                    ((Date) proxy).setTime(((Date) objval).getTime());</span>
+<span class="nc bnc" id="L89" title="All 4 branches missed.">                    if (proxy instanceof Timestamp &amp;&amp; objval instanceof Timestamp)</span>
+<span class="nc" id="L90">                        ((Timestamp) proxy).setNanos(((Timestamp) objval).getNanos());</span>
+<span class="nc" id="L91">                    ret = true;</span>
+                }
+                break;
+            case JavaTypes.CALENDAR:
+<span class="nc bnc" id="L95" title="All 2 branches missed.">                if (objval == null)</span>
+<span class="nc" id="L96">                    return false;</span>
+<span class="nc" id="L97">                proxy = checkProxy(fmd);</span>
+<span class="nc bnc" id="L98" title="All 2 branches missed.">                if (proxy == null) {</span>
+<span class="nc" id="L99">                    proxy = (Proxy) _sm.newFieldProxy(field);</span>
+<span class="nc" id="L100">                    ((Calendar) proxy).setTime(((Calendar) objval).getTime());</span>
+<span class="nc" id="L101">                    ret = true;</span>
+                } else {
+<span class="nc" id="L103">                    Object init = fmd.getInitializer();</span>
+<span class="nc bnc" id="L104" title="All 4 branches missed.">                    if (init != null &amp;&amp; init instanceof TimeZone) {</span>
+<span class="nc" id="L105">                        ((Calendar) proxy).setTimeZone((TimeZone)init);</span>
+                    }
+                }
+<span class="nc" id="L108">                break;</span>
+            case JavaTypes.COLLECTION:
+<span class="nc bnc" id="L110" title="All 4 branches missed.">                if (objval == null &amp;&amp; !replaceNull)</span>
+<span class="nc" id="L111">                    return false;</span>
+<span class="nc" id="L112">                proxy = checkProxy(fmd);</span>
+<span class="nc bnc" id="L113" title="All 2 branches missed.">                if (proxy == null) {</span>
+<span class="nc" id="L114">                    proxy = (Proxy) _sm.newFieldProxy(field);</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">                    if (objval != null)</span>
+<span class="nc" id="L116">                        ((Collection) proxy).addAll((Collection) objval);</span>
+<span class="nc" id="L117">                    ret = true;</span>
+                }
+                break;
+            case JavaTypes.MAP:
+<span class="nc bnc" id="L121" title="All 4 branches missed.">                if (objval == null &amp;&amp; !replaceNull)</span>
+<span class="nc" id="L122">                    return false;</span>
+<span class="nc" id="L123">                proxy = checkProxy(fmd);</span>
+<span class="nc bnc" id="L124" title="All 2 branches missed.">                if (proxy == null) {</span>
+<span class="nc" id="L125">                    proxy = (Proxy) _sm.newFieldProxy(field);</span>
+<span class="nc bnc" id="L126" title="All 2 branches missed.">                    if (objval != null)</span>
+<span class="nc" id="L127">                        ((Map) proxy).putAll((Map) objval);</span>
+<span class="nc" id="L128">                    ret = true;</span>
+                }
+                break;
+            case JavaTypes.OBJECT:
+<span class="nc bnc" id="L132" title="All 2 branches missed.">                if (objval == null)</span>
+<span class="nc" id="L133">                    return false;</span>
+<span class="nc" id="L134">                proxy = checkProxy(fmd);</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">                if (proxy == null) {</span>
+<span class="nc" id="L136">                    proxy = getProxyManager().newCustomProxy(objval,</span>
+<span class="nc" id="L137">                        _sm.getBroker().getConfiguration().</span>
+<span class="nc" id="L138">                        getCompatibilityInstance().getAutoOff());</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">                    ret = proxy != null;</span>
+                }
+                break;
+        }
+
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (proxy != null) {</span>
+<span class="nc" id="L145">            proxy.setOwner(_sm, field);</span>
+<span class="nc" id="L146">            ChangeTracker tracker = proxy.getChangeTracker();</span>
+<span class="nc bnc" id="L147" title="All 4 branches missed.">            if (reset &amp;&amp; tracker != null) {</span>
+<span class="nc bnc" id="L148" title="All 2 branches missed.">                if (fmd.getDeclaredTypeCode() == JavaTypes.MAP) {</span>
+                    // track values if key is derived from value, else keys
+<span class="nc bnc" id="L150" title="All 2 branches missed.">                    boolean keys = fmd.getKey().getValueMappedBy() == null;</span>
+<span class="nc" id="L151">                    ((MapChangeTracker) tracker).setTrackKeys(keys);</span>
+                }
+<span class="nc" id="L153">                tracker.startTracking();</span>
+            }
+<span class="nc" id="L155">            objval = proxy;</span>
+        }
+<span class="nc" id="L157">        return ret;</span>
+    }
+
+    /**
+     * If the current field is a usable proxy and it should be a proxy, return it; else return null.
+     *
+     * This method will skim out Calendar instances that were proxied before we knew if they need to be proxied.
+     */
+    private Proxy checkProxy(FieldMetaData fmd) {
+<span class="nc bnc" id="L166" title="All 2 branches missed.">        if (!(objval instanceof Proxy))</span>
+<span class="nc" id="L167">            return null;</span>
+
+<span class="nc" id="L169">        Proxy proxy = (Proxy) objval;</span>
+<span class="nc bnc" id="L170" title="All 4 branches missed.">        if (proxy.getOwner() == null || Proxies.isOwner(proxy, _sm, field)) {</span>
+<span class="nc bnc" id="L171" title="All 2 branches missed.">            if (fmd.getProxyType().isAssignableFrom(proxy.getClass())</span>
+<span class="nc bnc" id="L172" title="All 4 branches missed.">                    || (fmd.isLRS() &amp;&amp; (objval instanceof LRSProxy))) {</span>
+<span class="nc" id="L173">                return proxy;</span>
+            }
+        }
+<span class="nc" id="L176">        return null;</span>
+    }
+
+    /**
+     * Unproxies the current field if needed.
+     */
+    public void unproxy() {
+<span class="nc bnc" id="L183" title="All 2 branches missed.">        if (objval == null)</span>
+<span class="nc" id="L184">            return;</span>
+
+<span class="nc" id="L186">        FieldMetaData fmd = _sm.getMetaData().getField(field);</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        switch (fmd.getDeclaredTypeCode()) {</span>
+            case JavaTypes.COLLECTION:
+            case JavaTypes.MAP:
+            case JavaTypes.DATE:
+            case JavaTypes.OBJECT:
+<span class="nc bnc" id="L192" title="All 2 branches missed.">                if (objval instanceof Proxy) {</span>
+<span class="nc" id="L193">                    Proxy proxy = (Proxy) objval;</span>
+<span class="nc" id="L194">                    proxy.setOwner(null, -1);</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">                    if (proxy.getChangeTracker() != null)</span>
+<span class="nc" id="L196">                        proxy.getChangeTracker().stopTracking();</span>
+                }
+        }
+<span class="nc" id="L199">    }</span>
+
+    /**
+     * Release the currently embedded field (make it transient).
+     */
+    public void releaseEmbedded() {
+<span class="nc bnc" id="L205" title="All 2 branches missed.">        if (objval == null)</span>
+<span class="nc" id="L206">            return;</span>
+
+<span class="nc" id="L208">        FieldMetaData fmd = _sm.getMetaData().getField(field);</span>
+<span class="nc bnc" id="L209" title="All 5 branches missed.">        switch (fmd.getDeclaredTypeCode()) {</span>
+            case JavaTypes.PC:
+<span class="nc bnc" id="L211" title="All 2 branches missed.">                if (fmd.isEmbeddedPC())</span>
+<span class="nc" id="L212">                    releaseEmbedded(fmd, objval);</span>
+                break;
+            case JavaTypes.ARRAY:
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                if (fmd.getElement().isEmbeddedPC())</span>
+<span class="nc" id="L216">                    releaseEmbedded(fmd.getElement(), (Object[]) objval);</span>
+                break;
+            case JavaTypes.COLLECTION:
+<span class="nc bnc" id="L219" title="All 2 branches missed.">                if (fmd.getElement().isEmbeddedPC())</span>
+<span class="nc" id="L220">                    releaseEmbedded(fmd.getElement(), (Collection) objval);</span>
+                break;
+            case JavaTypes.MAP:
+<span class="nc bnc" id="L223" title="All 2 branches missed.">                if (fmd.getKey().isEmbeddedPC())</span>
+<span class="nc" id="L224">                    releaseEmbedded(fmd.getKey(), ((Map) objval).keySet());</span>
+<span class="nc bnc" id="L225" title="All 2 branches missed.">                if (fmd.getElement().isEmbeddedPC())</span>
+<span class="nc" id="L226">                    releaseEmbedded(fmd.getElement(), ((Map) objval).values());</span>
+                break;
+        }
+<span class="nc" id="L229">    }</span>
+
+    /**
+     * Release the given embedded objects.
+     */
+    private void releaseEmbedded(ValueMetaData vmd, Object[] objs) {
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        for (int i = 0; i &lt; objs.length; i++)</span>
+<span class="nc" id="L236">            releaseEmbedded(vmd, objs[i]);</span>
+<span class="nc" id="L237">    }</span>
+
+    /**
+     * Release the given embedded objects.
+     */
+    private void releaseEmbedded(ValueMetaData vmd, Collection objs) {
+<span class="nc bnc" id="L243" title="All 2 branches missed.">        for (Iterator itr = objs.iterator(); itr.hasNext();)</span>
+<span class="nc" id="L244">            releaseEmbedded(vmd, itr.next());</span>
+<span class="nc" id="L245">    }</span>
+
+    /**
+     * Release the given embedd object.
+     */
+    private void releaseEmbedded(ValueMetaData vmd, Object obj) {
+<span class="nc bnc" id="L251" title="All 2 branches missed.">        if (obj == null)</span>
+<span class="nc" id="L252">            return;</span>
+
+<span class="nc" id="L254">        StateManagerImpl sm = _broker.getStateManagerImpl(obj, false);</span>
+<span class="nc bnc" id="L255" title="All 4 branches missed.">        if (sm != null &amp;&amp; sm.getOwner() == _sm</span>
+<span class="nc bnc" id="L256" title="All 2 branches missed.">            &amp;&amp; sm.getOwnerIndex() == vmd.getFieldMetaData().getIndex())</span>
+<span class="nc" id="L257">            sm.release(true);</span>
+<span class="nc" id="L258">    }</span>
+
+    /**
+     * Persist the stored field safely, preventing infinite recursion using
+     * the given set of already-persisted objects. This method is only called
+     * for fields that we know have cascade-immediate settings.
+     */
+    public void persist(OpCallbacks call) {
+<span class="nc bnc" id="L266" title="All 2 branches missed.">        if (objval == null)</span>
+<span class="nc" id="L267">            return;</span>
+
+<span class="nc" id="L269">        FieldMetaData fmd = _sm.getMetaData().getField(field);</span>
+<span class="nc bnc" id="L270" title="All 5 branches missed.">        switch (fmd.getDeclaredTypeCode()) {</span>
+            case JavaTypes.PC:
+            case JavaTypes.PC_UNTYPED:
+<span class="nc bnc" id="L273" title="All 4 branches missed.">                if (!_broker.isDetachedNew() &amp;&amp; _broker.isDetached(objval, _checkDbOnCascadePersist))</span>
+<span class="nc" id="L274">                    return; // allow but ignore</span>
+<span class="nc" id="L275">                _broker.persist(objval, true, call);</span>
+<span class="nc" id="L276">                break;</span>
+            case JavaTypes.ARRAY:
+<span class="nc" id="L278">                _broker.persistAll(Arrays.asList((Object[]) objval), true,</span>
+                    call);
+<span class="nc" id="L280">                break;</span>
+            case JavaTypes.COLLECTION:
+<span class="nc" id="L282">                _broker.persistAll((Collection) objval, true, call);</span>
+<span class="nc" id="L283">                break;</span>
+            case JavaTypes.MAP:
+<span class="nc bnc" id="L285" title="All 2 branches missed.">                if (fmd.getKey().getCascadePersist()</span>
+                    == ValueMetaData.CASCADE_IMMEDIATE)
+<span class="nc" id="L287">                    _broker.persistAll(((Map) objval).keySet(), true, call);</span>
+<span class="nc bnc" id="L288" title="All 2 branches missed.">                if (fmd.getElement().getCascadePersist()</span>
+                    == ValueMetaData.CASCADE_IMMEDIATE)
+<span class="nc" id="L290">                    _broker.persistAll(((Map) objval).values(), true, call);</span>
+                break;
+        }
+<span class="nc" id="L293">    }</span>
+
+    /**
+     * Delete and/or dereference field values.
+     */
+    public void delete(OpCallbacks call) {
+<span class="nc" id="L299">        delete(true, call);</span>
+<span class="nc" id="L300">    }</span>
+
+    /**
+     * Dereference field values.
+     */
+    public void dereferenceDependent() {
+<span class="nc" id="L306">        delete(false, null, true);</span>
+<span class="nc" id="L307">    }</span>
+
+    private void delete(boolean immediate, OpCallbacks call) {
+<span class="nc" id="L310">        delete(immediate, call, false);</span>
+<span class="nc" id="L311">    }</span>
+
+    /**
+     * Delete or dereference the stored field as necessary.
+     */
+    private void delete(boolean immediate, OpCallbacks call, boolean deref) {
+<span class="nc bnc" id="L317" title="All 2 branches missed.">        if (objval == null)</span>
+<span class="nc" id="L318">            return;</span>
+
+<span class="nc" id="L320">        FieldMetaData fmd = _sm.getMetaData().getField(field);</span>
+<span class="nc bnc" id="L321" title="All 2 branches missed.">        if (fmd.getCascadeDelete() != ValueMetaData.CASCADE_NONE) {</span>
+            // immediate cascade works on field value; dependent deref
+            // works on external value
+<span class="nc bnc" id="L324" title="All 4 branches missed.">            if ((immediate || fmd.isEmbeddedPC())</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">                &amp;&amp; fmd.getCascadeDelete() == ValueMetaData.CASCADE_IMMEDIATE) {</span>
+<span class="nc bnc" id="L326" title="All 4 branches missed.">                if (fmd.isEmbeddedPC() &amp;&amp; deref) {</span>
+<span class="nc" id="L327">                    StateManagerImpl sm = _broker.getStateManagerImpl(objval, false);</span>
+<span class="nc bnc" id="L328" title="All 2 branches missed.">                    if (sm != null)</span>
+<span class="nc" id="L329">                        dereferenceEmbedDependent(sm);</span>
+                }
+<span class="nc" id="L331">                delete(fmd, objval, call);</span>
+            }
+<span class="nc bnc" id="L333" title="All 2 branches missed.">            else if (fmd.getCascadeDelete() == ValueMetaData.CASCADE_AUTO)</span>
+<span class="nc" id="L334">                dereferenceDependent(fmd.getExternalValue(objval, _broker));</span>
+<span class="nc" id="L335">            return;</span>
+        }
+
+<span class="nc" id="L338">        Object external = null;</span>
+<span class="nc" id="L339">        ValueMetaData vmd = fmd.getKey();</span>
+<span class="nc bnc" id="L340" title="All 4 branches missed.">        if ((immediate || vmd.isEmbeddedPC())</span>
+<span class="nc bnc" id="L341" title="All 2 branches missed.">            &amp;&amp; vmd.getCascadeDelete() == ValueMetaData.CASCADE_IMMEDIATE)</span>
+<span class="nc" id="L342">            delete(vmd, ((Map) objval).keySet(), call);</span>
+<span class="nc bnc" id="L343" title="All 2 branches missed.">        else if (vmd.getCascadeDelete() == ValueMetaData.CASCADE_AUTO) {</span>
+<span class="nc" id="L344">            external = fmd.getExternalValue(objval, _broker);</span>
+<span class="nc bnc" id="L345" title="All 2 branches missed.">            if (external == null)</span>
+<span class="nc" id="L346">                return;</span>
+<span class="nc" id="L347">            dereferenceDependent(((Map) external).keySet());</span>
+        }
+
+<span class="nc" id="L350">        vmd = fmd.getElement();</span>
+<span class="nc bnc" id="L351" title="All 4 branches missed.">        if ((immediate || vmd.isEmbeddedPC())</span>
+<span class="nc bnc" id="L352" title="All 2 branches missed.">            &amp;&amp; vmd.getCascadeDelete() == ValueMetaData.CASCADE_IMMEDIATE) {</span>
+<span class="nc bnc" id="L353" title="All 4 branches missed.">            switch (fmd.getDeclaredTypeCode()) {</span>
+                case JavaTypes.COLLECTION:
+<span class="nc" id="L355">                    delete(vmd, (Collection) objval, call);</span>
+<span class="nc" id="L356">                    break;</span>
+                case JavaTypes.ARRAY:
+<span class="nc" id="L358">                    delete(vmd, (Object[]) objval, call);</span>
+<span class="nc" id="L359">                    break;</span>
+                case JavaTypes.MAP:
+<span class="nc" id="L361">                    delete(vmd, ((Map) objval).values(), call);</span>
+<span class="nc" id="L362">                    break;</span>
+            }
+<span class="nc bnc" id="L364" title="All 2 branches missed.">        } else if (vmd.getCascadeDelete() == ValueMetaData.CASCADE_AUTO) {</span>
+<span class="nc bnc" id="L365" title="All 2 branches missed.">            if (external == null) {</span>
+<span class="nc" id="L366">                external = fmd.getExternalValue(objval, _broker);</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">                if (external == null)</span>
+<span class="nc" id="L368">                    return;</span>
+            }
+
+<span class="nc bnc" id="L371" title="All 4 branches missed.">            switch (fmd.getTypeCode()) {</span>
+                case JavaTypes.COLLECTION:
+<span class="nc" id="L373">                    dereferenceDependent((Collection) external);</span>
+<span class="nc" id="L374">                    break;</span>
+                case JavaTypes.ARRAY:
+<span class="nc" id="L376">                    dereferenceDependent((Object[]) external);</span>
+<span class="nc" id="L377">                    break;</span>
+                case JavaTypes.MAP:
+<span class="nc" id="L379">                    dereferenceDependent(((Map) external).values());</span>
+                    break;
+            }
+        }
+<span class="nc" id="L383">    }</span>
+
+    /**
+     * Delete the objects in the given value.
+     */
+    private void delete(ValueMetaData vmd, Object[] objs, OpCallbacks call) {
+<span class="nc bnc" id="L389" title="All 2 branches missed.">        for (int i = 0; i &lt; objs.length; i++)</span>
+<span class="nc" id="L390">            delete(vmd, objs[i], call);</span>
+<span class="nc" id="L391">    }</span>
+
+    /**
+     * Delete the objects embedded in the given value.
+     */
+    private void delete(ValueMetaData vmd, Collection objs, OpCallbacks call) {
+<span class="nc bnc" id="L397" title="All 2 branches missed.">        for (Iterator itr = objs.iterator(); itr.hasNext();)</span>
+<span class="nc" id="L398">            delete(vmd, itr.next(), call);</span>
+<span class="nc" id="L399">    }</span>
+
+    /**
+     * Delete an object embedded in the given value.
+     */
+    void delete(ValueMetaData vmd, Object obj, OpCallbacks call) {
+<span class="nc bnc" id="L405" title="All 2 branches missed.">        if (obj == null)</span>
+<span class="nc" id="L406">            return;</span>
+
+        // delete if unknowned or this isn't an embedded field or if owned by us
+<span class="nc" id="L409">        StateManagerImpl sm = _broker.getStateManagerImpl(obj, false);</span>
+<span class="nc bnc" id="L410" title="All 6 branches missed.">        if (sm != null &amp;&amp; (sm.getOwner() == null || !vmd.isEmbeddedPC()</span>
+<span class="nc bnc" id="L411" title="All 2 branches missed.">            || (sm.getOwner() == _sm</span>
+<span class="nc bnc" id="L412" title="All 2 branches missed.">            &amp;&amp; sm.getOwnerIndex() == vmd.getFieldMetaData().getIndex())))</span>
+<span class="nc" id="L413">            _broker.delete(sm.getManagedInstance(), sm, call);</span>
+<span class="nc" id="L414">    }</span>
+
+    /**
+     * Dereference all valid persistent objects in the given collection.
+     */
+    private void dereferenceDependent(Object[] objs) {
+<span class="nc bnc" id="L420" title="All 2 branches missed.">        for (int i = 0; i &lt; objs.length; i++)</span>
+<span class="nc" id="L421">            dereferenceDependent(objs[i]);</span>
+<span class="nc" id="L422">    }</span>
+
+    /**
+     * Dereference all valid persistent objects in the given collection.
+     */
+    private void dereferenceDependent(Collection objs) {
+<span class="nc bnc" id="L428" title="All 2 branches missed.">        for (Iterator itr = objs.iterator(); itr.hasNext();)</span>
+<span class="nc" id="L429">            dereferenceDependent(itr.next());</span>
+<span class="nc" id="L430">    }</span>
+
+    /**
+     * Dereference the given object.
+     */
+    void dereferenceDependent(Object obj) {
+<span class="nc bnc" id="L436" title="All 2 branches missed.">        if (obj == null)</span>
+<span class="nc" id="L437">            return;</span>
+<span class="nc" id="L438">        StateManagerImpl sm = _broker.getStateManagerImpl(obj, false);</span>
+<span class="nc bnc" id="L439" title="All 2 branches missed.">        if (sm != null)</span>
+<span class="nc" id="L440">            sm.setDereferencedDependent(true, true);</span>
+<span class="nc" id="L441">    }</span>
+
+    void dereferenceEmbedDependent(StateManagerImpl sm) {
+<span class="nc" id="L444">    	sm.setDereferencedEmbedDependent(true);</span>
+<span class="nc" id="L445">    }</span>
+
+    /**
+     * Recursively invoke the broker to gather cascade-refresh objects in
+     * the current field into the given set. This method is only called
+     * for fields that we know have cascade-refresh settings.
+     */
+    public void gatherCascadeRefresh(OpCallbacks call) {
+<span class="nc bnc" id="L453" title="All 2 branches missed.">        if (objval == null)</span>
+<span class="nc" id="L454">            return;</span>
+
+<span class="nc" id="L456">        FieldMetaData fmd = _sm.getMetaData().getField(field);</span>
+<span class="nc bnc" id="L457" title="All 5 branches missed.">        switch (fmd.getDeclaredTypeCode()) {</span>
+            case JavaTypes.PC:
+            case JavaTypes.PC_UNTYPED:
+<span class="nc" id="L460">                _broker.gatherCascadeRefresh(objval, call);</span>
+<span class="nc" id="L461">                break;</span>
+            case JavaTypes.ARRAY:
+<span class="nc" id="L463">                gatherCascadeRefresh((Object[]) objval, call);</span>
+<span class="nc" id="L464">                break;</span>
+            case JavaTypes.COLLECTION:
+<span class="nc" id="L466">                gatherCascadeRefresh((Collection) objval, call);</span>
+<span class="nc" id="L467">                break;</span>
+            case JavaTypes.MAP:
+<span class="nc bnc" id="L469" title="All 2 branches missed.">                if (fmd.getKey().getCascadeRefresh()</span>
+                    == ValueMetaData.CASCADE_IMMEDIATE)
+<span class="nc" id="L471">                    gatherCascadeRefresh(((Map) objval).keySet(), call);</span>
+<span class="nc bnc" id="L472" title="All 2 branches missed.">                if (fmd.getElement().getCascadeRefresh()</span>
+                    == ValueMetaData.CASCADE_IMMEDIATE)
+<span class="nc" id="L474">                    gatherCascadeRefresh(((Map) objval).values(), call);</span>
+                break;
+        }
+<span class="nc" id="L477">    }</span>
+
+    /**
+     * Gather each element.
+     */
+    private void gatherCascadeRefresh(Object[] arr, OpCallbacks call) {
+<span class="nc bnc" id="L483" title="All 2 branches missed.">        for (int i = 0; i &lt; arr.length; i++)</span>
+<span class="nc" id="L484">            _broker.gatherCascadeRefresh(arr[i], call);</span>
+<span class="nc" id="L485">    }</span>
+
+    /**
+     * Gather each element.
+     */
+    private void gatherCascadeRefresh(Collection coll, OpCallbacks call) {
+<span class="nc bnc" id="L491" title="All 2 branches missed.">        for (Iterator itr = coll.iterator(); itr.hasNext();)</span>
+<span class="nc" id="L492">            _broker.gatherCascadeRefresh(itr.next(), call);</span>
+<span class="nc" id="L493">    }</span>
+
+    /**
+     * Perform pre-flush tasks on the current field. This includes checking
+     * for nulls, persisting pcs, embedding embedded fields, and ref'ing
+     * pc fields. Return true if the field needs to be replaced with the
+     * new value.
+     */
+    public boolean preFlush(boolean logical, OpCallbacks call) {
+        // only care about object fields
+<span class="nc" id="L503">        FieldMetaData fmd = _sm.getMetaData().getField(field);</span>
+<span class="nc bnc" id="L504" title="All 2 branches missed.">        if (fmd.getDeclaredTypeCode() &lt; JavaTypes.OBJECT)</span>
+<span class="nc" id="L505">            return false;</span>
+
+        // manage inverses
+<span class="nc" id="L508">        InverseManager manager = _broker.getInverseManager();</span>
+<span class="nc bnc" id="L509" title="All 2 branches missed.">        if (manager != null)</span>
+<span class="nc" id="L510">            manager.correctRelations(_sm, fmd, objval);</span>
+
+        // perform pers-by-reach and dependent refs
+<span class="nc" id="L513">        return preFlush(fmd, logical, call);</span>
+    }
+
+    /**
+     * Return true if the last-provided field has a default value.
+     */
+    public boolean isDefaultValue() {
+<span class="nc bnc" id="L520" title="All 6 branches missed.">        return dblval == 0 &amp;&amp; longval == 0</span>
+<span class="nc bnc" id="L521" title="All 2 branches missed.">            &amp;&amp; (objval == null || &quot;&quot;.equals(objval));</span>
+    }
+
+    /**
+     * Write the stored field or its default value to the given stream.
+     */
+    public void serialize(ObjectOutput out, boolean def)
+        throws IOException {
+<span class="nc" id="L529">        FieldMetaData fmd = _sm.getMetaData().getField(field);</span>
+<span class="nc bnc" id="L530" title="All 9 branches missed.">        switch (fmd.getDeclaredTypeCode()) {</span>
+            case JavaTypes.BOOLEAN:
+<span class="nc bnc" id="L532" title="All 4 branches missed.">                out.writeBoolean(!def &amp;&amp; longval == 1);</span>
+<span class="nc" id="L533">                break;</span>
+            case JavaTypes.BYTE:
+<span class="nc bnc" id="L535" title="All 2 branches missed.">                out.writeByte((def) ? (byte) 0 : (byte) longval);</span>
+<span class="nc" id="L536">                break;</span>
+            case JavaTypes.CHAR:
+<span class="nc bnc" id="L538" title="All 2 branches missed.">                out.writeChar((def) ? (char) 0 : (char) longval);</span>
+<span class="nc" id="L539">                break;</span>
+            case JavaTypes.DOUBLE:
+<span class="nc bnc" id="L541" title="All 2 branches missed.">                out.writeDouble((def) ? 0D : dblval);</span>
+<span class="nc" id="L542">                break;</span>
+            case JavaTypes.FLOAT:
+<span class="nc bnc" id="L544" title="All 2 branches missed.">                out.writeFloat((def) ? 0F : (float) dblval);</span>
+<span class="nc" id="L545">                break;</span>
+            case JavaTypes.INT:
+<span class="nc bnc" id="L547" title="All 2 branches missed.">                out.writeInt((def) ? 0 : (int) longval);</span>
+<span class="nc" id="L548">                break;</span>
+            case JavaTypes.LONG:
+<span class="nc bnc" id="L550" title="All 2 branches missed.">                out.writeLong((def) ? 0L : longval);</span>
+<span class="nc" id="L551">                break;</span>
+            case JavaTypes.SHORT:
+<span class="nc bnc" id="L553" title="All 2 branches missed.">                out.writeShort((def) ? (short) 0 : (short) longval);</span>
+<span class="nc" id="L554">                break;</span>
+            default:
+<span class="nc bnc" id="L556" title="All 2 branches missed.">                out.writeObject((def) ? null : objval);</span>
+        }
+<span class="nc" id="L558">    }</span>
+
+    /**
+     * Helper method to perform pre flush actions on the current object.
+     */
+    private boolean preFlush(FieldMetaData fmd, boolean logical, OpCallbacks call) {
+        // check for illegal nulls
+<span class="nc bnc" id="L565" title="All 2 branches missed.">        if (objval == null) {</span>
+            // If we have an AUTOASSIGN strategy that means that we have a field that is GenerationType.IDENTITY so
+            // skip checking to see if the value is null as it will get assigned later in flush processing.
+<span class="nc bnc" id="L568" title="All 2 branches missed.">            if (fmd.getValueStrategy() != ValueStrategies.AUTOASSIGN) {</span>
+<span class="nc bnc" id="L569" title="All 4 branches missed.">                if (fmd.getNullValue() == FieldMetaData.NULL_EXCEPTION || fmd.getDeclaredTypeCode() == JavaTypes.OID)</span>
+<span class="nc" id="L570">                    throw new InvalidStateException(_loc.get(&quot;null-value&quot;, fmd.getName(), _sm.getManagedInstance()))</span>
+<span class="nc" id="L571">                        .setFatal(true);</span>
+            }
+<span class="nc" id="L573">            return false;</span>
+        }
+
+        // nothing else to do for non-persistent
+<span class="nc bnc" id="L577" title="All 2 branches missed.">        if (fmd.getManagement() != FieldMetaData.MANAGE_PERSISTENT)</span>
+<span class="nc" id="L578">            return false;</span>
+
+        // don't allow managed objectid field value
+<span class="nc bnc" id="L581" title="All 2 branches missed.">        if (fmd.getDeclaredTypeCode() == JavaTypes.OID) {</span>
+<span class="nc" id="L582">            _sm.assertNotManagedObjectId(objval);</span>
+<span class="nc bnc" id="L583" title="All 2 branches missed.">            if (_sm.getObjectId() != null</span>
+<span class="nc bnc" id="L584" title="All 2 branches missed.">                &amp;&amp; !objval.equals(((ObjectId) _sm.getObjectId()).getId()))</span>
+<span class="nc" id="L585">                throw new InvalidStateException(_loc.get(&quot;changed-oid&quot;,</span>
+<span class="nc" id="L586">                    _sm.getObjectId(), objval,</span>
+<span class="nc" id="L587">                    Exceptions.toString(_sm.getManagedInstance()))).</span>
+<span class="nc" id="L588">                    setFatal(true);</span>
+        }
+
+        // check for pcs in field value
+<span class="nc bnc" id="L592" title="All 2 branches missed.">        if (preFlush(fmd, fmd.getDeclaredTypeCode(),</span>
+<span class="nc" id="L593">            fmd.getKey().getDeclaredTypeCode(),</span>
+<span class="nc" id="L594">            fmd.getElement().getDeclaredTypeCode(), false, logical, call))</span>
+<span class="nc" id="L595">            return true;</span>
+
+        // also check for pcs in externalized values
+<span class="nc bnc" id="L598" title="All 2 branches missed.">        if (fmd.isExternalized())</span>
+<span class="nc" id="L599">            preFlush(fmd, fmd.getTypeCode(), fmd.getKey().getTypeCode(),</span>
+<span class="nc" id="L600">                fmd.getElement().getTypeCode(), true, logical, call);</span>
+<span class="nc" id="L601">        return false;</span>
+    }
+
+    /**
+     * Make new objects persistent and ref other objects so referenced
+     * dependent objects won't be deleted.
+     */
+    private boolean preFlush(FieldMetaData fmd, int type, int keyType,
+        int elemType, boolean external, boolean logical, OpCallbacks call) {
+<span class="nc" id="L610">        Object val = objval;</span>
+<span class="nc bnc" id="L611" title="All 2 branches missed.">        if (val == null)</span>
+<span class="nc" id="L612">            return false;</span>
+
+<span class="nc" id="L614">        boolean copy = false;</span>
+<span class="nc bnc" id="L615" title="All 6 branches missed.">        switch (type) {</span>
+            case JavaTypes.PC:
+<span class="nc bnc" id="L617" title="All 2 branches missed.">                if (fmd.isEmbeddedPC()) {</span>
+<span class="nc" id="L618">                    objval = embed(fmd, val);</span>
+<span class="nc" id="L619">                    copy = true;</span>
+                } else {
+<span class="nc bnc" id="L621" title="All 2 branches missed.">                    if (external)</span>
+<span class="nc" id="L622">                        val = fmd.getExternalValue(val, _broker);</span>
+<span class="nc bnc" id="L623" title="All 2 branches missed.">                    if (val != null)</span>
+<span class="nc" id="L624">                        preFlushPC(fmd, val, logical, call);</span>
+                }
+                break;
+            case JavaTypes.PC_UNTYPED:
+<span class="nc bnc" id="L628" title="All 2 branches missed.">                if (external)</span>
+<span class="nc" id="L629">                    val = fmd.getExternalValue(val, _broker);</span>
+<span class="nc bnc" id="L630" title="All 2 branches missed.">                if (val != null)</span>
+<span class="nc" id="L631">                    preFlushPC(fmd, val, logical, call);</span>
+                break;
+            case JavaTypes.ARRAY:
+<span class="nc bnc" id="L634" title="All 2 branches missed.">                if (fmd.getElement().isEmbeddedPC())</span>
+<span class="nc" id="L635">                    embed(fmd.getElement(), (Object[]) val);</span>
+<span class="nc bnc" id="L636" title="All 4 branches missed.">                else if (elemType == JavaTypes.PC</span>
+                    || elemType == JavaTypes.PC_UNTYPED) {
+<span class="nc bnc" id="L638" title="All 2 branches missed.">                    if (external)</span>
+<span class="nc" id="L639">                        val = fmd.getExternalValue(val, _broker);</span>
+<span class="nc bnc" id="L640" title="All 2 branches missed.">                    if (val != null)</span>
+<span class="nc" id="L641">                        preFlushPCs(fmd.getElement(), (Object[]) val, logical,</span>
+                            call);
+                }
+                break;
+            case JavaTypes.COLLECTION:
+<span class="nc bnc" id="L646" title="All 2 branches missed.">                if (fmd.getElement().isEmbeddedPC()) {</span>
+<span class="nc" id="L647">                    objval = embed(fmd.getElement(), (Collection) val);</span>
+<span class="nc" id="L648">                    copy = true;</span>
+<span class="nc bnc" id="L649" title="All 4 branches missed.">                } else if (elemType == JavaTypes.PC</span>
+                    || elemType == JavaTypes.PC_UNTYPED) {
+<span class="nc" id="L651">                    boolean flushed = false;</span>
+<span class="nc bnc" id="L652" title="All 2 branches missed.">                    if (external)</span>
+<span class="nc" id="L653">                        val = fmd.getExternalValue(val, _broker);</span>
+<span class="nc bnc" id="L654" title="All 2 branches missed.">                    else if (val instanceof Proxy) {</span>
+                        // shortcut change trackers; also ensures we don't
+                        // iterate lrs fields
+<span class="nc" id="L657">                        ChangeTracker ct = ((Proxy) val).getChangeTracker();</span>
+<span class="nc bnc" id="L658" title="All 4 branches missed.">                        if (ct != null &amp;&amp; ct.isTracking()) {</span>
+<span class="nc" id="L659">                            preFlushPCs(fmd.getElement(), ct.getAdded(),</span>
+                                logical, call);
+<span class="nc" id="L661">                            preFlushPCs(fmd.getElement(), ct.getChanged(),</span>
+                                logical, call);
+<span class="nc" id="L663">                            flushed = true;</span>
+                        }
+                    }
+<span class="nc bnc" id="L666" title="All 4 branches missed.">                    if (!flushed &amp;&amp; val != null)</span>
+<span class="nc" id="L667">                        preFlushPCs(fmd.getElement(), (Collection) val, logical,</span>
+                            call);
+<span class="nc" id="L669">                }</span>
+                break;
+            case JavaTypes.MAP:
+<span class="nc" id="L672">                boolean keyEmbed = fmd.getKey().isEmbeddedPC();</span>
+<span class="nc" id="L673">                boolean valEmbed = fmd.getElement().isEmbeddedPC();</span>
+<span class="nc bnc" id="L674" title="All 4 branches missed.">                if (keyEmbed || valEmbed) {</span>
+<span class="nc" id="L675">                    objval = embed(fmd, (Map) val, keyEmbed, valEmbed);</span>
+<span class="nc" id="L676">                    copy = keyEmbed;</span>
+                }
+
+<span class="nc bnc" id="L679" title="All 6 branches missed.">                if (!keyEmbed &amp;&amp; (keyType == JavaTypes.PC</span>
+                    || keyType == JavaTypes.PC_UNTYPED)) {
+<span class="nc" id="L681">                    boolean flushed = false;</span>
+<span class="nc bnc" id="L682" title="All 2 branches missed.">                    if (external) {</span>
+<span class="nc" id="L683">                        val = fmd.getExternalValue(val, _broker);</span>
+<span class="nc" id="L684">                        external = false;</span>
+<span class="nc bnc" id="L685" title="All 2 branches missed.">                    } else if (val instanceof Proxy) {</span>
+                        // shortcut change trackers; also ensures we don't
+                        // iterate lrs fields
+<span class="nc" id="L688">                        MapChangeTracker ct = (MapChangeTracker) ((Proxy) val).</span>
+<span class="nc" id="L689">                            getChangeTracker();</span>
+<span class="nc bnc" id="L690" title="All 6 branches missed.">                        if (ct != null &amp;&amp; ct.isTracking() &amp;&amp; ct.getTrackKeys())</span>
+                        {
+<span class="nc" id="L692">                            preFlushPCs(fmd.getKey(), ct.getAdded(), logical,</span>
+                                call);
+<span class="nc" id="L694">                            preFlushPCs(fmd.getKey(), ct.getChanged(), logical,</span>
+                                call);
+<span class="nc" id="L696">                            flushed = true;</span>
+                        }
+                    }
+<span class="nc bnc" id="L699" title="All 4 branches missed.">                    if (!flushed &amp;&amp; val != null)</span>
+<span class="nc" id="L700">                        preFlushPCs(fmd.getKey(), ((Map) val).keySet(), logical,</span>
+                            call);
+                }
+
+<span class="nc bnc" id="L704" title="All 6 branches missed.">                if (!valEmbed &amp;&amp; (elemType == JavaTypes.PC</span>
+                    || elemType == JavaTypes.PC_UNTYPED)) {
+<span class="nc" id="L706">                    boolean flushed = false;</span>
+<span class="nc bnc" id="L707" title="All 2 branches missed.">                    if (external)</span>
+<span class="nc" id="L708">                        val = fmd.getExternalValue(val, _broker);</span>
+<span class="nc bnc" id="L709" title="All 2 branches missed.">                    else if (val instanceof Proxy) {</span>
+                        // shortcut change trackers; also ensures we don't
+                        // iterate lrs fields
+<span class="nc" id="L712">                        MapChangeTracker ct = (MapChangeTracker) ((Proxy) val).</span>
+<span class="nc" id="L713">                            getChangeTracker();</span>
+<span class="nc bnc" id="L714" title="All 4 branches missed.">                        if (ct != null &amp;&amp; ct.isTracking()) {</span>
+<span class="nc bnc" id="L715" title="All 2 branches missed.">                            if (ct.getTrackKeys()) {</span>
+<span class="nc" id="L716">                                preFlushPCs(fmd.getElement(), ct.getAdded(),</span>
+                                    (Map) val, logical, call);
+<span class="nc" id="L718">                                preFlushPCs(fmd.getElement(), ct.getChanged(),</span>
+                                    (Map) val, logical, call);
+                            } else {
+<span class="nc" id="L721">                                preFlushPCs(fmd.getElement(), ct.getAdded(),</span>
+                                    logical, call);
+<span class="nc" id="L723">                                preFlushPCs(fmd.getElement(), ct.getChanged(),</span>
+                                    logical, call);
+                            }
+<span class="nc" id="L726">                            flushed = true;</span>
+                        }
+                    }
+<span class="nc bnc" id="L729" title="All 4 branches missed.">                    if (!flushed &amp;&amp; val != null)</span>
+<span class="nc" id="L730">                        preFlushPCs(fmd.getElement(), ((Map) val).values(),</span>
+                            logical, call);
+                }
+                break;
+        }
+<span class="nc" id="L735">        return copy;</span>
+    }
+
+    /**
+     * Make new objects persistent and ref all valid persistent objects for
+     * the given keys.
+     */
+    private void preFlushPCs(ValueMetaData vmd, Collection keys, Map map,
+        boolean logical, OpCallbacks call) {
+<span class="nc bnc" id="L744" title="All 2 branches missed.">        for (Iterator itr = keys.iterator(); itr.hasNext();)</span>
+<span class="nc" id="L745">            preFlushPC(vmd, map.get(itr.next()), logical, call);</span>
+<span class="nc" id="L746">    }</span>
+
+    /**
+     * Make new objects persistent and ref all valid persistent objects in
+     * the given array.
+     */
+    private void preFlushPCs(ValueMetaData vmd, Object[] objs,
+        boolean logical, OpCallbacks call) {
+<span class="nc bnc" id="L754" title="All 2 branches missed.">        for (int i = 0; i &lt; objs.length; i++)</span>
+<span class="nc" id="L755">            preFlushPC(vmd, objs[i], logical, call);</span>
+<span class="nc" id="L756">    }</span>
+
+    /**
+     * Make new objects persistent and ref all valid persistent objects in
+     * the given collection.
+     */
+    private void preFlushPCs(ValueMetaData vmd, Collection objs,
+        boolean logical, OpCallbacks call) {
+<span class="nc bnc" id="L764" title="All 2 branches missed.">        for (Iterator itr = objs.iterator(); itr.hasNext();)</span>
+<span class="nc" id="L765">            preFlushPC(vmd, itr.next(), logical, call);</span>
+<span class="nc" id="L766">    }</span>
+
+    /**
+     * Perform pre flush operations on the given object.
+     */
+    private void preFlushPC(ValueMetaData vmd, Object obj, boolean logical, OpCallbacks call) {
+<span class="nc bnc" id="L772" title="All 2 branches missed.">        if (obj == null)</span>
+<span class="nc" id="L773">            return;</span>
+
+        OpenJPAStateManager sm;
+
+<span class="nc bnc" id="L777" title="All 2 branches missed.">        if (vmd.getCascadePersist() == ValueMetaData.CASCADE_NONE) {</span>
+<span class="nc bnc" id="L778" title="All 4 branches missed.">            if (!_broker.isDetachedNew() &amp;&amp; _broker.isDetached(obj, _checkDbOnCascadePersist)) {</span>
+<span class="nc" id="L779">                return; // allow but ignore</span>
+            }
+
+<span class="nc" id="L782">            sm = _broker.getStateManager(obj);</span>
+<span class="nc bnc" id="L783" title="All 4 branches missed.">            if (sm == null || !sm.isPersistent()) {</span>
+<span class="nc bnc" id="L784" title="All 2 branches missed.">                if (((StoreContext)_broker).getAllowReferenceToSiblingContext()</span>
+<span class="nc bnc" id="L785" title="All 2 branches missed.">                 &amp;&amp; ImplHelper.isManageable(obj)</span>
+<span class="nc bnc" id="L786" title="All 2 branches missed.">                 &amp;&amp; ((PersistenceCapable)obj).pcGetStateManager() != null) {</span>
+<span class="nc" id="L787">                    return;</span>
+                } else {
+<span class="nc" id="L789">                    throw new InvalidStateException(_loc.get(&quot;cant-cascade-persist&quot;,</span>
+<span class="nc" id="L790">                            vmd.toString(), Exceptions.toString(obj),</span>
+<span class="nc bnc" id="L791" title="All 2 branches missed.">                            sm == null ? &quot; unmanaged&quot; : sm.getPCState().getClass().getSimpleName()))</span>
+<span class="nc" id="L792">                    .setFailedObject(obj);</span>
+                }
+            }
+        } else {
+<span class="nc bnc" id="L796" title="All 2 branches missed.">            if (vmd.getCascadePersist() == ValueMetaData.CASCADE_IMMEDIATE) {</span>
+<span class="nc bnc" id="L797" title="All 4 branches missed.">                if (!_broker.isDetachedNew() &amp;&amp; _broker.isDetached(obj, _checkDbOnCascadePersist)) {</span>
+<span class="nc" id="L798">                    return; // allow but ignore</span>
+                }
+            }
+<span class="nc" id="L801">            sm = _broker.getStateManager(obj);</span>
+<span class="nc bnc" id="L802" title="All 4 branches missed.">            if (sm == null || !sm.isProvisional()) {</span>
+<span class="nc" id="L803">                sm = _broker.persist(obj, null, true, call);</span>
+                // ensure generated IDs get assigned properly
+<span class="nc bnc" id="L805" title="All 2 branches missed.">                if (!logical)</span>
+<span class="nc" id="L806">                    ((StateManagerImpl)sm).assignObjectId(false, true);</span>
+
+                // Call preFetch on this and any related persistent fields.
+                // This will ensure IDs get assigned to those that need them.
+<span class="nc bnc" id="L810" title="All 2 branches missed.">                if (_broker.isFlushing()) {</span>
+<span class="nc" id="L811">                    ((StateManagerImpl)sm).preFlush(logical, call);</span>
+                }
+            }
+        }
+
+<span class="nc bnc" id="L816" title="All 2 branches missed.">        if (sm != null) {</span>
+            // if deleted and not managed inverse, die
+<span class="nc bnc" id="L818" title="All 4 branches missed.">            if (sm.isDeleted() &amp;&amp; (_broker.getInverseManager() == null</span>
+<span class="nc bnc" id="L819" title="All 2 branches missed.">                || vmd.getFieldMetaData().getInverseMetaDatas().length == 0))</span>
+<span class="nc" id="L820">                throw new UserException(_loc.get(&quot;ref-to-deleted&quot;,</span>
+<span class="nc" id="L821">                    Exceptions.toString(obj), vmd,</span>
+<span class="nc" id="L822">                    Exceptions.toString(_sm.getManagedInstance()))).</span>
+<span class="nc" id="L823">                    setFailedObject(obj);</span>
+
+<span class="nc" id="L825">            StateManagerImpl smimpl = (StateManagerImpl) sm;</span>
+<span class="nc" id="L826">            smimpl.nonprovisional(logical, call);</span>
+<span class="nc" id="L827">            smimpl.setDereferencedDependent(false, true);</span>
+        }
+<span class="nc" id="L829">    }</span>
+
+    /**
+     * Make all elements of the given array embedded.
+     */
+    private void embed(ValueMetaData vmd, Object[] arr) {
+<span class="nc bnc" id="L835" title="All 2 branches missed.">        for (int i = 0; i &lt; arr.length; i++)</span>
+<span class="nc" id="L836">            arr[i] = embed(vmd, arr[i]);</span>
+<span class="nc" id="L837">    }</span>
+
+    /**
+     * Create a copy of the given collection containing embedded elements.
+     */
+    private Collection embed(ValueMetaData vmd, Collection orig) {
+        // we have to copy to get a collection of the right type and size,
+        // though we immediately clear it
+<span class="nc bnc" id="L845" title="All 2 branches missed.">        if (orig == null)</span>
+<span class="nc" id="L846">            throw new UserException(_loc.get(&quot;not-copyable&quot;,</span>
+<span class="nc" id="L847">                vmd.getFieldMetaData()));</span>
+<span class="nc" id="L848">        Collection coll = null;</span>
+        try {
+<span class="nc" id="L850">            coll = getProxyManager().copyCollection(orig);</span>
+<span class="nc" id="L851">        } catch (Exception e) {</span>
+<span class="nc" id="L852">            coll = (Collection) _sm.newFieldProxy(vmd.getFieldMetaData().getIndex());</span>
+<span class="nc" id="L853">        }</span>
+<span class="nc" id="L854">        coll.clear();</span>
+<span class="nc bnc" id="L855" title="All 2 branches missed.">        for (Iterator itr = orig.iterator(); itr.hasNext();)</span>
+<span class="nc" id="L856">            coll.add(embed(vmd, itr.next()));</span>
+<span class="nc" id="L857">        return coll;</span>
+    }
+
+    /**
+     * Embed the elements of the given map.
+     */
+    private Map embed(FieldMetaData fmd, Map orig, boolean keyEmbed,
+        boolean valEmbed) {
+        Map map;
+        Map.Entry entry;
+
+        // if we have to replace keys, we need to copy the map; otherwise
+        // we can mutate the values directly
+<span class="nc bnc" id="L870" title="All 2 branches missed.">        if (keyEmbed) {</span>
+<span class="nc bnc" id="L871" title="All 2 branches missed.">            if (orig == null)</span>
+<span class="nc" id="L872">                throw new UserException(_loc.get(&quot;not-copyable&quot;, fmd));</span>
+            // we have to copy to get a collection of the right type and size,
+            // though we immediately clear it
+            try {
+<span class="nc" id="L876">                map = getProxyManager().copyMap(orig);</span>
+<span class="nc" id="L877">            } catch (Exception e) {</span>
+<span class="nc" id="L878">                map = (Map) _sm.newFieldProxy(fmd.getIndex());</span>
+<span class="nc" id="L879">            }</span>
+<span class="nc" id="L880">            map.clear();</span>
+            Object key, val;
+<span class="nc bnc" id="L882" title="All 2 branches missed.">            for (Iterator itr = orig.entrySet().iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L883">                entry = (Map.Entry) itr.next();</span>
+<span class="nc" id="L884">                key = embed(fmd.getKey(), entry.getKey());</span>
+<span class="nc" id="L885">                val = entry.getValue();</span>
+<span class="nc bnc" id="L886" title="All 2 branches missed.">                if (valEmbed)</span>
+<span class="nc" id="L887">                    val = embed(fmd.getElement(), val);</span>
+<span class="nc" id="L888">                map.put(key, val);</span>
+            }
+        } else {
+<span class="nc" id="L891">            map = orig;</span>
+<span class="nc bnc" id="L892" title="All 2 branches missed.">            for (Iterator itr = map.entrySet().iterator(); itr.hasNext();) {</span>
+<span class="nc" id="L893">                entry = (Map.Entry) itr.next();</span>
+<span class="nc" id="L894">                entry.setValue(embed(fmd.getElement(),</span>
+<span class="nc" id="L895">                    entry.getValue()));</span>
+            }
+        }
+<span class="nc" id="L898">        return map;</span>
+    }
+
+    /**
+     * Make the given object embedded.
+     */
+    private Object embed(ValueMetaData vmd, Object obj) {
+<span class="nc bnc" id="L905" title="All 2 branches missed.">        if (obj == null)</span>
+<span class="nc" id="L906">            return null;</span>
+<span class="nc" id="L907">        return _broker.embed(obj, null, _sm, vmd).getManagedInstance();</span>
+    }
+
+    /**
+     * Return the proxy manager.
+     */
+    private ProxyManager getProxyManager ()
+	{
+<span class="nc" id="L915">		return _broker.getConfiguration ().getProxyManagerInstance ();</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

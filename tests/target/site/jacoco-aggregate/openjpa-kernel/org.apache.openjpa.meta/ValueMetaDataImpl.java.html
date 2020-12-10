@@ -1,0 +1,566 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ValueMetaDataImpl.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.meta</a> &gt; <span class="el_source">ValueMetaDataImpl.java</span></div><h1>ValueMetaDataImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.meta;
+
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.util.MetaDataException;
+import org.apache.openjpa.util.UserException;
+
+/**
+ * Default {@link ValueMetaData} implementation.
+ *
+ * @author Abe White
+ */
+public class ValueMetaDataImpl
+    implements ValueMetaData {
+
+    private static final long serialVersionUID = 6766697443293395831L;
+
+<span class="nc" id="L35">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L36">        (ValueMetaDataImpl.class);</span>
+
+    ///////////////////////////////////////////////////////////////
+    // Note: if you add additional state that should be copied to
+    // embedded metadata, make sure to add it to the copy() method
+    ///////////////////////////////////////////////////////////////
+
+    private FieldMetaData _owner;
+<span class="nc" id="L44">    private Class _decType = Object.class;</span>
+<span class="nc" id="L45">    private int _decCode = JavaTypes.OBJECT;</span>
+<span class="nc" id="L46">    private ClassMetaData _decTypeMeta = null;</span>
+<span class="nc" id="L47">    private Class _type = null;</span>
+<span class="nc" id="L48">    private int _code = JavaTypes.OBJECT;</span>
+<span class="nc" id="L49">    private ClassMetaData _typeMeta = null;</span>
+<span class="nc" id="L50">    private Class _typeOverride = null;</span>
+<span class="nc" id="L51">    private int _delete = CASCADE_NONE;</span>
+<span class="nc" id="L52">    private int _persist = CASCADE_AUTO;</span>
+<span class="nc" id="L53">    private int _attach = CASCADE_IMMEDIATE;</span>
+<span class="nc" id="L54">    private int _detach = CASCADE_AUTO;</span>
+<span class="nc" id="L55">    private int _refresh = CASCADE_AUTO;</span>
+<span class="nc" id="L56">    private boolean _serialized = false;</span>
+<span class="nc" id="L57">    private Boolean _embedded = null;</span>
+<span class="nc" id="L58">    private ClassMetaData _embeddedMeta = null;</span>
+<span class="nc" id="L59">    private int _resMode = MODE_NONE;</span>
+<span class="nc" id="L60">    private String _mappedBy = null;</span>
+<span class="nc" id="L61">    private FieldMetaData _mappedByMeta = null;</span>
+<span class="nc" id="L62">    private boolean _checkPUDefaultCascadePersist = true;</span>
+
+<span class="nc" id="L64">    protected ValueMetaDataImpl(FieldMetaData owner) {</span>
+<span class="nc" id="L65">        _owner = owner;</span>
+<span class="nc" id="L66">    }</span>
+
+    /**
+     * Constructor for serialization.
+     */
+<span class="nc" id="L71">    protected ValueMetaDataImpl() {</span>
+<span class="nc" id="L72">    }</span>
+
+    @Override
+    public FieldMetaData getFieldMetaData() {
+<span class="nc" id="L76">        return _owner;</span>
+    }
+
+    @Override
+    public MetaDataRepository getRepository() {
+<span class="nc" id="L81">        return _owner.getRepository();</span>
+    }
+
+    @Override
+    public Class getType() {
+<span class="nc bnc" id="L86" title="All 2 branches missed.">        return (_type == null) ? _decType : _type;</span>
+    }
+
+    @Override
+    public void setType(Class type) {
+<span class="nc" id="L91">        _type = type;</span>
+<span class="nc" id="L92">        _typeMeta = null;</span>
+<span class="nc bnc" id="L93" title="All 2 branches missed.">        if (type != null)</span>
+<span class="nc" id="L94">            setTypeCode(JavaTypes.getTypeCode(type));</span>
+<span class="nc" id="L95">    }</span>
+
+    @Override
+    public int getTypeCode() {
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        return (_type == null) ? _decCode : _code;</span>
+    }
+
+    @Override
+    public void setTypeCode(int code) {
+<span class="nc" id="L104">        _code = code;</span>
+<span class="nc" id="L105">    }</span>
+
+    @Override
+    public boolean isTypePC() {
+<span class="nc bnc" id="L109" title="All 2 branches missed.">        return getTypeCode() == JavaTypes.PC</span>
+<span class="nc bnc" id="L110" title="All 2 branches missed.">            || getTypeCode() == JavaTypes.PC_UNTYPED;</span>
+    }
+
+    @Override
+    public ClassMetaData getTypeMetaData() {
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        if (_type == null)</span>
+<span class="nc" id="L116">            return getDeclaredTypeMetaData();</span>
+<span class="nc bnc" id="L117" title="All 4 branches missed.">        if (_typeMeta == null &amp;&amp; _code == JavaTypes.PC) {</span>
+<span class="nc" id="L118">            ClassMetaData meta = _owner.getDefiningMetaData();</span>
+<span class="nc" id="L119">            _typeMeta = meta.getRepository().getMetaData(_type,</span>
+<span class="nc" id="L120">                meta.getEnvClassLoader(), true);</span>
+        }
+<span class="nc" id="L122">        return _typeMeta;</span>
+    }
+
+    @Override
+    public Class getDeclaredType() {
+<span class="nc" id="L127">        return _decType;</span>
+    }
+
+    @Override
+    public void setDeclaredType(Class type) {
+<span class="nc" id="L132">        _decType = type;</span>
+<span class="nc" id="L133">        _decTypeMeta = null;</span>
+<span class="nc" id="L134">        _decCode = JavaTypes.getTypeCode(type);</span>
+<span class="nc bnc" id="L135" title="All 2 branches missed.">        if (_embeddedMeta != null)</span>
+<span class="nc" id="L136">            _embeddedMeta.setDescribedType(type);</span>
+<span class="nc" id="L137">    }</span>
+
+    @Override
+    public int getDeclaredTypeCode() {
+<span class="nc" id="L141">        return _decCode;</span>
+    }
+
+    @Override
+    public void setDeclaredTypeCode(int code) {
+<span class="nc" id="L146">        _decCode = code;</span>
+<span class="nc" id="L147">    }</span>
+
+    @Override
+    public boolean isDeclaredTypePC() {
+<span class="nc bnc" id="L151" title="All 4 branches missed.">        return _decCode == JavaTypes.PC || _decCode == JavaTypes.PC_UNTYPED;</span>
+    }
+
+    @Override
+    public ClassMetaData getDeclaredTypeMetaData() {
+<span class="nc bnc" id="L156" title="All 4 branches missed.">        if (_decTypeMeta == null &amp;&amp; _decCode == JavaTypes.PC) {</span>
+<span class="nc bnc" id="L157" title="All 2 branches missed.">            if (isEmbedded())</span>
+<span class="nc" id="L158">                _decTypeMeta = getEmbeddedMetaData();</span>
+            else {
+<span class="nc" id="L160">                ClassMetaData meta = _owner.getDefiningMetaData();</span>
+<span class="nc" id="L161">                _decTypeMeta = meta.getRepository().getMetaData(_decType,</span>
+<span class="nc" id="L162">                    meta.getEnvClassLoader(), true);</span>
+            }
+        }
+<span class="nc" id="L165">        return _decTypeMeta;</span>
+    }
+
+    @Override
+    public boolean isEmbedded() {
+<span class="nc bnc" id="L170" title="All 2 branches missed.">        if (_owner.getManagement() != FieldMetaData.MANAGE_PERSISTENT)</span>
+<span class="nc" id="L171">            return false;</span>
+<span class="nc bnc" id="L172" title="All 2 branches missed.">        if (_embedded == null) {</span>
+            // field left as default; embedded setting depends on type
+<span class="nc bnc" id="L174" title="All 2 branches missed.">            switch (_decCode) {</span>
+                case JavaTypes.PC:
+                case JavaTypes.COLLECTION:
+                case JavaTypes.MAP:
+                case JavaTypes.PC_UNTYPED:
+<span class="nc" id="L179">                    _embedded = Boolean.FALSE;</span>
+<span class="nc" id="L180">                    break;</span>
+                default:
+<span class="nc" id="L182">                    _embedded = Boolean.TRUE;</span>
+            }
+        }
+<span class="nc" id="L185">        return _embedded.booleanValue();</span>
+    }
+
+    @Override
+    public void setEmbedded(boolean embedded) {
+<span class="nc bnc" id="L190" title="All 4 branches missed.">        if (embedded &amp;&amp; _embedded != Boolean.TRUE) {</span>
+<span class="nc" id="L191">            _decTypeMeta = null;</span>
+<span class="nc" id="L192">            _typeMeta = null;</span>
+        }
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        _embedded = (embedded) ? Boolean.TRUE : Boolean.FALSE;</span>
+<span class="nc" id="L195">    }</span>
+
+    @Override
+    public boolean isEmbeddedPC() {
+<span class="nc bnc" id="L199" title="All 4 branches missed.">        return _decCode == JavaTypes.PC &amp;&amp; isEmbedded();</span>
+    }
+
+    @Override
+    public ClassMetaData getEmbeddedMetaData() {
+<span class="nc bnc" id="L204" title="All 4 branches missed.">        if (_embeddedMeta == null &amp;&amp; isEmbeddedPC())</span>
+<span class="nc" id="L205">            addEmbeddedMetaData();</span>
+<span class="nc" id="L206">        return _embeddedMeta;</span>
+    }
+
+    @Override
+    public ClassMetaData addEmbeddedMetaData(int access) {
+<span class="nc" id="L211">        MetaDataRepository repos = _owner.getRepository();</span>
+<span class="nc" id="L212">        _embeddedMeta = repos.newEmbeddedClassMetaData(this);</span>
+<span class="nc" id="L213">        _embeddedMeta.setDescribedType(_decType);</span>
+<span class="nc" id="L214">        repos.getMetaDataFactory().getDefaults().populate(_embeddedMeta,</span>
+                access);
+
+<span class="nc" id="L217">        setEmbedded(true);</span>
+<span class="nc" id="L218">        return _embeddedMeta;</span>
+    }
+
+    @Override
+    public ClassMetaData addEmbeddedMetaData() {
+<span class="nc" id="L223">        return addEmbeddedMetaData(AccessCode.UNKNOWN);</span>
+    }
+
+    @Override
+    public int getCascadeDelete() {
+<span class="nc bnc" id="L228" title="All 2 branches missed.">        if (_owner.getManagement() != FieldMetaData.MANAGE_PERSISTENT)</span>
+<span class="nc" id="L229">            return CASCADE_NONE;</span>
+<span class="nc bnc" id="L230" title="All 2 branches missed.">        if (isEmbeddedPC())</span>
+<span class="nc" id="L231">            return CASCADE_IMMEDIATE;</span>
+
+<span class="nc bnc" id="L233" title="All 4 branches missed.">        switch (_delete) {</span>
+            case CASCADE_NONE:
+                // if the user marks the owning field dependent and we
+                // externalize to a pc type, then become dependent
+<span class="nc bnc" id="L237" title="All 4 branches missed.">                if (this != _owner.getValue() &amp;&amp; isTypePC()</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">                    &amp;&amp; ((ValueMetaDataImpl) _owner.getValue())._delete</span>
+                    == CASCADE_AUTO)
+<span class="nc" id="L240">                    return CASCADE_AUTO;</span>
+                break;
+            case CASCADE_AUTO:
+<span class="nc bnc" id="L243" title="All 2 branches missed.">                if (isTypePC())</span>
+<span class="nc" id="L244">                    return CASCADE_AUTO;</span>
+                break;
+            case CASCADE_IMMEDIATE:
+<span class="nc bnc" id="L247" title="All 2 branches missed.">                if (isDeclaredTypePC())</span>
+<span class="nc" id="L248">                    return CASCADE_IMMEDIATE;</span>
+                break;
+        }
+<span class="nc" id="L251">        return CASCADE_NONE;</span>
+    }
+
+    @Override
+    public void setCascadeDelete(int delete) {
+<span class="nc" id="L256">        _delete = delete;</span>
+<span class="nc" id="L257">    }</span>
+
+    @Override
+    public int getCascadePersist() {
+<span class="nc bnc" id="L261" title="All 2 branches missed.">        if (_owner.getManagement() != FieldMetaData.MANAGE_PERSISTENT)</span>
+<span class="nc" id="L262">            return CASCADE_NONE;</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">        if (isDeclaredTypePC())</span>
+<span class="nc" id="L264">            return checkPUDefaultCascadePersist();</span>
+<span class="nc bnc" id="L265" title="All 2 branches missed.">        if (!isTypePC())</span>
+<span class="nc" id="L266">            return CASCADE_NONE;</span>
+        // if only externalized type is pc, can't cascade immediate
+<span class="nc bnc" id="L268" title="All 2 branches missed.">        return (_persist == CASCADE_IMMEDIATE) ? CASCADE_AUTO : checkPUDefaultCascadePersist();</span>
+    }
+
+    /**
+     * Check if the persistence unit default &lt;cascade-persist&gt; has been enabled.  If so, then change
+     * CASCADE_NONE to CASCADE_IMMEDIATE.
+     */
+    private int checkPUDefaultCascadePersist() {
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        if (_checkPUDefaultCascadePersist) {</span>
+            // Apply default &lt;cascade-persist&gt; only to entity relationships
+<span class="nc" id="L278">            boolean applyDefaultCascadePersist = false;</span>
+
+<span class="nc bnc" id="L280" title="All 2 branches missed.">            switch (_owner.getAssociationType()) {</span>
+            case FieldMetaData.ONE_TO_ONE:
+            case FieldMetaData.ONE_TO_MANY:
+            case FieldMetaData.MANY_TO_MANY:
+            case FieldMetaData.MANY_TO_ONE:
+<span class="nc" id="L285">                applyDefaultCascadePersist = true;</span>
+            default:
+            }
+
+<span class="nc bnc" id="L289" title="All 2 branches missed.">            if (applyDefaultCascadePersist) {</span>
+<span class="nc" id="L290">                Boolean dcpe = getRepository().getMetaDataFactory().getDefaults().isDefaultCascadePersistEnabled();</span>
+<span class="nc bnc" id="L291" title="All 6 branches missed.">                if (dcpe != null &amp;&amp; dcpe.equals(Boolean.TRUE) &amp;&amp; _persist == CASCADE_NONE) {</span>
+<span class="nc" id="L292">                    _persist = CASCADE_IMMEDIATE;</span>
+                }
+            }
+
+<span class="nc" id="L296">            _checkPUDefaultCascadePersist = false;</span>
+        }
+
+<span class="nc" id="L299">        return _persist;</span>
+    }
+
+    @Override
+    public void setCascadePersist(int persist) {
+<span class="nc" id="L304">        setCascadePersist(persist, true);</span>
+<span class="nc" id="L305">    }</span>
+
+    @Override
+    public void setCascadePersist(int persist, boolean checkPUDefault) {
+<span class="nc" id="L309">        _persist = persist;</span>
+<span class="nc" id="L310">        _checkPUDefaultCascadePersist = checkPUDefault;</span>
+<span class="nc" id="L311">    }</span>
+
+    @Override
+    public int getCascadeAttach() {
+<span class="nc bnc" id="L315" title="All 2 branches missed.">        if (_owner.getManagement() != FieldMetaData.MANAGE_PERSISTENT</span>
+<span class="nc bnc" id="L316" title="All 2 branches missed.">            || !isDeclaredTypePC()) // attach acts on declared type</span>
+<span class="nc" id="L317">            return CASCADE_NONE;</span>
+<span class="nc bnc" id="L318" title="All 2 branches missed.">        if (isEmbeddedPC())</span>
+<span class="nc" id="L319">            return CASCADE_IMMEDIATE;</span>
+<span class="nc" id="L320">        return _attach;</span>
+    }
+
+    @Override
+    public void setCascadeAttach(int attach) {
+<span class="nc bnc" id="L325" title="All 2 branches missed.">        if (attach == CASCADE_AUTO)</span>
+<span class="nc" id="L326">            throw new IllegalArgumentException(&quot;CASCADE_AUTO&quot;);</span>
+<span class="nc" id="L327">        _attach = attach;</span>
+<span class="nc" id="L328">    }</span>
+
+    @Override
+    public int getCascadeDetach() {
+<span class="nc bnc" id="L332" title="All 2 branches missed.">        if (_owner.getManagement() != FieldMetaData.MANAGE_PERSISTENT</span>
+<span class="nc bnc" id="L333" title="All 2 branches missed.">                || !isDeclaredTypePC()) // detach acts on declared type</span>
+<span class="nc" id="L334">                return CASCADE_NONE;</span>
+<span class="nc bnc" id="L335" title="All 2 branches missed.">        if (isEmbedded())</span>
+<span class="nc" id="L336">            return CASCADE_IMMEDIATE;</span>
+<span class="nc" id="L337">        return _detach;</span>
+    }
+
+    @Override
+    public void setCascadeDetach(int detach) {
+<span class="nc" id="L342">        _detach = detach;</span>
+<span class="nc" id="L343">    }</span>
+
+    @Override
+    public int getCascadeRefresh() {
+<span class="nc bnc" id="L347" title="All 2 branches missed.">        if (_owner.getManagement() != FieldMetaData.MANAGE_PERSISTENT</span>
+<span class="nc bnc" id="L348" title="All 2 branches missed.">            || !isDeclaredTypePC()) // refresh acts on declared type</span>
+<span class="nc" id="L349">            return CASCADE_NONE;</span>
+<span class="nc" id="L350">        return _refresh;</span>
+    }
+
+    @Override
+    public void setCascadeRefresh(int refresh) {
+<span class="nc" id="L355">        _refresh = refresh;</span>
+<span class="nc" id="L356">    }</span>
+
+    @Override
+    public boolean isSerialized() {
+<span class="nc" id="L360">        return _serialized;</span>
+    }
+
+    @Override
+    public void setSerialized(boolean serialized) {
+<span class="nc" id="L365">        _serialized = serialized;</span>
+<span class="nc" id="L366">    }</span>
+
+    @Override
+    public String getValueMappedBy() {
+<span class="nc bnc" id="L370" title="All 2 branches missed.">        if (_mappedBy == MAPPED_BY_PK) {</span>
+            // use this instead of getting meta from element b/c that
+            // requires element to be resolved
+<span class="nc" id="L373">            ClassMetaData meta = getRepository().getMetaData</span>
+<span class="nc" id="L374">                (_owner.getElement().getType(), null, false);</span>
+<span class="nc bnc" id="L375" title="All 2 branches missed.">            if (meta == null)</span>
+<span class="nc" id="L376">                throw new MetaDataException(_loc.get(&quot;val-not-pc&quot;, _owner));</span>
+<span class="nc bnc" id="L377" title="All 2 branches missed.">            if (meta.getPrimaryKeyFields().length != 1)</span>
+<span class="nc" id="L378">                throw new MetaDataException(_loc.get(&quot;val-not-one-pk&quot;,</span>
+                    _owner));
+<span class="nc" id="L380">            _mappedByMeta = meta.getPrimaryKeyFields()[0];</span>
+<span class="nc" id="L381">            _mappedBy = _mappedByMeta.getName();</span>
+        }
+<span class="nc" id="L383">        return _mappedBy;</span>
+    }
+
+    @Override
+    public void setValueMappedBy(String mapped) {
+<span class="nc bnc" id="L388" title="All 4 branches missed.">        if (_owner.getKey() != this &amp;&amp; mapped != null)</span>
+<span class="nc" id="L389">            throw new UserException(_loc.get(&quot;mapped-by-not-key&quot;, this));</span>
+        else {
+<span class="nc" id="L391">            _mappedBy = mapped;</span>
+<span class="nc" id="L392">            _mappedByMeta = null;</span>
+        }
+<span class="nc" id="L394">    }</span>
+
+    @Override
+    public FieldMetaData getValueMappedByMetaData() {
+<span class="nc bnc" id="L398" title="All 4 branches missed.">        if (getValueMappedBy() != null &amp;&amp; _mappedByMeta == null) {</span>
+<span class="nc" id="L399">            ClassMetaData meta = _owner.getElement().getTypeMetaData();</span>
+<span class="nc bnc" id="L400" title="All 2 branches missed.">            FieldMetaData field = (meta == null) ? null</span>
+<span class="nc" id="L401">                : meta.getField(getValueMappedBy());</span>
+<span class="nc bnc" id="L402" title="All 2 branches missed.">            if (field == null)</span>
+<span class="nc" id="L403">                throw new MetaDataException(_loc.get(&quot;no-mapped-by&quot;, this,</span>
+<span class="nc" id="L404">                    getValueMappedBy()));</span>
+<span class="nc bnc" id="L405" title="All 2 branches missed.">            if (field.getMappedBy() != null)</span>
+<span class="nc" id="L406">                throw new MetaDataException(_loc.get(&quot;circ-mapped-by&quot;, this,</span>
+<span class="nc" id="L407">                    getValueMappedBy()));</span>
+<span class="nc" id="L408">            _mappedByMeta = field;</span>
+        }
+<span class="nc" id="L410">        return _mappedByMeta;</span>
+    }
+
+    @Override
+    public Class getTypeOverride() {
+<span class="nc" id="L415">        return _typeOverride;</span>
+    }
+
+    @Override
+    public void setTypeOverride(Class val) {
+<span class="nc" id="L420">        _typeOverride = val;</span>
+<span class="nc" id="L421">    }</span>
+
+    @Override
+    public String toString() {
+<span class="nc" id="L425">        String ret = _owner.getFullName(true);</span>
+<span class="nc bnc" id="L426" title="All 2 branches missed.">        if (this == _owner.getKey())</span>
+<span class="nc" id="L427">            return ret + &quot;&lt;key:&quot; + _decType + &quot;&gt;&quot;;</span>
+<span class="nc bnc" id="L428" title="All 2 branches missed.">        if (this == _owner.getElement()) {</span>
+<span class="nc bnc" id="L429" title="All 2 branches missed.">            if (_owner.getTypeCode() == JavaTypes.MAP)</span>
+<span class="nc" id="L430">                return ret + &quot;&lt;value:&quot; + _decType + &quot;&gt;&quot;;</span>
+<span class="nc" id="L431">            return ret + &quot;&lt;element:&quot; + _decType + &quot;&gt;&quot;;</span>
+        }
+<span class="nc" id="L433">        return ret + &quot;&lt;&quot; + _decType + &quot;&gt;&quot;;</span>
+    }
+
+    ////////////////////////
+    // Resolve and validate
+    ////////////////////////
+
+    @Override
+    public int getResolve() {
+<span class="nc" id="L442">        return _resMode;</span>
+    }
+
+    @Override
+    public void setResolve(int mode) {
+<span class="nc" id="L447">        _resMode = mode;</span>
+<span class="nc" id="L448">    }</span>
+
+    @Override
+    public void setResolve(int mode, boolean on) {
+<span class="nc bnc" id="L452" title="All 2 branches missed.">        if (mode == MODE_NONE)</span>
+<span class="nc" id="L453">            _resMode = mode;</span>
+<span class="nc bnc" id="L454" title="All 2 branches missed.">        else if (on)</span>
+<span class="nc" id="L455">            _resMode |= mode;</span>
+        else
+<span class="nc" id="L457">            _resMode &amp;= ~mode;</span>
+<span class="nc" id="L458">    }</span>
+
+    @Override
+    public boolean resolve(int mode) {
+<span class="nc bnc" id="L462" title="All 2 branches missed.">        if ((_resMode &amp; mode) == mode)</span>
+<span class="nc" id="L463">            return true;</span>
+<span class="nc" id="L464">        int cur = _resMode;</span>
+<span class="nc" id="L465">        _resMode |= mode;</span>
+
+        // we only perform actions for meta mode
+<span class="nc bnc" id="L468" title="All 4 branches missed.">        if ((mode &amp; MODE_META) == 0 || (cur &amp; MODE_META) != 0)</span>
+<span class="nc" id="L469">            return false;</span>
+
+        // check for type extension
+<span class="nc" id="L472">        int codeOverride = JavaTypes.OBJECT;</span>
+<span class="nc bnc" id="L473" title="All 2 branches missed.">        if (_typeOverride != null) {</span>
+<span class="nc" id="L474">            codeOverride = JavaTypes.getTypeCode(_typeOverride);</span>
+
+            // if there is no externalizer method or this value is a key or
+            // element, set our type to the type extension; otherwise, use the
+            // type extension as a hint to the actual type of the declared
+            // value (e.g. marking an interface as non-pc)
+<span class="nc bnc" id="L480" title="All 2 branches missed.">            if (_owner.getExternalizerMethod() == null</span>
+<span class="nc bnc" id="L481" title="All 2 branches missed.">                || _owner.getValue() != this) {</span>
+<span class="nc" id="L482">                _type = _typeOverride;</span>
+<span class="nc" id="L483">                _code = codeOverride;</span>
+            } else {
+<span class="nc" id="L485">                _decCode = codeOverride;</span>
+<span class="nc bnc" id="L486" title="All 2 branches missed.">                if (JavaTypes.maybePC(codeOverride, _typeOverride))</span>
+<span class="nc" id="L487">                    resolveDeclaredType(_typeOverride);</span>
+            }
+        }
+
+        // see if actual type is pc
+<span class="nc bnc" id="L492" title="All 2 branches missed.">        if (JavaTypes.maybePC(_code, _type)) {</span>
+<span class="nc" id="L493">            _typeMeta = _owner.getRepository().getMetaData(_type,</span>
+<span class="nc" id="L494">                _owner.getDefiningMetaData().getEnvClassLoader(), false);</span>
+<span class="nc bnc" id="L495" title="All 2 branches missed.">            if (_typeMeta != null)</span>
+<span class="nc" id="L496">                _code = JavaTypes.PC;</span>
+        }
+
+        // if there is no externalizer, set our declared type code to the
+        // actual type so that we treat the value correctly at runtime
+        // (pers by reach, etc)
+<span class="nc bnc" id="L502" title="All 4 branches missed.">        if (_typeOverride != null &amp;&amp; _owner.getExternalizerMethod() == null</span>
+<span class="nc bnc" id="L503" title="All 2 branches missed.">            &amp;&amp; _owner.getExternalValues() == null) {</span>
+            // cache the metadata immediately since we won't be able to get
+            // it lazily, since we're not resetting _decType to _type
+<span class="nc" id="L506">            _decCode = _code;</span>
+<span class="nc" id="L507">            _decTypeMeta = _typeMeta;</span>
+<span class="nc bnc" id="L508" title="All 2 branches missed.">        } else if (JavaTypes.maybePC(_decCode, _decType))</span>
+<span class="nc" id="L509">            resolveDeclaredType(_decType);</span>
+
+        // resolves mapped by
+<span class="nc" id="L512">        getValueMappedBy();</span>
+
+<span class="nc" id="L514">        ClassMetaData embed = getEmbeddedMetaData();</span>
+<span class="nc bnc" id="L515" title="All 2 branches missed.">        if (embed != null)</span>
+<span class="nc" id="L516">            embed.resolve(MODE_META);</span>
+
+        // oid as primary key field?
+<span class="nc bnc" id="L519" title="All 4 branches missed.">        if (_decCode == JavaTypes.PC &amp;&amp; isEmbedded()</span>
+<span class="nc bnc" id="L520" title="All 4 branches missed.">            &amp;&amp; _owner.isPrimaryKey() &amp;&amp; _owner.getValue() == this)</span>
+<span class="nc" id="L521">            _code = _decCode = JavaTypes.OID;</span>
+
+<span class="nc" id="L523">        return false;</span>
+    }
+
+    /**
+     * Resolve the declared type.
+     */
+    private void resolveDeclaredType(Class type) {
+<span class="nc" id="L530">        ClassMetaData meta = _owner.getRepository().getMetaData(type,</span>
+<span class="nc" id="L531">            _owner.getDefiningMetaData().getEnvClassLoader(), false);</span>
+<span class="nc bnc" id="L532" title="All 2 branches missed.">        if (meta != null)</span>
+<span class="nc" id="L533">            _decCode = JavaTypes.PC;</span>
+
+<span class="nc bnc" id="L535" title="All 6 branches missed.">        if (meta != null &amp;&amp; meta.isEmbeddedOnly() &amp;&amp; !meta.isAbstract())</span>
+<span class="nc" id="L536">            setEmbedded(true);</span>
+
+<span class="nc bnc" id="L538" title="All 2 branches missed.">        if (!isEmbedded())</span>
+<span class="nc" id="L539">            _decTypeMeta = meta;</span>
+<span class="nc" id="L540">    }</span>
+
+    @Override
+    public void copy(ValueMetaData vmd) {
+        // copy declared types, but if OID revert to PC until we resolve
+        // to OID ourselves
+<span class="nc" id="L546">        _decType = vmd.getDeclaredType();</span>
+<span class="nc" id="L547">        _decCode = vmd.getDeclaredTypeCode();</span>
+<span class="nc bnc" id="L548" title="All 2 branches missed.">        if (_decCode == JavaTypes.OID)</span>
+<span class="nc" id="L549">            _decCode = JavaTypes.PC;</span>
+
+<span class="nc" id="L551">        _delete = vmd.getCascadeDelete();</span>
+<span class="nc" id="L552">        _persist = vmd.getCascadePersist();</span>
+<span class="nc" id="L553">        _attach = vmd.getCascadeAttach();</span>
+<span class="nc" id="L554">        _detach = vmd.getCascadeDetach();</span>
+<span class="nc" id="L555">        _refresh = vmd.getCascadeRefresh();</span>
+<span class="nc" id="L556">        _typeOverride = vmd.getTypeOverride();</span>
+<span class="nc" id="L557">        _serialized = vmd.isSerialized();</span>
+<span class="nc bnc" id="L558" title="All 2 branches missed.">        if (_embeddedMeta != null)</span>
+<span class="nc" id="L559">            _embeddedMeta.setDescribedType(vmd.getDeclaredType());</span>
+
+        // don't allow copy to override embedded
+<span class="nc bnc" id="L562" title="All 2 branches missed.">        if (_embedded == null)</span>
+<span class="nc" id="L563">            setEmbedded(vmd.isEmbedded());</span>
+<span class="nc" id="L564">    }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

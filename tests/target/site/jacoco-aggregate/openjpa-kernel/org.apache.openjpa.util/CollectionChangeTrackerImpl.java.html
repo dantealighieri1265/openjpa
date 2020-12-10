@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CollectionChangeTrackerImpl.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.util</a> &gt; <span class="el_source">CollectionChangeTrackerImpl.java</span></div><h1>CollectionChangeTrackerImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.util;
+
+import java.util.ArrayList;
+import java.util.Collection;
+
+/**
+ * Default {@link CollectionChangeTracker}.
+ *
+ * @author Abe White
+ */
+public class CollectionChangeTrackerImpl
+    extends AbstractChangeTracker
+    implements CollectionChangeTracker {
+
+    protected final Collection _coll;
+    protected final boolean _dups;
+    protected final boolean _order;
+
+    /**
+     * Constructor.
+     *
+     * @param coll the collection to delegate to
+     * @param dups true if the collection allows duplicates, false otherwise
+     * @param order true if the collection is ordered, false otherwise
+     */
+    public CollectionChangeTrackerImpl(Collection coll, boolean dups,
+<span class="fc" id="L45">        boolean order,boolean autoOff) {</span>
+<span class="fc" id="L46">        _coll = coll;</span>
+<span class="fc" id="L47">        _dups = dups;</span>
+<span class="fc" id="L48">        _order = order;</span>
+<span class="fc" id="L49">        this.setAutoOff(autoOff);</span>
+<span class="fc" id="L50">    }</span>
+
+    /**
+     * Whether the underlying collection allows duplicates.
+     */
+    public boolean allowsDuplicates() {
+<span class="nc" id="L56">        return _dups;</span>
+    }
+
+    /**
+     * Whether the underlying collection is ordered.
+     */
+    public boolean isOrdered() {
+<span class="nc" id="L63">        return _order;</span>
+    }
+
+    @Override
+    public void added(Object elem) {
+<span class="fc" id="L68">        super.added(elem);</span>
+<span class="fc" id="L69">    }</span>
+
+    @Override
+    public void removed(Object elem) {
+<span class="nc" id="L73">        super.removed(elem);</span>
+<span class="nc" id="L74">    }</span>
+
+    @Override
+    protected int initialSequence() {
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (_order)</span>
+<span class="nc" id="L79">            return _coll.size();</span>
+<span class="nc" id="L80">        return super.initialSequence();</span>
+    }
+
+    @Override
+    protected void add(Object elem) {
+<span class="nc bnc" id="L85" title="All 4 branches missed.">        if (rem == null || !rem.remove(elem)) {</span>
+            // after a point it's inefficient to keep tracking
+<span class="nc bnc" id="L87" title="All 2 branches missed.">            if (getAutoOff()</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">                &amp;&amp; getAdded().size() + getRemoved().size() &gt;= _coll.size())</span>
+<span class="nc" id="L89">                stopTracking();</span>
+            else {
+<span class="nc bnc" id="L91" title="All 2 branches missed.">                if (add == null) {</span>
+<span class="nc bnc" id="L92" title="All 4 branches missed.">                    if (_dups || _order)</span>
+<span class="nc" id="L93">                        add = new ArrayList();</span>
+                    else
+<span class="nc" id="L95">                        add = newSet();</span>
+                }
+<span class="nc" id="L97">                add.add(elem);</span>
+            }
+<span class="nc bnc" id="L99" title="All 2 branches missed.">        } else if (_order)</span>
+<span class="nc" id="L100">            stopTracking();</span>
+        else {
+<span class="nc bnc" id="L102" title="All 2 branches missed.">            if (change == null)</span>
+<span class="nc" id="L103">                change = newSet();</span>
+<span class="nc" id="L104">            change.add(elem);</span>
+        }
+<span class="nc" id="L106">    }</span>
+
+    @Override
+    protected void remove(Object elem) {
+        // if the collection contains multiple copies of the elem, we can't
+        // use change tracking because some back-ends can't just delete a
+        // single copy of a elem
+<span class="nc bnc" id="L113" title="All 6 branches missed.">        if (_dups &amp;&amp; getAutoOff() &amp;&amp; _coll.contains(elem))</span>
+<span class="nc" id="L114">            stopTracking();</span>
+<span class="nc bnc" id="L115" title="All 4 branches missed.">        else if (add == null || !add.remove(elem)) {</span>
+            // after a point it's inefficient to keep tracking
+<span class="nc bnc" id="L117" title="All 2 branches missed.">            if (getAutoOff()</span>
+<span class="nc bnc" id="L118" title="All 2 branches missed.">                &amp;&amp; getRemoved().size() + getAdded().size() &gt;= _coll.size())</span>
+<span class="nc" id="L119">                stopTracking();</span>
+            else {
+<span class="nc bnc" id="L121" title="All 2 branches missed.">                if (rem == null)</span>
+<span class="nc" id="L122">                    rem = newSet();</span>
+<span class="nc" id="L123">                rem.add(elem);</span>
+            }
+        }
+<span class="nc" id="L126">    }</span>
+
+    @Override
+    protected void change(Object elem) {
+<span class="nc" id="L130">        throw new InternalException();</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

@@ -1,0 +1,363 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>PCDataImpl.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">PCDataImpl.java</span></div><h1>PCDataImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.util.BitSet;
+
+import org.apache.openjpa.datacache.DataCache;
+import org.apache.openjpa.meta.ClassMetaData;
+import org.apache.openjpa.meta.FieldMetaData;
+
+/**
+ * Default {@link PCData} implementation.
+ *
+ * @author Patrick Linskey
+ * @author Abe White
+ */
+public class PCDataImpl
+    extends AbstractPCData {
+
+    
+    private static final long serialVersionUID = 1L;
+    private final Object _oid;
+    private final Class&lt;?&gt; _type;
+    private final String _cache;
+    private final Object[] _data;
+    private final BitSet _loaded;
+<span class="nc" id="L43">    private Object _version = null;</span>
+<span class="nc" id="L44">    private Object _impl = null;</span>
+<span class="nc" id="L45">    private Object[] _fieldImpl = null;</span>
+
+    public PCDataImpl(Object oid, ClassMetaData meta) {
+<span class="nc" id="L48">        this(oid, meta, DataCache.NAME_DEFAULT);</span>
+<span class="nc" id="L49">    }</span>
+
+    /**
+     * Constructor.
+     */
+<span class="nc" id="L54">    public PCDataImpl(Object oid, ClassMetaData meta, String name) {</span>
+<span class="nc" id="L55">        _oid = oid;</span>
+<span class="nc" id="L56">        _type = meta.getDescribedType();</span>
+<span class="nc" id="L57">        _cache = name;</span>
+
+<span class="nc" id="L59">        int len = meta.getFields().length;</span>
+<span class="nc" id="L60">        _data = new Object[len];</span>
+<span class="nc" id="L61">        _loaded = new BitSet(len);</span>
+<span class="nc" id="L62">    }</span>
+
+    @Override
+    public Object getId() {
+<span class="nc" id="L66">        return _oid;</span>
+    }
+
+    @Override
+    public Class&lt;?&gt; getType() {
+<span class="nc" id="L71">        return _type;</span>
+    }
+
+    @Override
+    public BitSet getLoaded() {
+<span class="nc" id="L76">        return _loaded;</span>
+    }
+
+    @Override
+    public Object getData(int index) {
+        // make sure index is actually loaded to avoid returning an
+        // intermediate value
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        return (_loaded.get(index)) ? _data[index] : null;</span>
+    }
+
+    public void setData(int index, Object val) {
+<span class="nc" id="L87">        _loaded.set(index);</span>
+<span class="nc" id="L88">        _data[index] = val;</span>
+<span class="nc" id="L89">    }</span>
+
+    public void clearData(int index) {
+<span class="nc" id="L92">        _loaded.clear(index);</span>
+<span class="nc" id="L93">        _data[index] = null;</span>
+<span class="nc" id="L94">    }</span>
+
+    @Override
+    public Object getImplData() {
+<span class="nc" id="L98">        return _impl;</span>
+    }
+
+    @Override
+    public void setImplData(Object val) {
+<span class="nc" id="L103">        _impl = val;</span>
+<span class="nc" id="L104">    }</span>
+
+    public Object getImplData(int index) {
+<span class="nc bnc" id="L107" title="All 2 branches missed.">        return (_fieldImpl != null) ? _fieldImpl[index] : null;</span>
+    }
+
+    public void setImplData(int index, Object val) {
+<span class="nc bnc" id="L111" title="All 2 branches missed.">        if (val != null) {</span>
+<span class="nc bnc" id="L112" title="All 2 branches missed.">            if (_fieldImpl == null)</span>
+<span class="nc" id="L113">                _fieldImpl = new Object[_data.length];</span>
+<span class="nc" id="L114">            _fieldImpl[index] = val;</span>
+<span class="nc bnc" id="L115" title="All 2 branches missed.">        } else if (_fieldImpl != null)</span>
+<span class="nc" id="L116">            _fieldImpl[index] = null;</span>
+<span class="nc" id="L117">    }</span>
+
+    public Object getIntermediate(int index) {
+<span class="nc bnc" id="L120" title="All 2 branches missed.">        return (!_loaded.get(index)) ? _data[index] : null;</span>
+    }
+
+    public void setIntermediate(int index, Object val) {
+<span class="nc" id="L124">        _loaded.clear(index);</span>
+<span class="nc" id="L125">        _data[index] = val;</span>
+<span class="nc" id="L126">    }</span>
+
+    @Override
+    public boolean isLoaded(int index) {
+<span class="nc" id="L130">        return _loaded.get(index);</span>
+    }
+
+    public void setLoaded(int index, boolean loaded) {
+<span class="nc bnc" id="L134" title="All 2 branches missed.">        if (loaded)</span>
+<span class="nc" id="L135">            _loaded.set(index);</span>
+        else
+<span class="nc" id="L137">            _loaded.clear(index);</span>
+<span class="nc" id="L138">    }</span>
+
+    @Override
+    public Object getVersion() {
+<span class="nc" id="L142">        return _version;</span>
+    }
+
+    @Override
+    public void setVersion(Object version) {
+<span class="nc" id="L147">        _version = version;</span>
+<span class="nc" id="L148">    }</span>
+
+    @Override
+    public void load(OpenJPAStateManager sm, FetchConfiguration fetch,
+        Object context) {
+<span class="nc" id="L153">        loadVersion(sm);</span>
+<span class="nc" id="L154">        loadImplData(sm);</span>
+
+<span class="nc" id="L156">        FieldMetaData[] fmds = sm.getMetaData().getFields();</span>
+<span class="nc" id="L157">        ((StateManagerImpl)sm).setLoading(true);</span>
+<span class="nc bnc" id="L158" title="All 2 branches missed.">        for (int i = 0; i &lt; fmds.length; i++) {</span>
+            // load intermediate data for all unloaded fields and data for
+            // fields in configured fetch groups
+<span class="nc bnc" id="L161" title="All 2 branches missed.">            if (!isLoaded(i))</span>
+<span class="nc" id="L162">                loadIntermediate(sm, fmds[i]);</span>
+<span class="nc bnc" id="L163" title="All 4 branches missed.">            else if (!sm.getLoaded().get(i) &amp;&amp; fetch.requiresFetch(fmds[i])</span>
+                != FetchConfiguration.FETCH_NONE)
+<span class="nc" id="L165">                loadField(sm, fmds[i], fetch, context);</span>
+        }
+<span class="nc" id="L167">    }</span>
+
+    @Override
+    public void load(OpenJPAStateManager sm, BitSet fields,
+        FetchConfiguration fetch, Object context) {
+<span class="nc" id="L172">        loadVersion(sm);</span>
+<span class="nc" id="L173">        loadImplData(sm);</span>
+
+        // attempt to load given fields
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        int len = (fields == null) ? 0 : fields.length();</span>
+        FieldMetaData fmd;
+<span class="nc bnc" id="L178" title="All 2 branches missed.">        for (int i = 0; i &lt; len; i++) {</span>
+<span class="nc bnc" id="L179" title="All 2 branches missed.">            if (!fields.get(i))</span>
+<span class="nc" id="L180">                continue;</span>
+
+<span class="nc" id="L182">            fmd = sm.getMetaData().getField(i);</span>
+<span class="nc" id="L183">            boolean loading = false;</span>
+<span class="nc bnc" id="L184" title="All 4 branches missed.">            if(sm.getContext() != null &amp;&amp; sm.getContext() instanceof BrokerImpl) {</span>
+<span class="nc" id="L185">                loading = ((BrokerImpl) sm.getContext()).isLoading(sm.getObjectId());</span>
+            }
+<span class="nc bnc" id="L187" title="All 4 branches missed.">            if (!isLoaded(i) || loading) { // prevent reentrant calls.</span>
+<span class="nc" id="L188">                loadIntermediate(sm, fmd);</span>
+            }
+            else {
+<span class="nc" id="L191">                loadField(sm, fmd, fetch, context);</span>
+<span class="nc" id="L192">                loadImplData(sm, fmd);</span>
+<span class="nc" id="L193">                fields.clear(i);</span>
+            }
+        }
+<span class="nc" id="L196">    }</span>
+
+    /**
+     * Set version information into the given state manager.
+     */
+    protected void loadVersion(OpenJPAStateManager sm) {
+<span class="nc bnc" id="L202" title="All 2 branches missed.">        if (sm.getVersion() == null)</span>
+<span class="nc" id="L203">            sm.setVersion(getVersion());</span>
+<span class="nc" id="L204">    }</span>
+
+    /**
+     * Set impl data information into the given state manager.
+     */
+    protected void loadImplData(OpenJPAStateManager sm) {
+<span class="nc" id="L210">        Object impl = getImplData();</span>
+<span class="nc bnc" id="L211" title="All 4 branches missed.">        if (sm.getImplData() == null &amp;&amp; impl != null)</span>
+<span class="nc" id="L212">            sm.setImplData(impl, true);</span>
+<span class="nc" id="L213">    }</span>
+
+    /**
+     * Set field-level information into the given state manager.
+     */
+    protected void loadField(OpenJPAStateManager sm, FieldMetaData fmd, FetchConfiguration fetch, Object context) {
+<span class="nc" id="L219">        int index = fmd.getIndex();</span>
+<span class="nc" id="L220">        Object val = toField(sm, fmd, getData(index), fetch, context);</span>
+
+        // If val is null, make sure that we don't send back a null Embeddable or ElementCollection...perhaps others?
+        // Probably should think about trying to shove this data back into the cache at this point so we don't
+        // continually run through this code.
+<span class="nc bnc" id="L225" title="All 4 branches missed.">        if (val == null &amp;&amp; fmd.isEmbeddedPC()) {</span>
+<span class="nc" id="L226">            val = sm.getContext().embed(null, null, sm, fmd).getManagedInstance();</span>
+<span class="nc bnc" id="L227" title="All 4 branches missed.">        } else if (val == null &amp;&amp; fmd.isElementCollection()) {</span>
+<span class="nc" id="L228">            val = sm.newProxy(index);</span>
+        }
+<span class="nc" id="L230">        sm.storeField(index, val);</span>
+<span class="nc" id="L231">    }</span>
+
+    /**
+     * Set field-level impl data into the given state manager.
+     */
+    protected void loadImplData(OpenJPAStateManager sm, FieldMetaData fmd) {
+<span class="nc" id="L237">        int index = fmd.getIndex();</span>
+<span class="nc" id="L238">        Object impl = getImplData(index);</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        if (impl != null)</span>
+<span class="nc" id="L240">            sm.setImplData(index, impl);</span>
+<span class="nc" id="L241">    }</span>
+
+    /**
+     * Set intermediate information for the given field into the state manager.
+     */
+    protected void loadIntermediate(OpenJPAStateManager sm, FieldMetaData fmd) {
+<span class="nc" id="L247">        int index = fmd.getIndex();</span>
+<span class="nc" id="L248">        Object inter = getIntermediate(index);</span>
+<span class="nc bnc" id="L249" title="All 4 branches missed.">        if (inter != null &amp;&amp; !sm.getLoaded().get(index))</span>
+<span class="nc" id="L250">            sm.setIntermediate(index, inter);</span>
+<span class="nc" id="L251">    }</span>
+
+    @Override
+    public void store(OpenJPAStateManager sm) {
+<span class="nc" id="L255">        storeVersion(sm);</span>
+<span class="nc" id="L256">        storeImplData(sm);</span>
+
+<span class="nc" id="L258">        FieldMetaData[] fmds = sm.getMetaData().getFields();</span>
+<span class="nc bnc" id="L259" title="All 2 branches missed.">        for (int i = 0; i &lt; fmds.length; i++) {</span>
+<span class="nc bnc" id="L260" title="All 2 branches missed.">            if (sm.getLoaded().get(i)) {</span>
+<span class="nc" id="L261">                storeField(sm, fmds[i]);</span>
+<span class="nc" id="L262">                storeImplData(sm, fmds[i], isLoaded(i));</span>
+<span class="nc bnc" id="L263" title="All 2 branches missed.">            } else if (!isLoaded(i))</span>
+<span class="nc" id="L264">                storeIntermediate(sm, fmds[i]);</span>
+        }
+<span class="nc" id="L266">    }</span>
+
+    @Override
+    public void store(OpenJPAStateManager sm, BitSet fields) {
+<span class="nc" id="L270">        storeVersion(sm);</span>
+<span class="nc" id="L271">        storeImplData(sm);</span>
+
+<span class="nc" id="L273">        FieldMetaData[] fmds = sm.getMetaData().getFields();</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">        for (int i = 0; i &lt; fmds.length; i++) {</span>
+<span class="nc bnc" id="L275" title="All 4 branches missed.">            if (fields != null &amp;&amp; fields.get(i)) {</span>
+<span class="nc" id="L276">                storeField(sm, fmds[i]);</span>
+<span class="nc" id="L277">                storeImplData(sm, fmds[i], isLoaded(i));</span>
+<span class="nc bnc" id="L278" title="All 2 branches missed.">            } else if (!isLoaded(i))</span>
+<span class="nc" id="L279">                storeIntermediate(sm, fmds[i]);</span>
+        }
+<span class="nc" id="L281">    }</span>
+
+    /**
+     * Store version information from the given state manager.
+     */
+    protected void storeVersion(OpenJPAStateManager sm) {
+<span class="nc" id="L287">        setVersion(sm.getVersion());</span>
+<span class="nc" id="L288">    }</span>
+
+    /**
+     * Store impl data from the given state manager.
+     */
+    protected void storeImplData(OpenJPAStateManager sm) {
+<span class="nc bnc" id="L294" title="All 2 branches missed.">        if (sm.isImplDataCacheable())</span>
+<span class="nc" id="L295">            setImplData(sm.getImplData());</span>
+<span class="nc" id="L296">    }</span>
+
+    /**
+     * Store field-level information from the given state manager.
+     */
+    protected void storeField(OpenJPAStateManager sm, FieldMetaData fmd) {
+<span class="nc bnc" id="L302" title="All 2 branches missed.">        if (fmd.getManagement() != FieldMetaData.MANAGE_PERSISTENT)</span>
+<span class="nc" id="L303">            return;</span>
+
+<span class="nc" id="L305">        int index = fmd.getIndex();</span>
+<span class="nc" id="L306">        OpenJPAStateManager dsm = null;</span>
+<span class="nc bnc" id="L307" title="All 2 branches missed.">        if (sm.getPersistenceCapable().pcIsDetached()) {</span>
+<span class="nc" id="L308">            dsm = (DetachedStateManager) sm.getPersistenceCapable().</span>
+<span class="nc" id="L309">                pcGetStateManager();</span>
+<span class="nc" id="L310">            sm.getPersistenceCapable().pcReplaceStateManager(sm);</span>
+        }
+
+<span class="nc" id="L313">        Object val = toData(fmd, sm.fetchField(index, false),</span>
+<span class="nc" id="L314">            sm.getContext());</span>
+<span class="nc bnc" id="L315" title="All 2 branches missed.">        if (dsm != null)</span>
+<span class="nc" id="L316">            sm.getPersistenceCapable().pcReplaceStateManager(dsm);</span>
+<span class="nc bnc" id="L317" title="All 2 branches missed.">        if (val != NULL)</span>
+<span class="nc" id="L318">            setData(index, val);</span>
+        else // unable to store field value; clear out any old values
+<span class="nc" id="L320">            clearData(index);</span>
+<span class="nc" id="L321">    }</span>
+
+    /**
+     * Store the intermediate field value for the given field.
+     */
+    protected void storeIntermediate(OpenJPAStateManager sm,
+        FieldMetaData fmd) {
+<span class="nc" id="L328">        int index = fmd.getIndex();</span>
+<span class="nc" id="L329">        Object val = sm.getIntermediate(index);</span>
+<span class="nc bnc" id="L330" title="All 2 branches missed.">        if (val != null)</span>
+<span class="nc" id="L331">            setIntermediate(index, val);</span>
+<span class="nc" id="L332">    }</span>
+
+    /**
+     * Store impl data for the given field.
+     */
+    protected void storeImplData(OpenJPAStateManager sm, FieldMetaData fmd,
+        boolean fieldLoaded) {
+<span class="nc" id="L339">        int index = fmd.getIndex();</span>
+<span class="nc bnc" id="L340" title="All 2 branches missed.">        if (fieldLoaded) {</span>
+            // is there impl data to store?
+<span class="nc" id="L342">            Object impl = sm.getImplData(index);</span>
+<span class="nc bnc" id="L343" title="All 4 branches missed.">            if (impl != null &amp;&amp; sm.isImplDataCacheable(index))</span>
+<span class="nc" id="L344">                setImplData(index, impl);</span>
+<span class="nc" id="L345">        } else</span>
+<span class="nc" id="L346">            setImplData(index, null);</span>
+<span class="nc" id="L347">    }</span>
+
+    /**
+     * Return a new {@link PCData} implementation of the right type for
+     * embedded instances. Returns a {@link PCDataImpl} by default.
+     */
+    @Override
+    public AbstractPCData newEmbeddedPCData(OpenJPAStateManager sm) {
+<span class="nc" id="L355">        return new PCDataImpl(sm.getId (), sm.getMetaData (), _cache);</span>
+	}
+
+    @Override
+    public String getCache() {
+<span class="nc" id="L360">        return _cache;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

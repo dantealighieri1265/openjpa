@@ -1,0 +1,11 @@
+#Thu Dec 10 14:26:40 CET 2020
+module-resource*?\:C\:\\Users\\marco\\Desktop\\openjpa\\openjpa-tools\\openjpa-maven-plugin\\..\\..\\openjpa-project\\suppressions.xml=84BC74EE597FDE97508C0B29BCFF92E5A31D721A
+configuration*?=EE1C3905734042024E015066EFEB0CB8AA14DC6B
+C\:\\Users\\marco\\Desktop\\openjpa\\openjpa-tools\\openjpa-maven-plugin\\src\\main\\java\\org\\apache\\openjpa\\tools\\maven\\OpenJpaSchemaMojo.java=1606313790621
+C\:\\Users\\marco\\Desktop\\openjpa\\openjpa-tools\\openjpa-maven-plugin\\src\\main\\java\\org\\apache\\openjpa\\tools\\maven\\AbstractOpenJpaMojo.java=1606313790621
+C\:\\Users\\marco\\Desktop\\openjpa\\openjpa-tools\\openjpa-maven-plugin\\target\\generated-sources\\plugin\\HelpMojo.java=1607606800244
+C\:\\Users\\marco\\Desktop\\openjpa\\openjpa-tools\\openjpa-maven-plugin\\src\\main\\java\\org\\apache\\openjpa\\tools\\maven\\OpenJpaEnhancerMojo.java=1606313790621
+C\:\\Users\\marco\\Desktop\\openjpa\\openjpa-tools\\openjpa-maven-plugin\\src\\main\\java\\org\\apache\\openjpa\\tools\\maven\\OpenJpaSqlMojo.java=1606313790622
+C\:\\Users\\marco\\Desktop\\openjpa\\openjpa-tools\\openjpa-maven-plugin\\src\\main\\java\\org\\apache\\openjpa\\tools\\maven\\AbstractOpenJpaEnhancerMojo.java=1606313790620
+C\:\\Users\\marco\\Desktop\\openjpa\\openjpa-tools\\openjpa-maven-plugin\\src\\main\\java\\org\\apache\\openjpa\\tools\\maven\\OpenJpaTestEnhancerMojo.java=1606313790622
+C\:\\Users\\marco\\Desktop\\openjpa\\openjpa-tools\\openjpa-maven-plugin\\src\\main\\java\\org\\apache\\openjpa\\tools\\maven\\AbstractOpenJpaMappingToolMojo.java=1606313790620

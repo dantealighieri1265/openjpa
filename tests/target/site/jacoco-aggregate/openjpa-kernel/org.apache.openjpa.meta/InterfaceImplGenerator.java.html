@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>InterfaceImplGenerator.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.meta</a> &gt; <span class="el_source">InterfaceImplGenerator.java</span></div><h1>InterfaceImplGenerator.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.meta;
+
+import java.io.ByteArrayInputStream;
+import java.lang.reflect.Method;
+import java.security.AccessController;
+import java.security.PrivilegedActionException;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
+import java.util.WeakHashMap;
+
+import org.apache.openjpa.enhance.PCEnhancer;
+import org.apache.openjpa.lib.util.J2DoPrivHelper;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.lib.util.StringUtil;
+import org.apache.openjpa.util.InternalException;
+
+import serp.bytecode.BCClass;
+import serp.bytecode.BCClassLoader;
+import serp.bytecode.BCField;
+import serp.bytecode.BCMethod;
+import serp.bytecode.Code;
+import serp.bytecode.Constants;
+import serp.bytecode.Project;
+
+/**
+ * Creates implementations of managed interfaces.  Will throw exceptions
+ * on unknown properties.
+ *
+ * @author Steve Kim
+ */
+class InterfaceImplGenerator {
+<span class="nc" id="L51">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L52">        (InterfaceImplGenerator.class);</span>
+    private static final String POSTFIX = &quot;openjpaimpl&quot;;
+
+    private final MetaDataRepository _repos;
+<span class="nc" id="L56">    private final Map&lt;Class&lt;?&gt;,Class&lt;?&gt;&gt; _impls = new WeakHashMap&lt;&gt;();</span>
+<span class="nc" id="L57">    private final Project _project = new Project();</span>
+
+    // distinct project / loader for enhanced version of class
+<span class="nc" id="L60">    private final Project _enhProject = new Project();</span>
+
+    /**
+     * Constructor.  Supply repository.
+     */
+<span class="nc" id="L65">    public InterfaceImplGenerator(MetaDataRepository repos) {</span>
+<span class="nc" id="L66">        _repos = repos;</span>
+<span class="nc" id="L67">    }</span>
+
+    /**
+     * Create a concrete implementation of the given type, possibly
+     * returning a cached version of the class.
+     */
+    public synchronized Class&lt;?&gt; createImpl(ClassMetaData meta) {
+<span class="nc" id="L74">        Class&lt;?&gt; iface = meta.getDescribedType();</span>
+
+        // check cache.
+<span class="nc" id="L77">        Class&lt;?&gt; impl = _impls.get(iface);</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">        if (impl != null)</span>
+<span class="nc" id="L79">            return impl;</span>
+
+<span class="nc" id="L81">        ClassLoader parentLoader = AccessController.doPrivileged(</span>
+<span class="nc" id="L82">            J2DoPrivHelper.getClassLoaderAction(iface));</span>
+<span class="nc" id="L83">        BCClassLoader loader = AccessController</span>
+<span class="nc" id="L84">            .doPrivileged(J2DoPrivHelper.newBCClassLoaderAction(_project,</span>
+                parentLoader));
+<span class="nc" id="L86">        BCClassLoader enhLoader = AccessController</span>
+<span class="nc" id="L87">            .doPrivileged(J2DoPrivHelper.newBCClassLoaderAction(_enhProject,</span>
+                parentLoader));
+<span class="nc" id="L89">        BCClass bc = _project.loadClass(getClassName(meta));</span>
+<span class="nc" id="L90">        bc.declareInterface(iface);</span>
+<span class="nc" id="L91">        ClassMetaData sup = meta.getPCSuperclassMetaData();</span>
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (sup != null) {</span>
+<span class="nc" id="L93">            bc.setSuperclass(sup.getInterfaceImpl());</span>
+<span class="nc" id="L94">            enhLoader = AccessController</span>
+<span class="nc" id="L95">                .doPrivileged(J2DoPrivHelper.newBCClassLoaderAction(</span>
+                    _enhProject, AccessController
+<span class="nc" id="L97">                        .doPrivileged(J2DoPrivHelper.getClassLoaderAction(sup</span>
+<span class="nc" id="L98">                            .getInterfaceImpl()))));</span>
+        }
+
+<span class="nc" id="L101">        FieldMetaData[] fields = meta.getDeclaredFields();</span>
+<span class="nc" id="L102">        Set&lt;Method&gt; methods = new HashSet&lt;&gt;();</span>
+<span class="nc bnc" id="L103" title="All 2 branches missed.">        for (int i = 0; i &lt; fields.length; i++)</span>
+<span class="nc" id="L104">            addField(bc, iface, fields[i], methods);</span>
+<span class="nc" id="L105">        invalidateNonBeanMethods(bc, iface, methods);</span>
+
+        // first load the base Class&lt;?&gt; as the enhancer requires the class
+        // to be available
+        try {
+<span class="nc" id="L110">            meta.setInterfaceImpl(Class.forName(bc.getName(), true, loader));</span>
+<span class="nc" id="L111">        } catch (Throwable t) {</span>
+<span class="nc" id="L112">            throw new InternalException(_loc.get(&quot;interface-load&quot;, iface,</span>
+<span class="nc" id="L113">                loader), t).setFatal(true);</span>
+<span class="nc" id="L114">        }</span>
+        // copy the BCClass&lt;?&gt; into the enhancer project.
+<span class="nc" id="L116">        bc = _enhProject.loadClass(new ByteArrayInputStream(bc.toByteArray()),</span>
+            loader);
+<span class="nc" id="L118">        PCEnhancer enhancer = new PCEnhancer(_repos, bc, meta);</span>
+
+<span class="nc" id="L120">        int result = enhancer.run();</span>
+<span class="nc bnc" id="L121" title="All 2 branches missed.">        if (result != PCEnhancer.ENHANCE_PC)</span>
+<span class="nc" id="L122">            throw new InternalException(_loc.get(&quot;interface-badenhance&quot;,</span>
+<span class="nc" id="L123">                iface)).setFatal(true);</span>
+        try {
+            // load the Class&lt;?&gt; for real.
+<span class="nc" id="L126">            impl = Class.forName(bc.getName(), true, enhLoader);</span>
+<span class="nc" id="L127">        } catch (Throwable t) {</span>
+<span class="nc" id="L128">            throw new InternalException(_loc.get(&quot;interface-load2&quot;, iface,</span>
+<span class="nc" id="L129">                enhLoader), t).setFatal(true);</span>
+<span class="nc" id="L130">        }</span>
+        // cache the generated impl.
+<span class="nc" id="L132">        _impls.put(iface, impl);</span>
+<span class="nc" id="L133">        return impl;</span>
+    }
+
+    /**
+     * Add bean getters and setters, also recording seen methods
+     * into the given set.
+     */
+    private void addField (BCClass bc, Class&lt;?&gt; iface, FieldMetaData fmd,
+        Set&lt;Method&gt; methods) {
+<span class="nc" id="L142">        String name = fmd.getName();</span>
+<span class="nc" id="L143">        Class&lt;?&gt; type = fmd.getDeclaredType();</span>
+<span class="nc" id="L144">        BCField field = bc.declareField(name, type);</span>
+<span class="nc" id="L145">        field.setAccessFlags(Constants.ACCESS_PRIVATE);</span>
+
+        // getter
+<span class="nc" id="L148">        name = StringUtil.capitalize(name);</span>
+<span class="nc bnc" id="L149" title="All 2 branches missed.">        String prefix = isGetter(iface, fmd) ? &quot;get&quot; : &quot;is&quot;;</span>
+<span class="nc" id="L150">        BCMethod meth = bc.declareMethod(prefix + name, type, null);</span>
+<span class="nc" id="L151">        meth.makePublic();</span>
+<span class="nc" id="L152">        Code code = meth.getCode(true);</span>
+<span class="nc" id="L153">        code.aload().setThis();</span>
+<span class="nc" id="L154">        code.getfield().setField(field);</span>
+<span class="nc" id="L155">        code.xreturn().setType(type);</span>
+<span class="nc" id="L156">        code.calculateMaxStack();</span>
+<span class="nc" id="L157">        code.calculateMaxLocals();</span>
+<span class="nc" id="L158">        methods.add(getMethodSafe(iface, meth.getName(), null));</span>
+
+        // setter
+<span class="nc" id="L161">        meth = bc.declareMethod(&quot;set&quot; + name, void.class, new Class[]{type});</span>
+<span class="nc" id="L162">        meth.makePublic();</span>
+<span class="nc" id="L163">        code = meth.getCode(true);</span>
+<span class="nc" id="L164">        code.aload().setThis();</span>
+<span class="nc" id="L165">        code.xload().setParam(0).setType(type);</span>
+<span class="nc" id="L166">        code.putfield().setField(field);</span>
+<span class="nc" id="L167">        code.vreturn();</span>
+<span class="nc" id="L168">        code.calculateMaxStack();</span>
+<span class="nc" id="L169">        code.calculateMaxLocals();</span>
+<span class="nc" id="L170">        methods.add(getMethodSafe(iface, meth.getName(), type));</span>
+<span class="nc" id="L171">    }</span>
+
+    /**
+     * Invalidate methods on the interface which are not managed.
+     */
+    private void invalidateNonBeanMethods(BCClass bc, Class&lt;?&gt; iface,
+        Set&lt;Method&gt; methods) {
+<span class="nc" id="L178">        Method[] meths = (Method[]) AccessController.doPrivileged(</span>
+<span class="nc" id="L179">            J2DoPrivHelper.getDeclaredMethodsAction(iface));</span>
+        BCMethod meth;
+        Code code;
+<span class="nc" id="L182">        Class&lt;?&gt; type = _repos.getMetaDataFactory().getDefaults().</span>
+<span class="nc" id="L183">            getUnimplementedExceptionType();</span>
+<span class="nc bnc" id="L184" title="All 2 branches missed.">        for (int i = 0; i &lt; meths.length; i++) {</span>
+<span class="nc bnc" id="L185" title="All 2 branches missed.">            if (methods.contains(meths[i]))</span>
+<span class="nc" id="L186">                continue;</span>
+<span class="nc" id="L187">            meth = bc.declareMethod(meths[i].getName(),</span>
+<span class="nc" id="L188">                meths[i].getReturnType(), meths[i].getParameterTypes());</span>
+<span class="nc" id="L189">            meth.makePublic();</span>
+<span class="nc" id="L190">            code = meth.getCode(true);</span>
+<span class="nc" id="L191">            code.anew().setType(type);</span>
+<span class="nc" id="L192">            code.dup();</span>
+<span class="nc" id="L193">            code.invokespecial().setMethod(type, &quot;&lt;init&gt;&quot;, void.class, null);</span>
+<span class="nc" id="L194">            code.athrow();</span>
+<span class="nc" id="L195">            code.calculateMaxLocals();</span>
+<span class="nc" id="L196">            code.calculateMaxStack();</span>
+        }
+<span class="nc" id="L198">    }</span>
+
+    /**
+     * Return a unique Class&lt;?&gt; name.
+     */
+    protected final String getClassName(ClassMetaData meta) {
+<span class="nc" id="L204">        Class&lt;?&gt; iface = meta.getDescribedType();</span>
+<span class="nc" id="L205">        return iface.getName() + &quot;$&quot; + System.identityHashCode(iface) + POSTFIX;</span>
+    }
+
+    /**
+     * Convenience method to return the given method / arg.
+     */
+    private static Method getMethodSafe(Class&lt;?&gt; iface, String name, Class&lt;?&gt; arg) {
+        try {
+<span class="nc" id="L213">            return AccessController.doPrivileged(</span>
+<span class="nc" id="L214">                J2DoPrivHelper.getDeclaredMethodAction(</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">                    iface, name, arg == null ? null : new Class[]{arg}));</span>
+<span class="nc" id="L216">        } catch (PrivilegedActionException pae) {</span>
+<span class="nc" id="L217">            throw new InternalException (_loc.get (&quot;interface-mismatch&quot;, name));</span>
+        }
+    }
+
+    private static boolean isGetter(Class&lt;?&gt; iface, FieldMetaData fmd) {
+<span class="nc bnc" id="L222" title="All 4 branches missed.">        if (fmd.getType() != boolean.class &amp;&amp; fmd.getType() != Boolean.class)</span>
+<span class="nc" id="L223">            return true;</span>
+        try {
+<span class="nc" id="L225">            Method meth = AccessController.doPrivileged(</span>
+<span class="nc" id="L226">                J2DoPrivHelper.getDeclaredMethodAction(iface, &quot;is&quot; +</span>
+<span class="nc" id="L227">                    StringUtil.capitalize(fmd.getName()), (Class[]) null));</span>
+<span class="nc bnc" id="L228" title="All 2 branches missed.">            return meth == null;</span>
+<span class="nc" id="L229">        } catch (PrivilegedActionException pae) {}</span>
+<span class="nc" id="L230">        return true;</span>
+    }
+
+    boolean isImplType(Class&lt;?&gt; cls) {
+<span class="nc bnc" id="L234" title="All 2 branches missed.">        return (cls.getName().endsWith(POSTFIX)</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">            &amp;&amp; cls.getName().indexOf('$') != -1);</span>
+    }
+
+    public Class&lt;?&gt; toManagedInterface(Class&lt;?&gt; cls) {
+<span class="nc" id="L239">        Class&lt;?&gt;[] ifaces = cls.getInterfaces();</span>
+<span class="nc bnc" id="L240" title="All 2 branches missed.">        for (int i = 0; i &lt; ifaces.length; i++) {</span>
+<span class="nc bnc" id="L241" title="All 2 branches missed.">            if (_impls.get(ifaces[i]) == cls)</span>
+<span class="nc" id="L242">                return ifaces[i];</span>
+        }
+<span class="nc" id="L244">        throw new IllegalArgumentException(cls.getName());</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

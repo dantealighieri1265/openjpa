@@ -335,6 +335,10 @@ public class ProxyManagerImpl
         ProxyBean proxy = getFactoryProxyBean(orig);
         return (proxy == null) ? null : proxy.newInstance(orig);
     }
+    public static void main(String[] args) {
+		ProxyManagerImpl proxyManagerImpl = new ProxyManagerImpl();
+		proxyManagerImpl.newCustomProxy(new Timestamp(5000000), true);
+	}
 
     /**
      * Return the concrete type for proxying.
@@ -1671,7 +1675,7 @@ public class ProxyManagerImpl
      * current directory.  The proxy manager looks for these classes
      * before generating its own proxies at runtime.
      */
-    public static void main(String[] args)
+   /* public static void main(String[] args)
         throws ClassNotFoundException, IOException {
         File dir = Files.getClassFile(ProxyManagerImpl.class);
         dir = (dir == null) ? new File(AccessController.doPrivileged(
@@ -1750,5 +1754,5 @@ public class ProxyManagerImpl
             // STOP - ALLOW PRINT STATEMENTS
             AsmAdaptor.write(bc, new File(dir, bc.getClassName() + ".class"));
         }
-    }
+    }*/
 }

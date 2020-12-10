@@ -11,6 +11,7 @@ import java.util.TreeSet;
 
 import org.apache.openjpa.util.support.Valid;
 import org.apache.openjpa.util.support.FinalClass;
+import org.apache.openjpa.util.support.Manageable;
 import org.apache.openjpa.util.support.NonValid;
 
 
@@ -19,6 +20,7 @@ public class ProxyManagerImplEntity {
 	private Object object;
 	private boolean autoOff;
     private String unproxyable;
+	private int expectedResultNanosTimestamp ;
 	
 	public ProxyManagerImplEntity() {
 		// Nothing to do
@@ -101,10 +103,18 @@ public class ProxyManagerImplEntity {
 		return this;
 	}
 
-	public ProxyManagerImplEntity initializeEntityTimestamp(Timestamp timestamp) {
+	public ProxyManagerImplEntity initializeEntityTimestamp(Timestamp timestamp, int nanos) {
+		this.setExpectedResultNanosTimestamp(nanos);
 		setObject(timestamp);
 		return this;
 	}
+	
+	public ProxyManagerImplEntity initializeEntityManageable() {
+		Manageable manageable = new Manageable();
+		setObject(manageable);
+		return this;
+	}
+
 	
 	
 	public Object getObject() {
@@ -131,6 +141,15 @@ public class ProxyManagerImplEntity {
 		this.autoOff = autoOff;
 	}
 
+	public int getExpectedResultNanosTimestamp() {
+		return expectedResultNanosTimestamp;
+	}
+
+	public void setExpectedResultNanosTimestamp(int expectedResultNanosTimestamp) {
+		this.expectedResultNanosTimestamp = expectedResultNanosTimestamp;
+	}
+
+	
 
 
 }

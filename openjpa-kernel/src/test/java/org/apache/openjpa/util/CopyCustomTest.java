@@ -38,14 +38,18 @@ public class CopyCustomTest {
         ProxyManagerImplEntity entityProxyDate = new ProxyManagerImplEntity(new ProxyManagerImpl().newDateProxy(Date.class));
         ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(r.nextInt(), r.nextInt(), r.nextInt());*/
         
+        
         ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity();
         ProxyManagerImplEntity entityNonValid = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity entityDate = new ProxyManagerImplEntity();
+        
+        
         ProxyManagerImplEntity entityValid = new ProxyManagerImplEntity();
         ProxyManagerImplEntity entityMap = new ProxyManagerImplEntity();
-        ProxyManagerImplEntity entityDate = new ProxyManagerImplEntity();
         ProxyManagerImplEntity entityGregorian = new ProxyManagerImplEntity();
         ProxyManagerImplEntity entityProxyDate = new ProxyManagerImplEntity();
         ProxyManagerImplEntity entityList = new ProxyManagerImplEntity();
+        ProxyManagerImplEntity entityManageable = new ProxyManagerImplEntity();
         
         
         //BeanClass beanClass = new BeanClass();
@@ -75,14 +79,18 @@ public class CopyCustomTest {
 
         return Arrays.asList(new Object[][] {
     		
+        	//Suite minimale
         	{entityNull.initializeEntityNull(null), null},
-            {entityNonValid.initializeEntityNonValid(r.nextInt(), r.nextInt()), null}, // non bean per ul branch coverage ultimo statement
-            {entityValid.initializeEntityValid(r.nextInt(), true), entityValid.getObject()}, //bean per il branch coverage per l'ultimo statement
-            {entityMap.initializeEntityMap(r.nextInt(), r.nextInt(), false), entityMap.getObject()},
+            {entityNonValid.initializeEntityNonValid(r.nextInt(), r.nextInt()), null}, 
             {entityDate.initializeEntityDate(new Date()), entityDate.getObject()},
+
+            //line, branch and mutation coverage
+            {entityManageable.initializeEntityManageable(), null},
+            {entityValid.initializeEntityValid(r.nextInt(), true), entityValid.getObject()}, 
+            {entityMap.initializeEntityMap(r.nextInt(), r.nextInt(), false), entityMap.getObject()},
             {entityGregorian.initializeEntityGregorian(new GregorianCalendar()), entityGregorian.getObject()},
             {entityProxyDate.initializeEntityProxyDate(new ProxyManagerImpl().newDateProxy(Date.class)), entityProxyDate.getObject()},
-            {entityList.initializeEntityList(r.nextInt()), entityList.getObject()}//Collection
+            {entityList.initializeEntityList(r.nextInt()), entityList.getObject()}
     	});
 
     }

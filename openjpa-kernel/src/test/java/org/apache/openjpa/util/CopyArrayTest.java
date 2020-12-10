@@ -33,23 +33,27 @@ public class CopyArrayTest {
         Random r = new Random();
         //List<TestInput> testInputs = new ArrayList<>();
 
-        Object obj = new Object();
-        obj=null;
 
         /*ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity(obj);
         ProxyManagerImplEntity entityNonBean = new ProxyManagerImplEntity(r.nextInt(), r.nextInt());
         ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(r.nextFloat());*/
+        
+        /*CATEGORY PARTIOTION:
+         * {Null, Valid, Invalid}
+         * copyArray(null)
+         * copyArray(Float[])
+         * copyArray(Nonvalid)
+         * */
+        
         ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity();
         ProxyManagerImplEntity entityNonValid = new ProxyManagerImplEntity();
         ProxyManagerImplEntity entityList = new ProxyManagerImplEntity();
 
         return Arrays.asList(new Object[][] {
-    		
-        	{entityNull.initializeEntityNull(null) , null},
         	
-        	//non bean per il branch coverage ultimo statement
-            {entityNonValid.initializeEntityNonValid(r.nextInt(), r.nextInt()), UnsupportedException.class}, 
-            
+        	//suite minimale
+        	{entityNull.initializeEntityNull(null) , null},
+        	{entityNonValid.initializeEntityNonValid(r.nextInt(), r.nextInt()), UnsupportedException.class}, 
             {entityList.initializeEntityArray(r.nextFloat()), entityList.getObject()}
     	});
 

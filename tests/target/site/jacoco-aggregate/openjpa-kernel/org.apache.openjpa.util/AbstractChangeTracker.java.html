@@ -1,0 +1,244 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractChangeTracker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.util</a> &gt; <span class="el_source">AbstractChangeTracker.java</span></div><h1>AbstractChangeTracker.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.util;
+
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.IdentityHashMap;
+import java.util.Set;
+
+import org.apache.commons.collections4.set.MapBackedSet;
+
+/**
+ * Base class that provides utilities to change trackers.
+ *
+ * @author Abe White
+ */
+public abstract class AbstractChangeTracker
+    implements ChangeTracker {
+
+    /**
+     * Collection of added items. May be null.
+     */
+<span class="fc" id="L40">    protected Collection add = null;</span>
+
+    /**
+     * Collection of removed items. May be null.
+     */
+<span class="fc" id="L45">    protected Collection rem = null;</span>
+
+    /**
+     * Collection of changed items. May be null.
+     */
+<span class="fc" id="L50">    protected Collection change = null;</span>
+
+<span class="fc" id="L52">    private boolean _autoOff = true;</span>
+<span class="fc" id="L53">    private boolean _track = false;</span>
+<span class="fc" id="L54">    private Boolean _identity = null;</span>
+<span class="fc" id="L55">    private int _seq = -1;</span>
+
+    /**
+     * Constructor; supply configuration.
+     */
+<span class="fc" id="L60">    public AbstractChangeTracker() {</span>
+<span class="fc" id="L61">    }</span>
+
+    /**
+     * Whether to automatically stop tracking when the number of changes
+     * exceeds the container size. Defaults to true.
+     */
+    public boolean getAutoOff() {
+<span class="nc" id="L68">        return _autoOff;</span>
+    }
+
+    /**
+     * Whether to automatically stop tracking when the number of changes
+     * exceeds the container size. Defaults to true.
+     */
+    public void setAutoOff(boolean autoOff) {
+<span class="fc" id="L76">        _autoOff = autoOff;</span>
+<span class="fc" id="L77">    }</span>
+
+    @Override
+    public boolean isTracking() {
+<span class="nc" id="L81">        return _track;</span>
+    }
+
+    @Override
+    public void startTracking() {
+<span class="nc" id="L86">        _track = true;</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (_seq == -1)</span>
+<span class="nc" id="L88">            _seq = initialSequence();</span>
+<span class="nc" id="L89">        reset();</span>
+<span class="nc" id="L90">    }</span>
+
+    /**
+     * Return the initial sequence value for this proxy. Typically this is
+     * the container size. Assumes an unordered collection by default,
+     * returning 0.
+     */
+    protected int initialSequence() {
+<span class="nc" id="L98">        return 0;</span>
+    }
+
+    @Override
+    public void stopTracking() {
+<span class="nc" id="L103">        _track = false;</span>
+<span class="nc" id="L104">        _seq = -1;</span>
+<span class="nc" id="L105">        reset();</span>
+<span class="nc" id="L106">    }</span>
+
+    /**
+     * Reset the state of the tracker.
+     */
+    protected void reset() {
+<span class="nc bnc" id="L112" title="All 2 branches missed.">        if (add != null)</span>
+<span class="nc" id="L113">            add.clear();</span>
+<span class="nc bnc" id="L114" title="All 2 branches missed.">        if (rem != null)</span>
+<span class="nc" id="L115">            rem.clear();</span>
+<span class="nc bnc" id="L116" title="All 2 branches missed.">        if (change != null)</span>
+<span class="nc" id="L117">            change.clear();</span>
+<span class="nc" id="L118">        _identity = null;</span>
+<span class="nc" id="L119">    }</span>
+
+    @Override
+    public Collection getAdded() {
+<span class="nc bnc" id="L123" title="All 2 branches missed.">        return (add == null) ? Collections.EMPTY_LIST : add;</span>
+    }
+
+    @Override
+    public Collection getRemoved() {
+<span class="nc bnc" id="L128" title="All 2 branches missed.">        return (rem == null) ? Collections.EMPTY_LIST : rem;</span>
+    }
+
+    @Override
+    public Collection getChanged() {
+<span class="nc bnc" id="L133" title="All 2 branches missed.">        return (change == null) ? Collections.EMPTY_LIST : change;</span>
+    }
+
+    /**
+     * Notify the tracker that the given object was added.
+     */
+    protected void added(Object val) {
+<span class="pc bpc" id="L140" title="1 of 2 branches missed.">        if (!_track)</span>
+<span class="fc" id="L141">            return;</span>
+<span class="nc" id="L142">        setIdentity(val);</span>
+<span class="nc" id="L143">        add(val);</span>
+<span class="nc" id="L144">    }</span>
+
+    /**
+     * Mark the given value as added.
+     */
+    protected abstract void add(Object val);
+
+    /**
+     * Notify the tracker that the given object was removed.
+     */
+    protected void removed(Object val) {
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (!_track)</span>
+<span class="nc" id="L156">            return;</span>
+<span class="nc" id="L157">        setIdentity(val);</span>
+<span class="nc" id="L158">        remove(val);</span>
+<span class="nc" id="L159">    }</span>
+
+    /**
+     * Mark the given value as removed.
+     */
+    protected abstract void remove(Object val);
+
+    /**
+     * Notify the tracker that the given object was changed.
+     */
+    protected void changed(Object val) {
+<span class="pc bpc" id="L170" title="1 of 2 branches missed.">        if (!_track)</span>
+<span class="fc" id="L171">            return;</span>
+<span class="nc" id="L172">        setIdentity(val);</span>
+<span class="nc" id="L173">        change(val);</span>
+<span class="nc" id="L174">    }</span>
+
+    /**
+     * Mark the given value as changed.
+     */
+    protected abstract void change(Object val);
+
+    @Override
+    public int getNextSequence() {
+<span class="nc" id="L183">        return _seq;</span>
+    }
+
+    @Override
+    public void setNextSequence(int seq) {
+<span class="nc" id="L188">        _seq = seq;</span>
+<span class="nc" id="L189">    }</span>
+
+    /**
+     * Create a new set for storing adds/removes/changes. Takes into account
+     * whether we need to use an identity set or standard set.
+     */
+    protected Set newSet() {
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if (_identity == Boolean.TRUE)</span>
+<span class="nc" id="L197">            return MapBackedSet.mapBackedSet(new IdentityHashMap());</span>
+<span class="nc" id="L198">        return new HashSet();</span>
+    }
+
+    /**
+     * Set whether to use identity-based datastructures, and switch our current
+     * datastructures appropriately if needed. We use identity structures for
+     * PC types in case the user has coded them such that two objects with
+     * different identities can compare equals().
+     */
+    private void setIdentity(Object val) {
+<span class="nc bnc" id="L208" title="All 4 branches missed.">        if (val == null || _identity != null)</span>
+<span class="nc" id="L209">            return;</span>
+
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (ImplHelper.isManagedType(null, val.getClass()))</span>
+<span class="nc" id="L212">            _identity = Boolean.TRUE;</span>
+        else
+<span class="nc" id="L214">            _identity = Boolean.FALSE;</span>
+
+<span class="nc" id="L216">        add = switchStructure(add, _identity.booleanValue());</span>
+<span class="nc" id="L217">        rem = switchStructure(rem, _identity.booleanValue());</span>
+<span class="nc" id="L218">        change = switchStructure(change, _identity.booleanValue());</span>
+<span class="nc" id="L219">    }</span>
+
+    /**
+     * Switch from an identity structure to a standard one, or vice versa.
+     */
+    private static Collection switchStructure(Collection cur,
+        boolean identity) {
+<span class="nc bnc" id="L226" title="All 2 branches missed.">        if (cur == null)</span>
+<span class="nc" id="L227">            return null;</span>
+<span class="nc bnc" id="L228" title="All 4 branches missed.">        if (identity &amp;&amp; cur instanceof HashSet) {</span>
+<span class="nc bnc" id="L229" title="All 2 branches missed.">            if (cur.isEmpty())</span>
+<span class="nc" id="L230">                return null;</span>
+<span class="nc" id="L231">            Set replace = MapBackedSet.mapBackedSet(new IdentityHashMap());</span>
+<span class="nc" id="L232">            replace.addAll(cur);</span>
+<span class="nc" id="L233">            return replace;</span>
+        }
+<span class="nc bnc" id="L235" title="All 6 branches missed.">        if (!identity &amp;&amp; !(cur instanceof HashSet) &amp;&amp; cur instanceof Set) {</span>
+<span class="nc bnc" id="L236" title="All 2 branches missed.">            if (cur.isEmpty())</span>
+<span class="nc" id="L237">                return null;</span>
+<span class="nc" id="L238">            return new HashSet(cur);</span>
+		}
+<span class="nc" id="L240">		return cur;</span>
+	}
+}
+
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

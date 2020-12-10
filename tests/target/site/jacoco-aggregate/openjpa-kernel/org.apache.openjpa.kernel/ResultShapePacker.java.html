@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>ResultShapePacker.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.kernel</a> &gt; <span class="el_source">ResultShapePacker.java</span></div><h1>ResultShapePacker.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.kernel;
+
+import java.util.Calendar;
+
+import org.apache.openjpa.util.ProxyCalendar;
+
+
+/**
+ * Packs result by delegation to a ResultShape.
+ *
+ * @author Pinaki Poddar
+ *
+ */
+public class ResultShapePacker extends ResultPacker {
+    private final ResultShape&lt;?&gt; _shape;
+    private final Class&lt;?&gt;[] _types;
+    private final String[] _aliases;
+    public ResultShapePacker(Class&lt;?&gt;[] types, String[] aliases, Class resultClass, ResultShape&lt;?&gt; shape) {
+<span class="nc" id="L37">        super(); // bypass superclass implementation</span>
+<span class="nc" id="L38">        _shape = shape;</span>
+<span class="nc" id="L39">        _types = types;</span>
+<span class="nc" id="L40">        _aliases = aliases;</span>
+<span class="nc" id="L41">    }</span>
+
+    @Override
+    public Object pack(Object o) {
+<span class="nc" id="L45">        return pack(new Object[]{o});</span>
+    }
+
+    @Override
+    public Object pack(Object[] values) {
+        // Check for proxied calenders and cleanup if any are found.
+<span class="nc bnc" id="L51" title="All 2 branches missed.">        if (_types != null) {</span>
+<span class="nc bnc" id="L52" title="All 2 branches missed.">            for (Class&lt;?&gt; t : _types) {</span>
+<span class="nc bnc" id="L53" title="All 2 branches missed.">                if (t.equals(Calendar.class)) {</span>
+<span class="nc bnc" id="L54" title="All 2 branches missed.">                    for (int i = 0; i &lt; values.length; i++) {</span>
+<span class="nc bnc" id="L55" title="All 2 branches missed.">                        if (values[i] instanceof ProxyCalendar) {</span>
+<span class="nc" id="L56">                            values[i] = ((ProxyCalendar) values[i]).copy((ProxyCalendar) values[i]);</span>
+                        }
+                    }
+                }
+            }
+        }
+<span class="nc bnc" id="L62" title="All 2 branches missed.">        if (_shape == null)</span>
+<span class="nc" id="L63">            return super.pack(values);</span>
+<span class="nc" id="L64">        return _shape.pack(values, _types, _aliases);</span>
+    }
+
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

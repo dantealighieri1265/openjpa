@@ -1,9 +1,6 @@
 package org.apache.openjpa.util;
 
 import org.apache.openjpa.util.entity.ProxyManagerImplEntity;
-import org.apache.openjpa.util.support.Valid;
-import org.apache.openjpa.util.support.FinalClass;
-import org.apache.openjpa.util.support.NonValid;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Test;
@@ -17,7 +14,6 @@ import java.util.*;
 public class NewCustomProxyTest {
 
     //private ProxyManagerImpl proxyManager;
-    private Object object;
     /*private boolean autoOff;
     private String unproxyable;
     private boolean resultNull;*/
@@ -40,30 +36,39 @@ public class NewCustomProxyTest {
     @Parameterized.Parameters
     public static Collection<?> getParameters(){
         Random r = new Random();
-        //List<TestInput> testInputs = new ArrayList<>();
         
+        /*CATEGORY PARTIOTION:
+         * Object origin -->{Null, Valid, Invalid}
+         * boolean autooff -->{True, False}
+         * 
+         * newCustomProxy(null, true)
+         * newCustomProxy(new Date(), false)
+         * newCustomProxy(NonValid, false)
+         * */
         
         ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity(true);
         ProxyManagerImplEntity entityNonValid = new ProxyManagerImplEntity(false);
+        ProxyManagerImplEntity entityDate = new ProxyManagerImplEntity(false);
+
         ProxyManagerImplEntity entityFinal = new ProxyManagerImplEntity(true);
         ProxyManagerImplEntity entityValid = new ProxyManagerImplEntity(true);
         ProxyManagerImplEntity entityMap = new ProxyManagerImplEntity(true);
         ProxyManagerImplEntity entitySortedMap = new ProxyManagerImplEntity(true);
         ProxyManagerImplEntity entitySortedSet = new ProxyManagerImplEntity(false);
-        ProxyManagerImplEntity entityDate = new ProxyManagerImplEntity(false);
         ProxyManagerImplEntity entityGregorian = new ProxyManagerImplEntity(false);
         ProxyManagerImplEntity entityProxyDate = new ProxyManagerImplEntity(true);
-        ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(true);//TODO: vedi se è una lista o array
+        ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(true);
         ProxyManagerImplEntity entityTimestamp = new ProxyManagerImplEntity(false);
         
-        /*TODO: RICORDATI DI SETTARE LA VARIABILE STRINGA UNPROXYBLE*/
         ProxyManagerImplEntity entityUnproxyable = new ProxyManagerImplEntity(false);
+        
+        ProxyManagerImplEntity entityManageable = new ProxyManagerImplEntity(false);
         
         boolean sortedMap = true;
         boolean notSortedMap = false;
         boolean proxyable = true;
         boolean unproxyable = false;
-        
+        int initNanos = 1;
         /*testInputs.add(new TestInput(null, true, true));
         testInputs.add(new TestInput(new NonBeanClass(r.nextInt(), r.nextInt()), false, true));
         testInputs.add(new TestInput(new FinalClass(), true, true));
@@ -113,25 +118,39 @@ public class NewCustomProxyTest {
         BeanClass unproxyableClass = new BeanClass();
         unproxyableClass.setValue(r.nextInt());
         testInputs.add(new TestInput(unproxyableClass, false, BeanClass.class.getName(),true));*/
+       
 
 
         return Arrays.asList(new Object[][] {
     		
+        	//Suite minimale
         	{entityNull.initializeEntityNull(null), null},
-            {entityNonValid.initializeEntityNonValid(r.nextInt(), r.nextInt()), null},// non bean per ul branch coverage ultimo statement
-            {entityFinal.initializeEntityFinal(), null},
-            {entityValid.initializeEntityValid(r.nextInt(), proxyable), entityValid.getObject()}, //bean per il branch coverage per l'ultimo statement
-            {entityMap.initializeEntityMap(r.nextInt(), r.nextInt(), notSortedMap), entityMap.getObject()},
-            {entitySortedMap.initializeEntityMap(r.nextInt(), r.nextInt(), sortedMap), entitySortedMap.getObject()},
-            {entitySortedSet.initializeSortedSet(r.nextInt()), entitySortedSet.getObject()},
+            {entityNonValid.initializeEntityNonValid(r.nextInt(), r.nextInt()), null},
             {entityDate.initializeEntityDate(new Date()), entityDate.getObject()},
+            
+            //line coverage
+            {entityManageable.initializeEntityManageable(), null},
+            {entityList.initializeEntityList(r.nextInt()), entityList.getObject()},
+            {entityMap.initializeEntityMap(r.nextInt(), r.nextInt(), notSortedMap), entityMap.getObject()},
             {entityGregorian.initializeEntityGregorian(new GregorianCalendar()), entityGregorian.getObject()},
             {entityProxyDate.initializeEntityProxyDate(new ProxyManagerImpl().newDateProxy(Date.class)), entityProxyDate.getObject()},
-            {entityList.initializeEntityList(r.nextInt()), entityList.getObject()},
-            {entityTimestamp.initializeEntityTimestamp(new Timestamp(System.currentTimeMillis())), entityTimestamp.getObject()},
-            /*In realtà questo non so a cosa serva. Non mi aumenta ne la coverage nè la branch. Forse
-            * è utile per la mutation*/
+            {entityTimestamp.initializeEntityTimestamp(new Timestamp(initNanos), initNanos), entityTimestamp.getObject()},
+            {entityFinal.initializeEntityFinal(), null},
+
+                        
+            //branch coverage
+            {entitySortedMap.initializeEntityMap(r.nextInt(), r.nextInt(), sortedMap), entitySortedMap.getObject()},
+            {entitySortedSet.initializeSortedSet(r.nextInt()), entitySortedSet.getObject()},
+            {entityValid.initializeEntityValid(r.nextInt(), proxyable), entityValid.getObject()}, 
+            
+            
+            /*TODO: NON AUMENTA Né LA BRANCH Né LA COVERAGE Né LA MUTATION COVERAGE.
+             * PROBABILMENTE VA TOLTO*/
             {entityUnproxyable.initializeEntityValid(r.nextInt(), unproxyable), null},
+            
+            
+            
+            
     	});
 
     }
@@ -181,20 +200,29 @@ public class NewCustomProxyTest {
     @Test
     public void newCustomProxyTest() {
         Object result = this.proxyManager.newCustomProxy(this.entity.getObject(), this.entity.isAutoOff());
+        Assert.assertEquals(this.expectedResult, result);
+        
+        /*if (result instanceof Timestamp) {
+        	((Timestamp) result).setNanos(entity.getExpectedResultNanosTimestamp()+1);
+        	Assert.assertNotEquals(entity.getExpectedResultNanosTimestamp(), ((Timestamp) result).getNanos());
+        }*/
+        	
 
+        /*try {
+        	System.out.println(((Timestamp) result).getNanos());
+		} catch (Exception e) {
+			// TODO: handle exception
+			System.out.println("Non timestamp");
+		}*/
+        
         /*if (this.resultNull) {
             Assert.assertNull(result);
         } else {
             Assert.assertEquals(this.object, result);
         }*/
         
-        Assert.assertEquals(this.expectedResult, result);
+        
 
     }
-    
-    public static void main(String[] args) {
-    	Valid unproxyableClass = new Valid();
-		System.out.println(Valid.class.getName());
-	}
 
 }

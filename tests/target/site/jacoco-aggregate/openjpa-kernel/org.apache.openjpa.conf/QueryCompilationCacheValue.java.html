@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>QueryCompilationCacheValue.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.conf</a> &gt; <span class="el_source">QueryCompilationCacheValue.java</span></div><h1>QueryCompilationCacheValue.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.conf;
+
+import java.util.Collections;
+import java.util.Hashtable;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import org.apache.openjpa.lib.conf.Configuration;
+import org.apache.openjpa.lib.conf.PluginValue;
+import org.apache.openjpa.lib.util.ParseException;
+import org.apache.openjpa.util.CacheMap;
+
+/**
+ * A cache of compiled queries.
+ *
+ * @author Abe White
+ * @since 0.9.6 (also existed in prior versions of Kodo)
+ */
+public class QueryCompilationCacheValue
+    extends PluginValue {
+
+<span class="nc" id="L40">    public static final String[] ALIASES = {</span>
+<span class="nc" id="L41">        &quot;true&quot;, CacheMap.class.getName(),</span>
+<span class="nc" id="L42">        &quot;all&quot;, ConcurrentHashMap.class.getName(),</span>
+        &quot;false&quot;, null,
+    };
+
+    public QueryCompilationCacheValue(String prop) {
+<span class="nc" id="L47">        super(prop, true);</span>
+<span class="nc" id="L48">        setAliases(ALIASES);</span>
+<span class="nc" id="L49">        setDefault(ALIASES[0]);</span>
+<span class="nc" id="L50">        setClassName(ALIASES[1]);</span>
+<span class="nc" id="L51">    }</span>
+
+    @Override
+    public Object newInstance(String clsName, Class type,
+        Configuration conf, boolean fatal) {
+        // make sure map handles concurrency
+        Map map;
+
+        try {
+<span class="nc" id="L60">            map = (Map) super.newInstance(clsName, type, conf, fatal);</span>
+<span class="nc" id="L61">        } catch (ParseException pe) {</span>
+            // OPENJPA256: this class differs from most plugins in that
+            // the plugin type is the standard java interface Map.class (rather
+            // than an openjpa-specific interface), which means that the
+            // ClassLoader used to load the implementation will be the system
+            // class loader; this presents a problem if OpenJPA is not in the
+            // system classpath, so work around the problem by catching
+            // the ParseException (which is what we wrap the
+            // ClassNotFoundException in) and try again, this time using
+            // this class' ClassLoader.
+<span class="nc" id="L71">            map = (Map) super.newInstance(clsName,</span>
+                QueryCompilationCacheValue.class, conf, fatal);
+<span class="nc" id="L73">        } catch (IllegalArgumentException iae) {</span>
+            // OPENJPA256: this class differs from most plugins in that
+            // the plugin type is the standard java interface Map.class (rather
+            // than an openjpa-specific interface), which means that the
+            // ClassLoader used to load the implementation will be the system
+            // class loader; this presents a problem if OpenJPA is not in the
+            // system classpath, so work around the problem by catching
+            // the IllegalArgumentException (which is what we wrap the
+            // ClassNotFoundException in) and try again, this time using
+            // this class' ClassLoader.
+<span class="nc" id="L83">            map = (Map) super.newInstance(clsName,</span>
+                QueryCompilationCacheValue.class, conf, fatal);
+<span class="nc" id="L85">        }</span>
+
+<span class="nc bnc" id="L87" title="All 10 branches missed.">        if (map != null &amp;&amp; !(map instanceof Hashtable)</span>
+            &amp;&amp; !(map instanceof CacheMap)
+            &amp;&amp; !(map instanceof
+                    org.apache.openjpa.lib.util.concurrent.ConcurrentMap)
+            &amp;&amp; !(map instanceof java.util.concurrent.ConcurrentMap))
+<span class="nc" id="L92">            map = Collections.synchronizedMap(map);</span>
+<span class="nc" id="L93">        return map;</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

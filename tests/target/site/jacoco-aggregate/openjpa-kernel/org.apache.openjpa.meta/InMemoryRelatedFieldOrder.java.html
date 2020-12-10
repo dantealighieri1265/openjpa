@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>InMemoryRelatedFieldOrder.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.meta</a> &gt; <span class="el_source">InMemoryRelatedFieldOrder.java</span></div><h1>InMemoryRelatedFieldOrder.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.meta;
+
+import java.util.Comparator;
+
+import org.apache.openjpa.conf.OpenJPAConfiguration;
+import org.apache.openjpa.enhance.PersistenceCapable;
+import org.apache.openjpa.kernel.OpenJPAStateManager;
+import org.apache.openjpa.util.ImplHelper;
+
+/**
+ * Order by a field in the related type in memory.
+ *
+ * @author Abe White
+ */
+class InMemoryRelatedFieldOrder
+    implements Order, Comparator {
+
+    
+    private static final long serialVersionUID = 1L;
+    private final FieldMetaData _rel;
+    private final boolean _asc;
+    private final OpenJPAConfiguration _conf;
+
+    public InMemoryRelatedFieldOrder(FieldMetaData rel, boolean asc,
+<span class="nc" id="L43">        OpenJPAConfiguration conf) {</span>
+<span class="nc" id="L44">        _rel = rel;</span>
+<span class="nc" id="L45">        _asc = asc;</span>
+<span class="nc" id="L46">        _conf = conf;</span>
+<span class="nc" id="L47">    }</span>
+
+    @Override
+    public String getName() {
+<span class="nc" id="L51">        return _rel.getName();</span>
+    }
+
+    @Override
+    public boolean isAscending() {
+<span class="nc" id="L56">        return _asc;</span>
+    }
+
+    @Override
+    public Comparator getComparator() {
+<span class="nc" id="L61">        return this;</span>
+    }
+
+    @Override
+    public int compare(Object o1, Object o2) {
+<span class="nc bnc" id="L66" title="All 2 branches missed.">        if (o1 == o2)</span>
+<span class="nc" id="L67">            return 0;</span>
+<span class="nc bnc" id="L68" title="All 2 branches missed.">        if (!(ImplHelper.isManageable(o1))</span>
+<span class="nc bnc" id="L69" title="All 2 branches missed.">            || !(ImplHelper.isManageable(o2)))</span>
+<span class="nc" id="L70">            return 0;</span>
+
+<span class="nc" id="L72">        PersistenceCapable pc1 = ImplHelper.toPersistenceCapable(o1, _conf);</span>
+<span class="nc" id="L73">        PersistenceCapable pc2 = ImplHelper.toPersistenceCapable(o2, _conf);</span>
+<span class="nc" id="L74">        OpenJPAStateManager sm1 = (OpenJPAStateManager) pc1.pcGetStateManager();</span>
+<span class="nc" id="L75">        OpenJPAStateManager sm2 = (OpenJPAStateManager) pc2.pcGetStateManager();</span>
+<span class="nc bnc" id="L76" title="All 4 branches missed.">        if (sm1 == null || sm2 == null)</span>
+<span class="nc" id="L77">            return 0;</span>
+
+<span class="nc" id="L79">        Object v1 = sm1.fetchField(_rel.getIndex(), false);</span>
+<span class="nc" id="L80">        Object v2 = sm2.fetchField(_rel.getIndex(), false);</span>
+<span class="nc bnc" id="L81" title="All 2 branches missed.">        if (v1 == v2)</span>
+<span class="nc" id="L82">            return 0;</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">        if (v1 == null)</span>
+<span class="nc bnc" id="L84" title="All 2 branches missed.">            return (_asc) ? -1 : 1;</span>
+<span class="nc bnc" id="L85" title="All 2 branches missed.">        if (v2 == null)</span>
+<span class="nc bnc" id="L86" title="All 2 branches missed.">            return (_asc) ? 1 : -1;</span>
+<span class="nc" id="L87">        int cmp = ((Comparable) v1).compareTo(v2);</span>
+<span class="nc bnc" id="L88" title="All 2 branches missed.">        return (_asc) ? cmp : -cmp;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

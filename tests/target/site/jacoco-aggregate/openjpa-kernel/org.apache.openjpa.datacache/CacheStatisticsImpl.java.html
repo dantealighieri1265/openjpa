@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>CacheStatisticsImpl.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.datacache</a> &gt; <span class="el_source">CacheStatisticsImpl.java</span></div><h1>CacheStatisticsImpl.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.datacache;
+
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+
+import org.apache.openjpa.util.OpenJPAId;
+
+/**
+ * The default CacheStatistics(SPI) implementation.
+ */
+<span class="nc" id="L32">public class CacheStatisticsImpl implements CacheStatisticsSPI {</span>
+    private static final long serialVersionUID = 9014495759588003166L;
+    private static final int ARRAY_SIZE = 3;
+<span class="nc" id="L35">    private long[] totalStat = new long[ARRAY_SIZE];</span>
+<span class="nc" id="L36">    private long[] stat = new long[ARRAY_SIZE];</span>
+<span class="nc" id="L37">    private Map&lt;String, long[]&gt; stats = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L38">    private Map&lt;String, long[]&gt; totalStats = new HashMap&lt;&gt;();</span>
+
+<span class="nc" id="L40">    private Date start = new Date();</span>
+<span class="nc" id="L41">    private Date since = new Date();</span>
+<span class="nc" id="L42">    private boolean enabled = false;</span>
+
+    private static final int READ = 0;
+    private static final int HIT = 1;
+    private static final int WRITE = 2;
+
+    @Override
+    public long getReadCount() {
+<span class="nc" id="L50">        return stat[READ];</span>
+    }
+
+    @Override
+    public long getHitCount() {
+<span class="nc" id="L55">        return stat[HIT];</span>
+    }
+
+    @Override
+    public long getWriteCount() {
+<span class="nc" id="L60">        return stat[WRITE];</span>
+    }
+
+    @Override
+    public long getTotalReadCount() {
+<span class="nc" id="L65">        return totalStat[READ];</span>
+    }
+
+    @Override
+    public long getTotalHitCount() {
+<span class="nc" id="L70">        return totalStat[HIT];</span>
+    }
+
+    @Override
+    public long getTotalWriteCount() {
+<span class="nc" id="L75">        return totalStat[WRITE];</span>
+    }
+
+    @Override
+    public long getReadCount(Class&lt;?&gt; c) {
+<span class="nc" id="L80">        return getReadCount(c.getName());</span>
+    }
+
+    @Override
+    public long getReadCount(String str){
+<span class="nc" id="L85">        return getCount(stats, str, READ);</span>
+    }
+
+    @Override
+    public long getHitCount(Class&lt;?&gt; c) {
+<span class="nc" id="L90">        return getHitCount(c.getName());</span>
+    }
+
+    @Override
+    public long getHitCount(String str) {
+<span class="nc" id="L95">        return getCount(stats, str, HIT);</span>
+    }
+
+    @Override
+    public long getWriteCount(Class&lt;?&gt; c) {
+<span class="nc" id="L100">        return getWriteCount(c.getName());</span>
+    }
+    @Override
+    public long getWriteCount(String str) {
+<span class="nc" id="L104">        return getCount(stats, str, WRITE);</span>
+    }
+
+    @Override
+    public long getTotalReadCount(Class&lt;?&gt; c) {
+<span class="nc" id="L109">        return getTotalReadCount(c.getName());</span>
+    }
+
+    @Override
+    public long getTotalReadCount(String str) {
+<span class="nc" id="L114">        return getCount(totalStats, str, READ);</span>
+    }
+
+    @Override
+    public long getTotalHitCount(Class&lt;?&gt; c) {
+<span class="nc" id="L119">        return getTotalHitCount(c.getName());</span>
+    }
+
+    @Override
+    public long getTotalHitCount(String str) {
+<span class="nc" id="L124">        return getCount(totalStats, str, HIT);</span>
+    }
+
+    @Override
+    public long getTotalWriteCount(Class&lt;?&gt; c) {
+<span class="nc" id="L129">        return getCount(totalStats, c.getName(), WRITE);</span>
+    }
+
+    @Override
+    public long getTotalWriteCount(String str) {
+<span class="nc" id="L134">        return getCount(totalStats, str, WRITE);</span>
+    }
+
+    @Override
+    public Date since() {
+<span class="nc" id="L139">        return since;</span>
+    }
+
+    @Override
+    public Date start() {
+<span class="nc" id="L144">        return start;</span>
+    }
+
+    @Override
+    public void reset() {
+<span class="nc" id="L149">        stat = new long[ARRAY_SIZE];</span>
+<span class="nc" id="L150">        stats.clear();</span>
+<span class="nc" id="L151">        since = new Date();</span>
+<span class="nc" id="L152">    }</span>
+
+    @Override
+    public boolean isEnabled() {
+<span class="nc" id="L156">        return enabled;</span>
+    }
+
+    @Override
+    public Set&lt;String&gt; classNames() {
+<span class="nc" id="L161">        return totalStats.keySet();</span>
+    }
+
+    @Override
+    public Map&lt;String, long[]&gt; toMap() {
+<span class="nc" id="L166">        Map&lt;String, long[]&gt; res = new HashMap&lt;&gt;();</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        for(Entry&lt;String, long[]&gt; s  : stats.entrySet()){</span>
+<span class="nc" id="L168">            res.put(s.getKey(), s.getValue());</span>
+<span class="nc" id="L169">        }</span>
+<span class="nc" id="L170">        return res;</span>
+    }
+
+    /**
+     * SPI implementation
+     */
+    @Override
+    public void enable() {
+<span class="nc" id="L178">        enabled = true;</span>
+<span class="nc" id="L179">    }</span>
+
+    @Override
+    public void disable() {
+<span class="nc" id="L183">        enabled = false;</span>
+<span class="nc" id="L184">    }</span>
+
+    @Override
+    public void newGet(Class&lt;?&gt; cls, boolean hit) {
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        if (!enabled) {</span>
+<span class="nc" id="L189">            return;</span>
+        }
+<span class="nc bnc" id="L191" title="All 2 branches missed.">        cls = (cls == null) ? Object.class : cls;</span>
+<span class="nc" id="L192">        String clsName = cls.getName();</span>
+<span class="nc" id="L193">        addSample(clsName, READ);</span>
+<span class="nc bnc" id="L194" title="All 2 branches missed.">        if (hit) {</span>
+<span class="nc" id="L195">            addSample(clsName, HIT);</span>
+        }
+<span class="nc" id="L197">    }</span>
+
+    public void newGet(Object oid, boolean hit) {
+<span class="nc bnc" id="L200" title="All 2 branches missed.">        if (!enabled) {</span>
+<span class="nc" id="L201">            return;</span>
+        }
+<span class="nc bnc" id="L203" title="All 2 branches missed.">        if (oid instanceof OpenJPAId) {</span>
+<span class="nc" id="L204">            newGet(((OpenJPAId) oid).getType(), hit);</span>
+        }
+<span class="nc" id="L206">    }</span>
+
+    @Override
+    public void newPut(Class&lt;?&gt; cls) {
+<span class="nc bnc" id="L210" title="All 2 branches missed.">        if (!enabled) {</span>
+<span class="nc" id="L211">            return;</span>
+        }
+<span class="nc bnc" id="L213" title="All 2 branches missed.">        cls = (cls == null) ? Object.class : cls;</span>
+<span class="nc" id="L214">        addSample(cls.getName(), WRITE);</span>
+<span class="nc" id="L215">    }</span>
+
+    public void newPut(Object oid) {
+<span class="nc bnc" id="L218" title="All 2 branches missed.">        if (!enabled) {</span>
+<span class="nc" id="L219">            return;</span>
+        }
+<span class="nc bnc" id="L221" title="All 2 branches missed.">        if (oid instanceof OpenJPAId) {</span>
+<span class="nc" id="L222">            newPut(((OpenJPAId) oid).getType());</span>
+        }
+<span class="nc" id="L224">    }</span>
+
+    /**
+     *  Private worker methods.
+     */
+    private void addSample(String c, int index) {
+<span class="nc" id="L230">        stat[index]++;</span>
+<span class="nc" id="L231">        totalStat[index]++;</span>
+<span class="nc" id="L232">        addSample(stats, c, index);</span>
+<span class="nc" id="L233">        addSample(totalStats, c, index);</span>
+<span class="nc" id="L234">    }</span>
+
+    private void addSample(Map&lt;String, long[]&gt; target, String c, int index) {
+<span class="nc" id="L237">        long[] row = target.get(c);</span>
+<span class="nc bnc" id="L238" title="All 2 branches missed.">        if (row == null) {</span>
+<span class="nc" id="L239">            row = new long[ARRAY_SIZE];</span>
+        }
+<span class="nc" id="L241">        row[index]++;</span>
+<span class="nc" id="L242">        target.put(c, row);</span>
+<span class="nc" id="L243">    }</span>
+
+    private long getCount(Map&lt;String, long[]&gt; target, String c, int index) {
+<span class="nc" id="L246">        long[] row = target.get(c);</span>
+<span class="nc bnc" id="L247" title="All 2 branches missed.">        return (row == null) ? 0 : row[index];</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

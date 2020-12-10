@@ -1,0 +1,536 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>JavaTypes.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.meta</a> &gt; <span class="el_source">JavaTypes.java</span></div><h1>JavaTypes.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.meta;
+
+import java.io.InputStream;
+import java.io.Reader;
+import java.io.Serializable;
+import java.lang.reflect.Array;
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.OffsetDateTime;
+import java.time.OffsetTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Calendar;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Properties;
+
+import org.apache.openjpa.enhance.PersistenceCapable;
+import org.apache.openjpa.lib.meta.CFMetaDataParser;
+import org.apache.openjpa.lib.util.ClassUtil;
+import org.apache.openjpa.lib.util.Localizer;
+import org.apache.openjpa.util.MetaDataException;
+
+/**
+ * Type constants for managed fields.
+ *
+ * @author Abe White
+ */
+<span class="nc" id="L55">public class JavaTypes {</span>
+
+    public static final int BOOLEAN = 0;
+    public static final int BYTE = 1;
+    public static final int CHAR = 2;
+    public static final int DOUBLE = 3;
+    public static final int FLOAT = 4;
+    public static final int INT = 5;
+    public static final int LONG = 6;
+    public static final int SHORT = 7;
+    // keep OBJECT as first non-primitive type code; other code relies on it
+    public static final int OBJECT = 8;
+    public static final int STRING = 9;
+    public static final int NUMBER = 10;
+    public static final int ARRAY = 11;
+    public static final int COLLECTION = 12;
+    public static final int MAP = 13;
+    public static final int DATE = 14;
+    public static final int PC = 15;
+    public static final int BOOLEAN_OBJ = 16;
+    public static final int BYTE_OBJ = 17;
+    public static final int CHAR_OBJ = 18;
+    public static final int DOUBLE_OBJ = 19;
+    public static final int FLOAT_OBJ = 20;
+    public static final int INT_OBJ = 21;
+    public static final int LONG_OBJ = 22;
+    public static final int SHORT_OBJ = 23;
+    public static final int BIGDECIMAL = 24;
+    public static final int BIGINTEGER = 25;
+    public static final int LOCALE = 26;
+    public static final int PC_UNTYPED = 27;
+    public static final int CALENDAR = 28;
+    public static final int OID = 29;
+    public static final int INPUT_STREAM = 30;
+    public static final int INPUT_READER = 31;
+    public static final int ENUM = 32;
+
+    // Java8 time API
+    public static final int LOCAL_DATE = 33;
+    public static final int LOCAL_TIME = 34;
+    public static final int LOCAL_DATETIME = 35;
+    public static final int OFFSET_TIME = 36;
+    public static final int OFFSET_DATETIME = 37;
+
+
+
+<span class="nc" id="L101">    private static final Localizer _loc = Localizer.forPackage(JavaTypes.class);</span>
+
+<span class="nc" id="L103">    private static final Map&lt;Class&lt;?&gt;, Integer&gt; _typeCodes = new HashMap&lt;&gt;();</span>
+
+    static {
+<span class="nc" id="L106">        _typeCodes.put(String.class, STRING);</span>
+<span class="nc" id="L107">        _typeCodes.put(Boolean.class, BOOLEAN_OBJ);</span>
+<span class="nc" id="L108">        _typeCodes.put(Byte.class, BYTE_OBJ);</span>
+<span class="nc" id="L109">        _typeCodes.put(Character.class, CHAR_OBJ);</span>
+<span class="nc" id="L110">        _typeCodes.put(Double.class, DOUBLE_OBJ);</span>
+<span class="nc" id="L111">        _typeCodes.put(Float.class, FLOAT_OBJ);</span>
+<span class="nc" id="L112">        _typeCodes.put(Integer.class, INT_OBJ);</span>
+<span class="nc" id="L113">        _typeCodes.put(Long.class, LONG_OBJ);</span>
+<span class="nc" id="L114">        _typeCodes.put(Short.class, SHORT_OBJ);</span>
+<span class="nc" id="L115">        _typeCodes.put(Date.class, DATE);</span>
+<span class="nc" id="L116">        _typeCodes.put(java.sql.Date.class, DATE);</span>
+<span class="nc" id="L117">        _typeCodes.put(java.sql.Timestamp.class, DATE);</span>
+<span class="nc" id="L118">        _typeCodes.put(java.sql.Time.class, DATE);</span>
+<span class="nc" id="L119">        _typeCodes.put(BigInteger.class, BIGINTEGER);</span>
+<span class="nc" id="L120">        _typeCodes.put(BigDecimal.class, BIGDECIMAL);</span>
+<span class="nc" id="L121">        _typeCodes.put(Number.class, NUMBER);</span>
+<span class="nc" id="L122">        _typeCodes.put(Locale.class, LOCALE);</span>
+<span class="nc" id="L123">        _typeCodes.put(Object.class, OBJECT);</span>
+<span class="nc" id="L124">        _typeCodes.put(PersistenceCapable.class, PC_UNTYPED);</span>
+<span class="nc" id="L125">        _typeCodes.put(Properties.class, MAP);</span>
+<span class="nc" id="L126">        _typeCodes.put(Calendar.class, CALENDAR);</span>
+
+        // Java8 time API
+<span class="nc" id="L129">        _typeCodes.put(LocalDate.class, LOCAL_DATE);</span>
+<span class="nc" id="L130">        _typeCodes.put(LocalTime.class, LOCAL_TIME);</span>
+<span class="nc" id="L131">        _typeCodes.put(LocalDateTime.class, LOCAL_DATETIME);</span>
+<span class="nc" id="L132">        _typeCodes.put(OffsetTime.class, OFFSET_TIME);</span>
+<span class="nc" id="L133">        _typeCodes.put(OffsetDateTime.class, OFFSET_DATETIME);</span>
+<span class="nc" id="L134">    }</span>
+
+    /**
+     * Return the field metadata type code for the given class. First class
+     * objects are not recognized in this method.
+     */
+    public static int getTypeCode(Class&lt;?&gt; type) {
+<span class="nc bnc" id="L141" title="All 2 branches missed.">        if (type == null)</span>
+<span class="nc" id="L142">            return OBJECT;</span>
+
+<span class="nc bnc" id="L144" title="All 2 branches missed.">        if (type.isPrimitive()) {</span>
+<span class="nc bnc" id="L145" title="All 8 branches missed.">            switch (type.getName().charAt(0)) {</span>
+                case 'b':
+<span class="nc bnc" id="L147" title="All 2 branches missed.">                    return (type == boolean.class) ? BOOLEAN : BYTE;</span>
+                case 'c':
+<span class="nc" id="L149">                    return CHAR;</span>
+                case 'd':
+<span class="nc" id="L151">                    return DOUBLE;</span>
+                case 'f':
+<span class="nc" id="L153">                    return FLOAT;</span>
+                case 'i':
+<span class="nc" id="L155">                    return INT;</span>
+                case 'l':
+<span class="nc" id="L157">                    return LONG;</span>
+                case 's':
+<span class="nc" id="L159">                    return SHORT;</span>
+            }
+        }
+
+<span class="nc" id="L163">        Integer code = _typeCodes.get(type);</span>
+<span class="nc bnc" id="L164" title="All 2 branches missed.">        if (code != null) {</span>
+<span class="nc" id="L165">            return code.intValue();</span>
+        }
+
+        // have to do this first to catch custom collection and map types;
+        // on resolve we figure out if these custom types are
+        // persistence-capable
+<span class="nc bnc" id="L171" title="All 2 branches missed.">        if (Collection.class.isAssignableFrom(type))</span>
+<span class="nc" id="L172">            return COLLECTION;</span>
+<span class="nc bnc" id="L173" title="All 2 branches missed.">        if (Map.class.isAssignableFrom(type))</span>
+<span class="nc" id="L174">            return MAP;</span>
+<span class="nc bnc" id="L175" title="All 2 branches missed.">        if (type.isArray())</span>
+<span class="nc" id="L176">            return ARRAY;</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">        if (Calendar.class.isAssignableFrom(type))</span>
+<span class="nc" id="L178">            return CALENDAR;</span>
+
+<span class="nc bnc" id="L180" title="All 2 branches missed.">        if (type.isInterface()) {</span>
+<span class="nc bnc" id="L181" title="All 2 branches missed.">            if (Serializable.class.isAssignableFrom(type))</span>
+<span class="nc" id="L182">                return OBJECT;</span>
+<span class="nc" id="L183">            return PC_UNTYPED;</span>
+        }
+<span class="nc bnc" id="L185" title="All 2 branches missed.">        if (type.isAssignableFrom(Reader.class))</span>
+<span class="nc" id="L186">            return INPUT_READER;</span>
+<span class="nc bnc" id="L187" title="All 2 branches missed.">        if (type.isAssignableFrom (InputStream.class))</span>
+<span class="nc" id="L188">            return INPUT_STREAM;</span>
+<span class="nc bnc" id="L189" title="All 2 branches missed.">        if (Enum.class.isAssignableFrom(type))</span>
+<span class="nc" id="L190">            return ENUM;</span>
+
+<span class="nc" id="L192">        return OBJECT;</span>
+    }
+
+    /**
+     * Check the given name against the same set of standard packages used
+     * when parsing metadata.
+     */
+    public static Class&lt;?&gt; classForName(String name, ClassMetaData context) {
+<span class="nc" id="L200">        return classForName(name, context, null);</span>
+    }
+
+    /**
+     * Check the given name against the same set of standard packages used
+     * when parsing metadata.
+     */
+    public static Class&lt;?&gt; classForName(String name, ClassMetaData context, ClassLoader loader) {
+<span class="nc" id="L208">        return classForName(name, context, context.getDescribedType(), null,</span>
+            loader);
+    }
+
+    /**
+     * Check the given name against the same set of standard packages used
+     * when parsing metadata.
+     *
+     * @param mustExist Whether the supplied loader &lt;b&gt;must&lt;/b&gt; be able to load the class. If true no attempt to use a
+     * different classloader will be made. If false the ClassResolver from the configuration will be used.
+     */
+    public static Class&lt;?&gt; classForName(String name, ClassMetaData context, ClassLoader loader, boolean mustExist) {
+<span class="nc" id="L220">        return classForName(name, context, context.getDescribedType(), null, loader, mustExist);</span>
+    }
+
+    /**
+     * Check the given name against the same set of standard packages used
+     * when parsing metadata.
+     */
+    public static Class&lt;?&gt; classForName(String name, ValueMetaData context) {
+<span class="nc" id="L228">        return classForName(name, context, null);</span>
+    }
+
+    /**
+     * Check the given name against the same set of standard packages used
+     * when parsing metadata.
+     */
+    public static Class&lt;?&gt; classForName(String name, ValueMetaData context, ClassLoader loader) {
+<span class="nc" id="L236">        return classForName(name,</span>
+<span class="nc" id="L237">            context.getFieldMetaData().getDefiningMetaData(),</span>
+<span class="nc" id="L238">            context.getFieldMetaData().getDeclaringType(), context, loader);</span>
+    }
+
+     /**
+     * Try to load a class using the provided loader. Optionally tries the
+     * configuration's ClassResolver if the supplied loader cannot find the class.
+     *
+     * @param name Name of the class to load.
+     * @param loader ClassLoader to use. If null, the configuration's ClassResolver will be used.
+     * @param mustExist Whether the supplied loader &lt;b&gt;must&lt;/b&gt; be able to load the class. If true no attempt to use a
+     *        different classloader will be made. If false the ClassResolver from the configuration will be used.
+     */
+    public static Class&lt;?&gt; classForName(String name, ValueMetaData context,
+            ClassLoader loader, boolean mustExist) {
+<span class="nc" id="L252">            return classForName(name,</span>
+<span class="nc" id="L253">                context.getFieldMetaData().getDefiningMetaData(),</span>
+<span class="nc" id="L254">                context.getFieldMetaData().getDeclaringType(), context, loader, mustExist);</span>
+        }
+
+    /**
+     * OJ-758: Delegates to the final classForName.  This is needed
+     * to maintain the existing code path prior to OJ-758.
+     */
+    private static Class&lt;?&gt; classForName(String name, ClassMetaData meta,
+            Class&lt;?&gt; dec, ValueMetaData vmd, ClassLoader loader) {
+<span class="nc" id="L263">        return classForName(name, meta, dec, vmd,  loader, true);</span>
+    }
+
+    /**
+     * Check the given name against the same set of standard packages used
+     * when parsing metadata.
+     */
+    private static Class&lt;?&gt; classForName(String name, ClassMetaData meta, Class&lt;?&gt; dec, ValueMetaData vmd,
+        ClassLoader loader, boolean mustExist) {
+        // special case for PersistenceCapable and Object
+<span class="nc bnc" id="L273" title="All 2 branches missed.">        if (&quot;PersistenceCapable&quot;.equals(name)</span>
+<span class="nc bnc" id="L274" title="All 2 branches missed.">            || &quot;javax.jdo.PersistenceCapable&quot;.equals(name)) // backwards compatibility</span>
+<span class="nc" id="L275">            return PersistenceCapable.class;</span>
+<span class="nc bnc" id="L276" title="All 2 branches missed.">        if (&quot;Object&quot;.equals(name))</span>
+<span class="nc" id="L277">            return Object.class;</span>
+
+<span class="nc" id="L279">        MetaDataRepository rep = meta.getRepository();</span>
+<span class="nc bnc" id="L280" title="All 2 branches missed.">        boolean runtime = (rep.getValidate() &amp; MetaDataRepository.VALIDATE_RUNTIME) != 0;</span>
+<span class="nc bnc" id="L281" title="All 2 branches missed.">        if (loader == null)</span>
+<span class="nc" id="L282">            loader = rep.getConfiguration().getClassResolverInstance().</span>
+<span class="nc" id="L283">                getClassLoader(dec, meta.getEnvClassLoader());</span>
+
+        // try the owner's package
+<span class="nc" id="L286">        String pkg = ClassUtil.getPackageName(dec);</span>
+<span class="nc" id="L287">        Class&lt;?&gt; cls = CFMetaDataParser.classForName(name, pkg, runtime, loader);</span>
+<span class="nc bnc" id="L288" title="All 4 branches missed.">        if (cls == null &amp;&amp; vmd != null) {</span>
+            // try against this value type's package too
+<span class="nc" id="L290">            pkg = ClassUtil.getPackageName(vmd.getDeclaredType());</span>
+<span class="nc" id="L291">            cls = CFMetaDataParser.classForName(name, pkg, runtime, loader);</span>
+        }
+
+        //OJ-758 start: If the class is still null, as a last/final attempt to
+        //load the class, check with the ClassResolver to get a loader
+        //and use it to attempt to load the class.
+<span class="nc bnc" id="L297" title="All 4 branches missed.">        if (cls == null  &amp;&amp; !mustExist){</span>
+<span class="nc" id="L298">            loader = rep.getConfiguration().getClassResolverInstance().</span>
+<span class="nc" id="L299">            getClassLoader(dec, meta.getEnvClassLoader());</span>
+<span class="nc" id="L300">            cls = CFMetaDataParser.classForName(name, pkg, runtime, loader);</span>
+        }
+        //OJ-758 end
+
+<span class="nc bnc" id="L304" title="All 2 branches missed.">        if (cls == null)</span>
+<span class="nc" id="L305">            throw new MetaDataException(_loc.get(&quot;bad-class&quot;, name,</span>
+<span class="nc bnc" id="L306" title="All 2 branches missed.">                (vmd == null) ? (Object) meta : (Object) vmd));</span>
+
+<span class="nc" id="L308">        return cls;</span>
+    }
+
+    /**
+     * Convert the given object to the given type if possible. If the type is
+     * a numeric primitive, this method only guarantees that the return value
+     * is a {@link Number}. If no known conversion or the value is null,
+     * returns the original value.
+     */
+    public static Object convert(Object val, int typeCode) {
+<span class="nc bnc" id="L318" title="All 2 branches missed.">        if (val == null)</span>
+<span class="nc" id="L319">            return null;</span>
+
+<span class="nc bnc" id="L321" title="All 20 branches missed.">        switch (typeCode) {</span>
+            case BIGDECIMAL:
+<span class="nc bnc" id="L323" title="All 2 branches missed.">                if (val instanceof BigDecimal)</span>
+<span class="nc" id="L324">                    return val;</span>
+<span class="nc bnc" id="L325" title="All 2 branches missed.">                if (val instanceof Number)</span>
+<span class="nc" id="L326">                    return new BigDecimal(((Number) val).doubleValue());</span>
+<span class="nc bnc" id="L327" title="All 2 branches missed.">                if (val instanceof String)</span>
+<span class="nc" id="L328">                    return new BigDecimal(val.toString());</span>
+<span class="nc" id="L329">                return val;</span>
+            case BIGINTEGER:
+<span class="nc bnc" id="L331" title="All 2 branches missed.">                if (val instanceof BigInteger)</span>
+<span class="nc" id="L332">                    return val;</span>
+<span class="nc bnc" id="L333" title="All 4 branches missed.">                if (val instanceof Number || val instanceof String)</span>
+<span class="nc" id="L334">                    return new BigInteger(val.toString());</span>
+<span class="nc" id="L335">                return val;</span>
+            case BOOLEAN:
+            case BOOLEAN_OBJ:
+<span class="nc bnc" id="L338" title="All 2 branches missed.">                if (val instanceof String)</span>
+<span class="nc" id="L339">                    return Boolean.valueOf(val.toString());</span>
+<span class="nc" id="L340">                return val;</span>
+            case BYTE_OBJ:
+<span class="nc bnc" id="L342" title="All 2 branches missed.">                if (val instanceof Byte)</span>
+<span class="nc" id="L343">                    return val;</span>
+<span class="nc bnc" id="L344" title="All 2 branches missed.">                if (val instanceof Number)</span>
+<span class="nc" id="L345">                    return Byte.valueOf(((Number) val).byteValue());</span>
+                // no break
+            case BYTE:
+<span class="nc bnc" id="L348" title="All 2 branches missed.">                if (val instanceof String)</span>
+<span class="nc" id="L349">                    return Byte.valueOf((String)val);</span>
+<span class="nc" id="L350">                return val;</span>
+            case CHAR:
+            case CHAR_OBJ:
+<span class="nc bnc" id="L353" title="All 2 branches missed.">                if (val instanceof Character)</span>
+<span class="nc" id="L354">                    return val;</span>
+<span class="nc bnc" id="L355" title="All 2 branches missed.">                if (val instanceof String)</span>
+<span class="nc" id="L356">                    return Character.valueOf(val.toString().charAt(0));</span>
+<span class="nc bnc" id="L357" title="All 2 branches missed.">                if (val instanceof Number)</span>
+<span class="nc" id="L358">                    return Character.valueOf((char) ((Number) val).intValue());</span>
+<span class="nc" id="L359">                return val;</span>
+            case DATE:
+<span class="nc bnc" id="L361" title="All 2 branches missed.">                if (val instanceof String)</span>
+<span class="nc" id="L362">                    return new Date(val.toString());</span>
+<span class="nc" id="L363">                return val;</span>
+            case DOUBLE_OBJ:
+<span class="nc bnc" id="L365" title="All 2 branches missed.">                if (val instanceof Double)</span>
+<span class="nc" id="L366">                    return val;</span>
+<span class="nc bnc" id="L367" title="All 2 branches missed.">                if (val instanceof Number)</span>
+<span class="nc" id="L368">                    return Double.valueOf(((Number) val).doubleValue());</span>
+                // no break
+            case DOUBLE:
+<span class="nc bnc" id="L371" title="All 2 branches missed.">                if (val instanceof String)</span>
+<span class="nc" id="L372">                    return Double.valueOf(val.toString());</span>
+<span class="nc" id="L373">                return val;</span>
+            case FLOAT_OBJ:
+<span class="nc bnc" id="L375" title="All 2 branches missed.">                if (val instanceof Float)</span>
+<span class="nc" id="L376">                    return val;</span>
+<span class="nc bnc" id="L377" title="All 2 branches missed.">                if (val instanceof Number)</span>
+<span class="nc" id="L378">                    return Float.valueOf(((Number) val).floatValue());</span>
+                // no break
+            case FLOAT:
+<span class="nc bnc" id="L381" title="All 2 branches missed.">                if (val instanceof String)</span>
+<span class="nc" id="L382">                    return Float.valueOf(val.toString());</span>
+<span class="nc" id="L383">                return val;</span>
+            case INT_OBJ:
+<span class="nc bnc" id="L385" title="All 2 branches missed.">                if (val instanceof Integer)</span>
+<span class="nc" id="L386">                    return val;</span>
+<span class="nc bnc" id="L387" title="All 2 branches missed.">                if (val instanceof Number)</span>
+<span class="nc" id="L388">                    return ((Number) val).intValue();</span>
+                // no break
+            case INT:
+<span class="nc bnc" id="L391" title="All 2 branches missed.">                if (val instanceof String)</span>
+<span class="nc" id="L392">                    return Integer.valueOf(val.toString());</span>
+<span class="nc" id="L393">                return val;</span>
+            case LONG_OBJ:
+<span class="nc bnc" id="L395" title="All 2 branches missed.">                if (val instanceof Long)</span>
+<span class="nc" id="L396">                    return val;</span>
+<span class="nc bnc" id="L397" title="All 2 branches missed.">                if (val instanceof Number)</span>
+<span class="nc" id="L398">                    return ((Number) val).longValue();</span>
+                // no break
+            case LONG:
+<span class="nc bnc" id="L401" title="All 2 branches missed.">                if (val instanceof String)</span>
+<span class="nc" id="L402">                    return Long.valueOf(val.toString());</span>
+<span class="nc" id="L403">                return val;</span>
+            case NUMBER:
+<span class="nc bnc" id="L405" title="All 2 branches missed.">                if (val instanceof Number)</span>
+<span class="nc" id="L406">                    return val;</span>
+<span class="nc bnc" id="L407" title="All 2 branches missed.">                if (val instanceof String)</span>
+<span class="nc" id="L408">                    return new BigDecimal(val.toString());</span>
+<span class="nc" id="L409">                return val;</span>
+            case SHORT_OBJ:
+<span class="nc bnc" id="L411" title="All 2 branches missed.">                if (val instanceof Short)</span>
+<span class="nc" id="L412">                    return val;</span>
+<span class="nc bnc" id="L413" title="All 2 branches missed.">                if (val instanceof Number)</span>
+<span class="nc" id="L414">                    return Short.valueOf(((Number) val).shortValue());</span>
+                // no break
+            case SHORT:
+<span class="nc bnc" id="L417" title="All 2 branches missed.">                if (val instanceof String)</span>
+<span class="nc" id="L418">                    return Short.valueOf(val.toString());</span>
+<span class="nc" id="L419">                return val;</span>
+            case STRING:
+<span class="nc" id="L421">                return val.toString();</span>
+            default:
+<span class="nc" id="L423">                return val;</span>
+        }
+    }
+
+    /**
+     * Return true if the (possibly unresolved) field or its elements might be
+     * persistence capable objects.
+     */
+    public static boolean maybePC(FieldMetaData field) {
+<span class="nc bnc" id="L432" title="All 3 branches missed.">        switch (field.getDeclaredTypeCode()) {</span>
+            case JavaTypes.ARRAY:
+            case JavaTypes.COLLECTION:
+<span class="nc" id="L435">                return maybePC(field.getElement());</span>
+            case JavaTypes.MAP:
+<span class="nc bnc" id="L437" title="All 4 branches missed.">                return maybePC(field.getKey()) || maybePC(field.getElement());</span>
+            default:
+<span class="nc" id="L439">                return maybePC((ValueMetaData) field);</span>
+        }
+    }
+
+    /**
+     * Return true if the (possibly unresolved) value might be a first class
+     * object.
+     */
+    public static boolean maybePC(ValueMetaData val) {
+<span class="nc" id="L448">        return maybePC(val.getDeclaredTypeCode(), val.getDeclaredType());</span>
+    }
+
+    /**
+     * Return true if the given unresolved typecode/type pair may represent a
+     * persistent object.
+     */
+    static boolean maybePC(int typeCode, Class&lt;?&gt; type) {
+<span class="nc bnc" id="L456" title="All 2 branches missed.">        if (type == null)</span>
+<span class="nc" id="L457">            return false;</span>
+<span class="nc bnc" id="L458" title="All 3 branches missed.">        switch (typeCode) {</span>
+            case JavaTypes.OBJECT:
+            case JavaTypes.PC:
+            case JavaTypes.PC_UNTYPED:
+<span class="nc" id="L462">                return true;</span>
+            case JavaTypes.COLLECTION:
+            case JavaTypes.MAP:
+<span class="nc bnc" id="L465" title="All 2 branches missed.">                return !type.getName().startsWith(&quot;java.util.&quot;);</span>
+            default:
+<span class="nc" id="L467">                return false;</span>
+        }
+    }
+
+    /**
+     * Helper method to return the given array value as a collection.
+     */
+    @SuppressWarnings(&quot;unchecked&quot;)
+    public static &lt;T&gt; List&lt;T&gt; toList(Object val, Class&lt;T&gt; elem, boolean mutable) {
+<span class="nc bnc" id="L476" title="All 2 branches missed.">        if (val == null)</span>
+<span class="nc" id="L477">            return null;</span>
+
+        List&lt;T&gt; l;
+<span class="nc bnc" id="L480" title="All 2 branches missed.">        if (!elem.isPrimitive()) {</span>
+            // if an object array, use built-in list function
+<span class="nc" id="L482">            l = Arrays.asList((T[]) val);</span>
+<span class="nc bnc" id="L483" title="All 2 branches missed.">            if (mutable)</span>
+<span class="nc" id="L484">                l = new ArrayList&lt;&gt;(l);</span>
+        } else {
+            // convert to list of wrapper objects
+<span class="nc" id="L487">            int length = Array.getLength(val);</span>
+<span class="nc" id="L488">            l = new ArrayList&lt;&gt;(length);</span>
+<span class="nc bnc" id="L489" title="All 2 branches missed.">            for (int i = 0; i &lt; length; i++)</span>
+<span class="nc" id="L490">                l.add((T)Array.get(val, i));</span>
+        }
+<span class="nc" id="L492">        return l;</span>
+    }
+
+    /**
+     * Helper method to return the given collection as an array.
+     */
+    public static Object toArray(Collection&lt;?&gt; coll, Class&lt;?&gt; elem) {
+<span class="nc bnc" id="L499" title="All 2 branches missed.">        if (coll == null)</span>
+<span class="nc" id="L500">            return null;</span>
+
+<span class="nc" id="L502">        Object array = Array.newInstance(elem, coll.size());</span>
+<span class="nc" id="L503">        int idx = 0;</span>
+<span class="nc bnc" id="L504" title="All 2 branches missed.">        for (Iterator&lt;?&gt; itr = coll.iterator(); itr.hasNext(); idx++)</span>
+<span class="nc" id="L505">            Array.set(array, idx, itr.next ());</span>
+<span class="nc" id="L506">		return array;</span>
+	}
+
+    /**
+     * Determine whether or not the provided Object value is the default for the provided typeCode.
+     *
+     * For example: If o = Integer(0) and typeCode = JavaTypes.INT, this method will return true.
+     */
+    public static boolean isPrimitiveDefault(Object o, int typeCode) {
+<span class="nc bnc" id="L515" title="All 9 branches missed.">        switch (typeCode) {</span>
+            case BOOLEAN:
+<span class="nc bnc" id="L517" title="All 2 branches missed.">                return ((Boolean) o).equals(Boolean.FALSE) ? true : false;</span>
+            case BYTE:
+<span class="nc bnc" id="L519" title="All 2 branches missed.">                return ((Byte) o) == 0 ? true : false;</span>
+            case SHORT:
+<span class="nc bnc" id="L521" title="All 2 branches missed.">                return ((Short) o) == 0 ? true : false;</span>
+            case INT:
+<span class="nc bnc" id="L523" title="All 2 branches missed.">                return ((Integer) o) == 0 ? true : false;</span>
+            case LONG:
+<span class="nc bnc" id="L525" title="All 2 branches missed.">                return ((Long) o) == 0L ? true : false;</span>
+            case FLOAT:
+<span class="nc bnc" id="L527" title="All 2 branches missed.">                return ((Float) o) == 0.0F ? true : false;</span>
+            case CHAR:
+<span class="nc bnc" id="L529" title="All 2 branches missed.">                return ((Character) o) == '\u0000' ? true : false;</span>
+            case DOUBLE:
+<span class="nc bnc" id="L531" title="All 2 branches missed.">                return ((Double) o) == 0.0d ? true : false;</span>
+        }
+<span class="nc" id="L533">        return false;</span>
+    }
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>

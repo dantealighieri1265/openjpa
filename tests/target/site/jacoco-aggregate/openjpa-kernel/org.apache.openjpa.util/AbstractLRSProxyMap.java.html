@@ -1,0 +1,565 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="it"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../../jacoco-resources/report.gif" type="image/gif"/><title>AbstractLRSProxyMap.java</title><link rel="stylesheet" href="../../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../../index.html" class="el_report">Tests</a> &gt; <a href="../index.html" class="el_bundle">openjpa-kernel</a> &gt; <a href="index.source.html" class="el_package">org.apache.openjpa.util</a> &gt; <span class="el_source">AbstractLRSProxyMap.java</span></div><h1>AbstractLRSProxyMap.java</h1><pre class="source lang-java linenums">/*
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * &quot;License&quot;); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * &quot;AS IS&quot; BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+ * KIND, either express or implied.  See the License for the
+ * specific language governing permissions and limitations
+ * under the License.
+ */
+package org.apache.openjpa.util;
+
+import java.io.ObjectStreamException;
+import java.util.AbstractCollection;
+import java.util.AbstractSet;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
+import java.util.NoSuchElementException;
+import java.util.Set;
+
+import org.apache.commons.collections4.Predicate;
+import org.apache.commons.collections4.iterators.FilterIterator;
+import org.apache.commons.collections4.iterators.IteratorChain;
+import org.apache.openjpa.kernel.OpenJPAStateManager;
+import org.apache.openjpa.lib.util.Closeable;
+import org.apache.openjpa.lib.util.Localizer;
+
+/**
+ * A map proxy designed for maps backed by extremely large result sets in
+ * which each call to {@link #get} or {@link #containsKey} may perform a
+ * database query. Changes to the map are tracked through a
+ * {@link ChangeTracker}. This map has the following limitations:
+ * &lt;ul&gt;
+ * &lt;li&gt;The &lt;code&gt;size&lt;/code&gt; method may return {@link Integer#MAX_VALUE}.&lt;/li&gt;
+ * &lt;li&gt;Null keys and values are not supported.&lt;/li&gt;
+ * &lt;/ul&gt;
+ *
+ * @author Abe White
+ */
+public abstract class AbstractLRSProxyMap&lt;K,V&gt;
+    implements Map&lt;K,V&gt;, LRSProxy, MapChangeTracker, Predicate {
+
+    private static final int MODE_KEY = 0;
+    private static final int MODE_VALUE = 1;
+    private static final int MODE_ENTRY = 2;
+
+<span class="nc" id="L58">    private static final Localizer _loc = Localizer.forPackage</span>
+<span class="nc" id="L59">        (AbstractLRSProxyMap.class);</span>
+
+<span class="nc" id="L61">    private Class&lt;K&gt; _keyType = null;</span>
+<span class="nc" id="L62">    private Class&lt;V&gt; _valueType = null;</span>
+<span class="nc" id="L63">    private MapChangeTrackerImpl _ct = null;</span>
+<span class="nc" id="L64">    private OpenJPAStateManager _sm = null;</span>
+<span class="nc" id="L65">    private int _field = -1;</span>
+<span class="nc" id="L66">    private OpenJPAStateManager _origOwner = null;</span>
+<span class="nc" id="L67">    private int _origField = -1;</span>
+<span class="nc" id="L68">    private Map&lt;K,V&gt; _map = null;</span>
+<span class="nc" id="L69">    private int _count = -1;</span>
+<span class="nc" id="L70">    private boolean _iterated = false;</span>
+
+<span class="nc" id="L72">    public AbstractLRSProxyMap(Class&lt;K&gt; keyType, Class&lt;V&gt; valueType) {</span>
+<span class="nc" id="L73">        _keyType = keyType;</span>
+<span class="nc" id="L74">        _valueType = valueType;</span>
+<span class="nc" id="L75">        _ct = new MapChangeTrackerImpl(this,false);</span>
+<span class="nc" id="L76">        _ct.setAutoOff(false);</span>
+<span class="nc" id="L77">    }</span>
+
+    @Override
+    public void setOwner(OpenJPAStateManager sm, int field) {
+        // can't transfer ownership of an lrs proxy
+<span class="nc bnc" id="L82" title="All 8 branches missed.">        if (sm != null &amp;&amp; _origOwner != null</span>
+            &amp;&amp; (_origOwner != sm || _origField != field)) {
+<span class="nc" id="L84">            throw new InvalidStateException(_loc.get(&quot;transfer-lrs&quot;,</span>
+<span class="nc" id="L85">                _origOwner.getMetaData().getField(_origField)));</span>
+        }
+
+<span class="nc" id="L88">        _sm = sm;</span>
+<span class="nc" id="L89">        _field = field;</span>
+
+        // keep track of original owner so we can detect transfer attempts
+<span class="nc bnc" id="L92" title="All 2 branches missed.">        if (sm != null) {</span>
+<span class="nc" id="L93">            _origOwner = sm;</span>
+<span class="nc" id="L94">            _origField = field;</span>
+        }
+<span class="nc" id="L96">    }</span>
+
+    @Override
+    public OpenJPAStateManager getOwner() {
+<span class="nc" id="L100">        return _sm;</span>
+    }
+
+    @Override
+    public int getOwnerField() {
+<span class="nc" id="L105">        return _field;</span>
+    }
+
+    @Override
+    public ChangeTracker getChangeTracker() {
+<span class="nc" id="L110">        return this;</span>
+    }
+
+    @Override
+    public Object copy(Object orig) {
+        // used to store fields for rollbac; we don't store lrs fields
+<span class="nc" id="L116">        return null;</span>
+    }
+
+    /**
+     * used in testing; we need to be able to make sure that OpenJPA does not
+     * iterate lrs fields during standard crud operations
+     */
+    boolean isIterated() {
+<span class="nc" id="L124">        return _iterated;</span>
+    }
+
+    /**
+     * used in testing; we need to be able to make sure that OpenJPA does not
+     * iterate lrs fields during standard crud operations
+     */
+    void setIterated(boolean it) {
+<span class="nc" id="L132">        _iterated = it;</span>
+<span class="nc" id="L133">    }</span>
+
+    @Override
+    public int size() {
+<span class="nc bnc" id="L137" title="All 2 branches missed.">        if (_count == -1)</span>
+<span class="nc" id="L138">            _count = count();</span>
+<span class="nc bnc" id="L139" title="All 2 branches missed.">        if (_count == Integer.MAX_VALUE)</span>
+<span class="nc" id="L140">            return _count;</span>
+<span class="nc" id="L141">        return _count + _ct.getAdded().size() - _ct.getRemoved().size();</span>
+    }
+
+    @Override
+    public boolean isEmpty() {
+<span class="nc bnc" id="L146" title="All 2 branches missed.">        return size() == 0;</span>
+    }
+
+    @Override
+    public boolean containsKey(Object key) {
+<span class="nc bnc" id="L151" title="All 4 branches missed.">        if (_keyType != null &amp;&amp; !_keyType.isInstance(key))</span>
+<span class="nc" id="L152">            return false;</span>
+<span class="nc bnc" id="L153" title="All 4 branches missed.">        if (_map != null &amp;&amp; _map.containsKey(key))</span>
+<span class="nc" id="L154">            return true;</span>
+<span class="nc bnc" id="L155" title="All 2 branches missed.">        if (_ct.getTrackKeys()) {</span>
+<span class="nc bnc" id="L156" title="All 2 branches missed.">            if (_ct.getRemoved().contains(key))</span>
+<span class="nc" id="L157">                return false;</span>
+<span class="nc" id="L158">            return hasKey(key);</span>
+        }
+
+        // value tracking:
+        // if we've removed values, we need to see if this key represents
+        // a removed instance. otherwise we can rely on the 1-1 between
+        // keys and values when using value tracking
+<span class="nc bnc" id="L165" title="All 2 branches missed.">        if (_ct.getRemoved().isEmpty())</span>
+<span class="nc" id="L166">            return hasKey(key);</span>
+<span class="nc bnc" id="L167" title="All 2 branches missed.">        return get(key) != null;</span>
+    }
+
+    @Override
+    public boolean containsValue(Object val) {
+<span class="nc bnc" id="L172" title="All 4 branches missed.">        if (_valueType != null &amp;&amp; !_valueType.isInstance(val))</span>
+<span class="nc" id="L173">            return false;</span>
+<span class="nc bnc" id="L174" title="All 4 branches missed.">        if (_map != null &amp;&amp; _map.containsValue(val))</span>
+<span class="nc" id="L175">            return true;</span>
+<span class="nc bnc" id="L176" title="All 2 branches missed.">        if (!_ct.getTrackKeys()) {</span>
+<span class="nc bnc" id="L177" title="All 2 branches missed.">            if (_ct.getRemoved().contains(val))</span>
+<span class="nc" id="L178">                return false;</span>
+<span class="nc" id="L179">            return hasValue(val);</span>
+        }
+
+        // key tracking
+<span class="nc" id="L183">        Collection&lt;K&gt; keys = keys(val);</span>
+<span class="nc bnc" id="L184" title="All 4 branches missed.">        if (keys == null || keys.isEmpty())</span>
+<span class="nc" id="L185">            return false;</span>
+<span class="nc" id="L186">        keys.removeAll(_ct.getRemoved());</span>
+<span class="nc" id="L187">        keys.removeAll(_ct.getChanged());</span>
+<span class="nc bnc" id="L188" title="All 2 branches missed.">        return keys.size() &gt; 0;</span>
+    }
+
+    @Override
+    public V get(Object key) {
+<span class="nc bnc" id="L193" title="All 4 branches missed.">        if (_keyType != null &amp;&amp; !_keyType.isInstance(key))</span>
+<span class="nc" id="L194">            return null;</span>
+<span class="nc bnc" id="L195" title="All 2 branches missed.">        V ret = (_map == null) ? null : _map.get(key);</span>
+<span class="nc bnc" id="L196" title="All 2 branches missed.">        if (ret != null)</span>
+<span class="nc" id="L197">            return ret;</span>
+<span class="nc bnc" id="L198" title="All 4 branches missed.">        if (_ct.getTrackKeys() &amp;&amp; _ct.getRemoved().contains(key))</span>
+<span class="nc" id="L199">            return null;</span>
+<span class="nc" id="L200">        V val = value(key);</span>
+<span class="nc bnc" id="L201" title="All 4 branches missed.">        if (!_ct.getTrackKeys() &amp;&amp; _ct.getRemoved().contains(val))</span>
+<span class="nc" id="L202">            return null;</span>
+<span class="nc" id="L203">        return val;</span>
+    }
+
+    @Override
+    public V put(K key, V value) {
+<span class="nc" id="L208">        Proxies.assertAllowedType(key, _keyType);</span>
+<span class="nc" id="L209">        Proxies.assertAllowedType(value, _valueType);</span>
+<span class="nc" id="L210">        Proxies.dirty(this, false);</span>
+<span class="nc bnc" id="L211" title="All 2 branches missed.">        if (_map == null)</span>
+<span class="nc" id="L212">            _map = new HashMap&lt;&gt;();</span>
+<span class="nc" id="L213">        V old = _map.put(key, value);</span>
+<span class="nc bnc" id="L214" title="All 4 branches missed.">        if (old == null &amp;&amp; (!_ct.getTrackKeys()</span>
+<span class="nc bnc" id="L215" title="All 2 branches missed.">            || !_ct.getRemoved().contains(key)))</span>
+<span class="nc" id="L216">            old = value(key);</span>
+<span class="nc bnc" id="L217" title="All 2 branches missed.">        if (old != null) {</span>
+<span class="nc" id="L218">            _ct.changed(key, old, value);</span>
+<span class="nc" id="L219">            Proxies.removed(this, old, false);</span>
+        } else
+<span class="nc" id="L221">            _ct.added(key, value);</span>
+<span class="nc" id="L222">        return old;</span>
+    }
+
+    @Override
+    public void putAll(Map&lt;? extends K,? extends V&gt; m) {
+<span class="nc bnc" id="L227" title="All 2 branches missed.">        for (Map.Entry&lt;? extends K, ? extends V&gt; entry : m.entrySet()) {</span>
+<span class="nc" id="L228">            put(entry.getKey(), entry.getValue());</span>
+<span class="nc" id="L229">        }</span>
+<span class="nc" id="L230">    }</span>
+
+    @Override
+    public V remove(Object key) {
+<span class="nc" id="L234">        Proxies.dirty(this, false);</span>
+<span class="nc bnc" id="L235" title="All 2 branches missed.">        V old = (_map == null) ? null : _map.remove(key);</span>
+<span class="nc bnc" id="L236" title="All 4 branches missed.">        if (old == null &amp;&amp; (!_ct.getTrackKeys()</span>
+<span class="nc bnc" id="L237" title="All 2 branches missed.">            || !_ct.getRemoved().contains(key)))</span>
+<span class="nc" id="L238">            old = value(key);</span>
+<span class="nc bnc" id="L239" title="All 2 branches missed.">        if (old != null) {</span>
+<span class="nc" id="L240">            _ct.removed(key, old);</span>
+<span class="nc" id="L241">            Proxies.removed(this, key, true);</span>
+<span class="nc" id="L242">            Proxies.removed(this, old, false);</span>
+        }
+<span class="nc" id="L244">        return old;</span>
+    }
+
+    @Override
+    public void clear() {
+<span class="nc" id="L249">        Proxies.dirty(this, false);</span>
+<span class="nc" id="L250">        Itr itr = iterator(MODE_ENTRY);</span>
+        try {
+            Map.Entry&lt;K,V&gt; entry;
+<span class="nc bnc" id="L253" title="All 2 branches missed.">            while (itr.hasNext()) {</span>
+<span class="nc" id="L254">                entry = (Map.Entry&lt;K,V&gt;) itr.next();</span>
+<span class="nc" id="L255">                Proxies.removed(this, entry.getKey(), true);</span>
+<span class="nc" id="L256">                Proxies.removed(this, entry.getValue(), false);</span>
+<span class="nc" id="L257">                _ct.removed(entry.getKey(), entry.getValue());</span>
+            }
+        }
+        finally {
+<span class="nc" id="L261">            itr.close();</span>
+        }
+<span class="nc" id="L263">    }</span>
+
+    @Override
+    public Set&lt;K&gt; keySet() {
+<span class="nc" id="L267">        return new AbstractSet&lt;K&gt;() {</span>
+            @Override
+            public int size() {
+<span class="nc" id="L270">                return AbstractLRSProxyMap.this.size();</span>
+            }
+
+            @Override
+            public boolean remove(Object o) {
+<span class="nc bnc" id="L275" title="All 2 branches missed.">                return AbstractLRSProxyMap.this.remove(o) != null;</span>
+            }
+
+            @Override
+            public Iterator&lt;K&gt; iterator() {
+<span class="nc" id="L280">                return AbstractLRSProxyMap.this.iterator(MODE_KEY);</span>
+            }
+        };
+    }
+
+    @Override
+    public Collection&lt;V&gt; values() {
+<span class="nc" id="L287">        return new AbstractCollection&lt;V&gt;() {</span>
+            @Override
+            public int size() {
+<span class="nc" id="L290">                return AbstractLRSProxyMap.this.size();</span>
+            }
+
+            @Override
+            public Iterator&lt;V&gt; iterator() {
+<span class="nc" id="L295">                return AbstractLRSProxyMap.this.iterator(MODE_VALUE);</span>
+            }
+        };
+    }
+
+    @Override
+    public Set&lt;Map.Entry&lt;K, V&gt;&gt; entrySet() {
+<span class="nc" id="L302">        return new AbstractSet&lt;Map.Entry&lt;K, V&gt;&gt;() {</span>
+            @Override
+            public int size() {
+<span class="nc" id="L305">                return AbstractLRSProxyMap.this.size();</span>
+            }
+
+            @Override
+            public Iterator&lt;Map.Entry&lt;K, V&gt;&gt; iterator() {
+<span class="nc" id="L310">                return AbstractLRSProxyMap.this.iterator(MODE_ENTRY);</span>
+            }
+        };
+    }
+
+    protected Object writeReplace()
+        throws ObjectStreamException {
+<span class="nc" id="L317">        Itr itr = iterator(MODE_ENTRY);</span>
+        try {
+<span class="nc" id="L319">            Map&lt;K,V&gt; map = new HashMap&lt;&gt;();</span>
+            Map.Entry&lt;K,V&gt; entry;
+<span class="nc bnc" id="L321" title="All 2 branches missed.">            while (itr.hasNext()) {</span>
+<span class="nc" id="L322">                entry = (Map.Entry&lt;K,V&gt;) itr.next();</span>
+<span class="nc" id="L323">                map.put(entry.getKey(), entry.getValue());</span>
+            }
+<span class="nc" id="L325">            return map;</span>
+        } finally {
+<span class="nc" id="L327">            itr.close();</span>
+        }
+    }
+
+    /**
+     * Return whether the given key exists in the map.
+     */
+    protected abstract boolean hasKey(Object key);
+
+    /**
+     * Return whether the given value exists in the map.
+     */
+    protected abstract boolean hasValue(Object value);
+
+    /**
+     * Return all keys for the given value.
+     */
+    protected abstract Collection&lt;K&gt; keys(Object value);
+
+    /**
+     * Return the value of the given key.
+     */
+    protected abstract V value(Object key);
+
+    /**
+     * Implement this method to return an iterator over the entries
+     * in the map. Each returned object must implement the
+     * &lt;code&gt;Map.Entry&lt;/code&gt; interface. This method may be invoked multiple
+     * times. The iterator does not have to support the
+     * {@link Iterator#remove} method, and may implement
+     * {@link org.apache.openjpa.lib.util.Closeable}.
+     */
+    protected abstract Iterator&lt;?&gt; itr();
+
+    /**
+     * Return the number of entries in the map, or {@link Integer#MAX_VALUE}.
+     */
+    protected abstract int count();
+
+    private Itr iterator(int mode) {
+<span class="nc" id="L367">        _iterated = true;</span>
+
+        // have to copy the entry set of _map to prevent concurrent mod errors
+<span class="nc" id="L370">        IteratorChain chain = new IteratorChain();</span>
+<span class="nc bnc" id="L371" title="All 2 branches missed.">        if (_map != null)</span>
+<span class="nc" id="L372">            chain.addIterator(new ArrayList(_map.entrySet()).iterator());</span>
+<span class="nc" id="L373">        chain.addIterator(new FilterIterator(itr(), this));</span>
+<span class="nc" id="L374">        return new Itr(mode, chain);</span>
+    }
+
+    ////////////////////////////
+    // Predicate Implementation
+    ////////////////////////////
+
+    @Override
+    public boolean evaluate(Object obj) {
+<span class="nc" id="L383">        Map.Entry entry = (Map.Entry) obj;</span>
+<span class="nc bnc" id="L384" title="All 2 branches missed.">        return (_ct.getTrackKeys()</span>
+<span class="nc bnc" id="L385" title="All 2 branches missed.">            &amp;&amp; !_ct.getRemoved().contains(entry.getKey())</span>
+<span class="nc bnc" id="L386" title="All 2 branches missed.">            || (!_ct.getTrackKeys()</span>
+<span class="nc bnc" id="L387" title="All 4 branches missed.">            &amp;&amp; !_ct.getRemoved().contains(entry.getValue())))</span>
+<span class="nc bnc" id="L388" title="All 2 branches missed.">            &amp;&amp; (_map == null || !_map.containsKey(entry.getKey()));</span>
+    }
+
+    ///////////////////////////////////
+    // MapChangeTracker Implementation
+    ///////////////////////////////////
+
+    @Override
+    public boolean isTracking() {
+<span class="nc" id="L397">        return _ct.isTracking();</span>
+    }
+
+    @Override
+    public void startTracking() {
+<span class="nc" id="L402">        _ct.startTracking();</span>
+<span class="nc" id="L403">        reset();</span>
+<span class="nc" id="L404">    }</span>
+
+    @Override
+    public void stopTracking() {
+<span class="nc" id="L408">        _ct.stopTracking();</span>
+<span class="nc" id="L409">        reset();</span>
+<span class="nc" id="L410">    }</span>
+
+    private void reset() {
+<span class="nc bnc" id="L413" title="All 2 branches missed.">        if (_map != null)</span>
+<span class="nc" id="L414">            _map.clear();</span>
+<span class="nc bnc" id="L415" title="All 2 branches missed.">        if (_count != Integer.MAX_VALUE)</span>
+<span class="nc" id="L416">            _count = -1;</span>
+<span class="nc" id="L417">    }</span>
+
+    @Override
+    public boolean getTrackKeys() {
+<span class="nc" id="L421">        return _ct.getTrackKeys();</span>
+    }
+
+    @Override
+    public void setTrackKeys(boolean keys) {
+<span class="nc" id="L426">        _ct.setTrackKeys(keys);</span>
+<span class="nc" id="L427">    }</span>
+
+    @Override
+    public Collection getAdded() {
+<span class="nc" id="L431">        return _ct.getAdded();</span>
+    }
+
+    @Override
+    public Collection getRemoved() {
+<span class="nc" id="L436">        return _ct.getRemoved();</span>
+    }
+
+    @Override
+    public Collection getChanged() {
+<span class="nc" id="L441">        return _ct.getChanged();</span>
+    }
+
+    @Override
+    public void added(Object key, Object val) {
+<span class="nc" id="L446">        _ct.added(key, val);</span>
+<span class="nc" id="L447">    }</span>
+
+    @Override
+    public void removed(Object key, Object val) {
+<span class="nc" id="L451">        _ct.removed(key, val);</span>
+<span class="nc" id="L452">    }</span>
+
+    @Override
+    public void changed(Object key, Object orig, Object val) {
+<span class="nc" id="L456">        _ct.changed(key, orig, val);</span>
+<span class="nc" id="L457">    }</span>
+
+    @Override
+    public int getNextSequence() {
+<span class="nc" id="L461">        return _ct.getNextSequence();</span>
+    }
+
+    @Override
+    public void setNextSequence(int seq) {
+<span class="nc" id="L466">        _ct.setNextSequence(seq);</span>
+<span class="nc" id="L467">    }</span>
+
+    /**
+     * Wrapper around our filtering iterator chain.
+     */
+    private class Itr
+        implements Iterator, Closeable {
+
+        private static final int OPEN = 0;
+        private static final int LAST_ELEM = 1;
+        private static final int CLOSED = 2;
+
+        private final int _mode;
+        private final IteratorChain _itr;
+<span class="nc" id="L481">        private Map.Entry _last = null;</span>
+<span class="nc" id="L482">        private int _state = OPEN;</span>
+
+<span class="nc" id="L484">        public Itr(int mode, IteratorChain itr) {</span>
+<span class="nc" id="L485">            _mode = mode;</span>
+<span class="nc" id="L486">            _itr = itr;</span>
+<span class="nc" id="L487">        }</span>
+
+        @Override
+        public boolean hasNext() {
+<span class="nc bnc" id="L491" title="All 2 branches missed.">            if (_state != OPEN)</span>
+<span class="nc" id="L492">                return false;</span>
+
+            // close automatically if no more elements
+<span class="nc bnc" id="L495" title="All 2 branches missed.">            if (!_itr.hasNext()) {</span>
+<span class="nc" id="L496">                free();</span>
+<span class="nc" id="L497">                _state = LAST_ELEM;</span>
+<span class="nc" id="L498">                return false;</span>
+            }
+<span class="nc" id="L500">            return true;</span>
+        }
+
+        @Override
+        public Object next() {
+<span class="nc bnc" id="L505" title="All 2 branches missed.">            if (_state != OPEN)</span>
+<span class="nc" id="L506">                throw new NoSuchElementException();</span>
+
+<span class="nc" id="L508">            _last = (Map.Entry) _itr.next();</span>
+<span class="nc bnc" id="L509" title="All 3 branches missed.">            switch (_mode) {</span>
+                case MODE_KEY:
+<span class="nc" id="L511">                    return _last.getKey();</span>
+                case MODE_VALUE:
+<span class="nc" id="L513">                    return _last.getValue();</span>
+                default:
+<span class="nc" id="L515">                    return _last;</span>
+            }
+        }
+
+        @Override
+        public void remove() {
+<span class="nc bnc" id="L521" title="All 4 branches missed.">            if (_state == CLOSED || _last == null)</span>
+<span class="nc" id="L522">                throw new NoSuchElementException();</span>
+
+<span class="nc" id="L524">            Proxies.dirty(AbstractLRSProxyMap.this, false);</span>
+<span class="nc" id="L525">            Proxies.removed(AbstractLRSProxyMap.this, _last.getKey(), true);</span>
+<span class="nc" id="L526">            Proxies.removed(AbstractLRSProxyMap.this, _last.getValue(), false);</span>
+
+            // need to get a reference to the key before we remove it
+            // from the map, since in JDK 1.3-, the act of removing an entry
+            // from the map will also null the entry's value, which would
+            // result in incorrectly passing a null to the change tracker
+<span class="nc" id="L532">            Object key = _last.getKey();</span>
+<span class="nc" id="L533">            Object value = _last.getValue();</span>
+
+<span class="nc bnc" id="L535" title="All 2 branches missed.">            if (_map != null)</span>
+<span class="nc" id="L536">                _map.remove(key);</span>
+<span class="nc" id="L537">            _ct.removed(key, value);</span>
+<span class="nc" id="L538">            _last = null;</span>
+<span class="nc" id="L539">        }</span>
+
+        @Override
+        public void close() {
+<span class="nc" id="L543">            free();</span>
+<span class="nc" id="L544">            _state = CLOSED;</span>
+<span class="nc" id="L545">        }</span>
+
+        private void free() {
+<span class="nc bnc" id="L548" title="All 2 branches missed.">            if (_state != OPEN)</span>
+<span class="nc" id="L549">                return;</span>
+
+<span class="nc bnc" id="L551" title="All 2 branches missed.">            for (Iterator itr = _itr; itr.hasNext();) {</span>
+<span class="nc" id="L552">                itr.next();</span>
+<span class="nc bnc" id="L553" title="All 2 branches missed.">                if (itr instanceof FilterIterator)</span>
+<span class="nc" id="L554">                    itr = ((FilterIterator) itr).getIterator();</span>
+<span class="nc" id="L555">                ImplHelper.close(itr);</span>
+            }
+<span class="nc" id="L557">        }</span>
+
+        @Override
+        protected void finalize() {
+<span class="nc" id="L561">            close ();</span>
+<span class="nc" id="L562">		}</span>
+	}
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.4.201905082037</span></div></body></html>
