@@ -1,6 +1,5 @@
 package org.apache.openjpa.util.support;
-
-public class NonValid {
+public class NonValid{
     /*Integer value;
     Integer otherValue;*/
 
