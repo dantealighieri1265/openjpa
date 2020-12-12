@@ -45,23 +45,23 @@ public class DelayedArrayListProxy extends ArrayList implements ProxyCollection,
     private transient CollectionChangeTracker changeTracker;
     private transient Class&lt;?&gt; elementType;
     private transient OpenJPAStateManager _ownerSm;
-<span class="nc" id="L48">    private transient boolean _directAccess = false;</span>
-<span class="nc" id="L49">    private transient BrokerFactory _brokerFactory = null;</span>
-<span class="nc" id="L50">    private transient Broker _broker = null;</span>
+<span class="pc" id="L48">    private transient boolean _directAccess = false;</span>
+<span class="pc" id="L49">    private transient BrokerFactory _brokerFactory = null;</span>
+<span class="pc" id="L50">    private transient Broker _broker = null;</span>
     private transient OpenJPAStateManager _delayedSm;
     private transient int _delayedField;
-<span class="nc" id="L53">    private transient boolean _detached = false;</span>
+<span class="pc" id="L53">    private transient boolean _detached = false;</span>
 
-<span class="nc" id="L55">    public DelayedArrayListProxy() {</span>
-<span class="nc" id="L56">    }</span>
+<span class="fc" id="L55">    public DelayedArrayListProxy() {</span>
+<span class="fc" id="L56">    }</span>
 
     public DelayedArrayListProxy(Collection paramCollection) {
 <span class="nc" id="L59">        super(paramCollection);</span>
 <span class="nc" id="L60">    }</span>
 
     public DelayedArrayListProxy(int paramInt) {
-<span class="nc" id="L63">        super(paramInt);</span>
-<span class="nc" id="L64">    }</span>
+<span class="fc" id="L63">        super(paramInt);</span>
+<span class="fc" id="L64">    }</span>
 
     @Override
     public void setOwner(OpenJPAStateManager paramOpenJPAStateManager,

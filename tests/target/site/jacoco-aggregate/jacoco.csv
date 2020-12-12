@@ -428,7 +428,7 @@ Tests/openjpa-kernel,org.apache.openjpa.util,DelayedTreeSetProxy,710,0,166,0,188
 Tests/openjpa-kernel,org.apache.openjpa.util,StringId,47,0,4,0,11,0,9,0,7,0
 Tests/openjpa-kernel,org.apache.openjpa.util,QueryException,78,0,2,0,22,0,10,0,9,0
 Tests/openjpa-kernel,org.apache.openjpa.util,DelayedHashSetProxy,511,0,102,0,138,0,94,0,43,0
-Tests/openjpa-kernel,org.apache.openjpa.util,Proxies,160,18,40,6,39,6,26,4,4,3
+Tests/openjpa-kernel,org.apache.openjpa.util,Proxies,157,21,40,6,38,7,25,5,3,4
 Tests/openjpa-kernel,org.apache.openjpa.util,Exceptions.new OutputStream() {...},4,0,0,0,2,0,2,0,2,0
 Tests/openjpa-kernel,org.apache.openjpa.util,DelayedPriorityQueueProxy,621,0,116,0,167,0,107,0,49,0
 Tests/openjpa-kernel,org.apache.openjpa.util,StoreFacadeTypeRegistry.Key,39,0,6,0,9,0,6,0,3,0
@@ -462,7 +462,7 @@ Tests/openjpa-kernel,org.apache.openjpa.util,InvalidStateException,14,0,0,0,6,0,
 Tests/openjpa-kernel,org.apache.openjpa.util,DelayedVectorProxy,961,0,212,0,280,0,177,0,71,0
 Tests/openjpa-kernel,org.apache.openjpa.util,Exceptions,453,0,82,0,109,0,54,0,13,0
 Tests/openjpa-kernel,org.apache.openjpa.util,OpenJPAId,185,0,26,0,45,0,25,0,12,0
-Tests/openjpa-kernel,org.apache.openjpa.util,DelayedArrayListProxy,653,0,136,0,181,0,119,0,51,0
+Tests/openjpa-kernel,org.apache.openjpa.util,DelayedArrayListProxy,622,31,136,0,173,8,117,2,49,2
 Tests/openjpa-kernel,org.apache.openjpa.util,WrappedException,26,0,0,0,11,0,6,0,6,0
 Tests/openjpa-kernel,org.apache.openjpa.util,NonUniqueResultException,14,0,0,0,6,0,3,0,3,0
 Tests/openjpa-kernel,org.apache.openjpa.util,BigIntegerId,68,0,10,0,20,0,13,0,8,0
@@ -497,12 +497,11 @@ Tests/openjpa-kernel,org.apache.openjpa.util,ArrayStateImage,134,0,20,0,27,0,17,
 Tests/openjpa-kernel,org.apache.openjpa.util,ProxyCollections.new ProxyCollections.ProxyListIterator() {...},135,0,8,0,35,0,14,0,10,0
 Tests/openjpa-kernel,org.apache.openjpa.util,ProxyCollections.new ProxyCollections.ProxyIterator() {...},25,24,2,0,7,5,2,3,1,3
 Tests/openjpa-kernel,org.apache.openjpa.util,ProxyManagerImpl.new PrivilegedAction() {...},0,16,0,0,0,2,0,2,0,2
-Tests/openjpa-kernel,org.apache.openjpa.util,ProxyManagerImpl.new PrivilegedAction() {...},16,0,0,0,2,0,2,0,2,0
 Tests/openjpa-kernel,org.apache.openjpa.util,UnsupportedException,25,9,0,0,10,3,4,1,4,1
 Tests/openjpa-kernel,org.apache.openjpa.util,InternalException,51,0,0,0,19,0,7,0,7,0
 Tests/openjpa-kernel,org.apache.openjpa.util,MetaDataException,34,0,0,0,13,0,5,0,5,0
-Tests/openjpa-kernel,org.apache.openjpa.util,ProxyManagerImpl,835,3584,151,245,187,806,129,135,10,56
-Tests/openjpa-kernel,org.apache.openjpa.util,ImplHelper,337,37,77,7,92,7,56,3,12,3
+Tests/openjpa-kernel,org.apache.openjpa.util,ProxyManagerImpl,594,3591,130,248,138,809,117,138,10,56
+Tests/openjpa-kernel,org.apache.openjpa.util,ImplHelper,335,39,76,8,92,7,55,4,12,3
 Tests/openjpa-kernel,org.apache.openjpa.util,OpenJPAException,156,38,8,2,40,12,23,3,18,3
 Tests/openjpa-kernel,org.apache.openjpa.util,ApplicationIds.PrimaryKeyFieldManager,183,0,8,0,49,0,30,0,26,0
 Tests/openjpa-kernel,org.apache.openjpa.util,ProxyMaps.ProxyEntrySetImpl.new Iterator() {...},49,30,4,1,10,6,4,3,1,3

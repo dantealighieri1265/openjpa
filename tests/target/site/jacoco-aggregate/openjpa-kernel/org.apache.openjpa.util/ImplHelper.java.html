@@ -234,7 +234,7 @@ import org.apache.openjpa.meta.ValueStrategies;
      * @return true if the instance is a persistent type, false otherwise
      */
     public static boolean isManageable(Object instance) {
-<span class="pc bpc" id="L237" title="2 of 4 branches missed.">        return instance instanceof PersistenceCapable</span>
+<span class="pc bpc" id="L237" title="1 of 4 branches missed.">        return instance instanceof PersistenceCapable</span>
 <span class="pc bpc" id="L238" title="1 of 2 branches missed.">            || instance != null &amp;&amp; PCRegistry.isRegistered(instance.getClass());</span>
     }
 
