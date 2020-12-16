@@ -177,6 +177,8 @@
                             <targetTests>
                                 <param>org.apache.openjpa.util.PutCacheMapTest</param>
                                 <param>org.apache.openjpa.util.RemoveCacheMapTest</param>
+                                <param>org.apache.openjpa.util.GetCacheMapTest</param>
+                                <param>org.apache.openjpa.util.UnpinCacheMapTest</param>
                                 <param>org.apache.openjpa.util.PinCacheMapTest</param>
                                 <param>org.apache.openjpa.util.CopyCustomTest</param>
                                 <param>org.apache.openjpa.util.CopyArrayTest</param>

@@ -9,11 +9,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import org.apache.openjpa.util.support.Valid;
-import org.apache.openjpa.util.support.FinalClass;
-import org.apache.openjpa.util.support.Manageable;
-import org.apache.openjpa.util.support.NonValid;
-
 
 public class ProxyManagerImplEntity {
 	
@@ -37,9 +32,9 @@ public class ProxyManagerImplEntity {
 	}
 	
 	
-	public ProxyManagerImplEntity initializeEntityNonValid(int nextInt, int nextInt2) {
+	public ProxyManagerImplEntity initializeEntityNonValid() {
 		
-        NonValid nonValid = new NonValid(nextInt, nextInt2);
+        NonValid nonValid = new NonValid();
         setObject(nonValid);
         return this;
     }
@@ -91,7 +86,7 @@ public class ProxyManagerImplEntity {
 	}
 
 	public ProxyManagerImplEntity initializeEntityFinal() {
-		FinalClass finalClass = new FinalClass();
+		Final finalClass = new Final();
 		setObject(finalClass);
 		return this;
 	}

@@ -335,10 +335,6 @@ public class ProxyManagerImpl
         ProxyBean proxy = getFactoryProxyBean(orig);
         return (proxy == null) ? null : proxy.newInstance(orig);
     }
-    public static void main(String[] args) {
-		ProxyManagerImpl proxyManagerImpl = new ProxyManagerImpl();
-		proxyManagerImpl.newCustomProxy(new Timestamp(5000000), true);
-	}
 
     /**
      * Return the concrete type for proxying.

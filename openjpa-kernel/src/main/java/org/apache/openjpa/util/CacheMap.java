@@ -292,8 +292,8 @@ public class CacheMap
         try {
             // if we don't have a pinned map we need to create one; else if the
             // pinned map already contains the key, nothing to do
-            if (pinnedMap.containsKey(key))
-                return pinnedMap.get(key) != null;
+            if (pinnedMap.containsKey(key)) 
+                return pinnedMap.get(key) != null; 
 
             // check other maps for key
             Object val = remove(cacheMap, key);
@@ -385,12 +385,12 @@ public class CacheMap
         writeLock();
         try {
             // if the key is pinned, just interact directly with the pinned map
-            Object val;
+            Object val; //ok
             if (pinnedMap.containsKey(key)) {
-                val = put(pinnedMap, key, value);
+                val = put(pinnedMap, key, value); 
                 if (val == null) {
                     _pinnedSize++;
-                    entryAdded(key, value);
+                    entryAdded(key, value); 
                 } else {
                     entryRemoved(key, val, false);
                     entryAdded(key, value);
@@ -399,23 +399,23 @@ public class CacheMap
             }
 
             // if no hard refs, don't put anything
-            if (cacheMap.getMaxSize() == 0) //first test case
+            if (cacheMap.getMaxSize() == 0)
                 return null;
 
             // otherwise, put the value into the map and clear it from the
             // soft map
-            val = put(cacheMap, key, value);
+            val = put(cacheMap, key, value); 
             if (val == null) {
                 val = remove(softMap, key); 
-                if (val == null)
-                    entryAdded(key, value); //no Already exist
-                else {
-                    entryRemoved(key, val, false);//no storage & alreadyExixts
+                if (val == null) 
                     entryAdded(key, value);
+                else {
+                    entryRemoved(key, val, false); 
+                    entryAdded(key, value); 
                 }
             } else {
-                entryRemoved(key, val, false); //storage & alreadyExixts
-                entryAdded(key, value);
+                entryRemoved(key, val, false);
+                entryAdded(key, value); 
             }
             return val;
         } finally {
@@ -461,7 +461,7 @@ public class CacheMap
 
             val = remove(cacheMap, key);
             if (val == null)
-                val = softMap.remove(key);
+                val = softMap.remove(key); 
             if (val != null)
                 entryRemoved(key, val, false);
 

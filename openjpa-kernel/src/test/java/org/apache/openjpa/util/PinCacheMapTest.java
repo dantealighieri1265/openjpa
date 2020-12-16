@@ -1,5 +1,6 @@
 package org.apache.openjpa.util;
 
+import org.apache.openjpa.util.entity.CacheMapEntity;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -9,11 +10,9 @@ import org.junit.runners.Parameterized;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
-
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.*;;
 
 /*
 CacheMap maintains
@@ -28,101 +27,83 @@ amount of memory is used by the cache.
 
 @RunWith(Parameterized.class)
 public class PinCacheMapTest {
-
-    private Object key;
-    private Object value;
+	
     private CacheMap cacheMap;
-    private boolean hasPreviousValue;
-    private boolean pinned;
+	
+    private CacheMapEntity entity;
     private boolean expectedResult;
-
+	private int expectedSize;
+   
     @Rule
     public MockitoRule mockitoRule = MockitoJUnit.rule();
-
-
-    public PinCacheMapTest(TestInput testInput) {
-        this.key = testInput.getKey();
-        this.hasPreviousValue = testInput.isAlreadyExist();
-        this.pinned = testInput.isPinned();
-        this.expectedResult = testInput.isExpectedResult();
-        if (this.hasPreviousValue) {
-            this.value = testInput.getValue();
-        } else {
-            this.value = null;
-        }
+    
+    
+    public PinCacheMapTest(CacheMapEntity entity, Boolean expectedResult, int expectedSize) { //, Object expectedResult
+    	this.entity = entity;
+    	this.expectedResult = expectedResult;
+    	this.expectedSize = expectedSize;
     }
 
 
     @Parameterized.Parameters
-    public static Collection<TestInput> getParameters(){
-        List<TestInput> testInputs = new ArrayList<>();
+    public static Collection<?> getParameters(){
+    	
+    	/*CATEGORY PARTITION:
+    	 * 
+    	 * Key --> {valid, NonValid, null}
+    	 * 
+    	 * L'oggetto nonValid non può essere considerato per via del fatto che 
+    	 * il paramentro è una classe di tipo Object.
+    	 * 
+    	 * pin(valid)
+    	 * pin(null)
+    	 * */
+    	
+    	/*MUTATION TESTING:
+    	 * 
+    	 * 
+    	 * */
+    	
+    	Object obj = new Object();
 
-        testInputs.add(new TestInput(null, null, false,false, false));
-        testInputs.add(new TestInput(new Object(), new Object(), true,false, true));
-        testInputs.add(new TestInput(new Object(), null, false,true, false));
-        testInputs.add(new TestInput(new Object(), new Object(), true,true, true));
 
-        return testInputs;
+        return Arrays.asList(new Object[][] {
+   		 //suite minimale
+         {new CacheMapEntity(new Object(), null, false, true), false, 0},
+   		 {new CacheMapEntity(null, null, false, false), false, 0},
+   		 
+   		 //coverage
+   		 {new CacheMapEntity(new Object(), obj, true, true), true, 1},
+   		 {new CacheMapEntity(null, obj, true, false), true, 1},
+        });
 
-    }
-
-    private static class TestInput {
-        private Object key;
-        private Object value;
-        private boolean alreadyExist;
-        private boolean pinned;
-        private boolean expectedResult;
-
-        public TestInput(Object key, Object value, boolean alreadyExist, boolean pinned, boolean expectedResult) {
-            this.key = key;
-            this.value = value;
-            this.alreadyExist = alreadyExist;
-            this.pinned = pinned;
-            this.expectedResult = expectedResult;
-        }
-
-        public Object getKey() {
-            return key;
-        }
-
-        public Object getValue() {
-            return value;
-        }
-
-        public boolean isAlreadyExist() {
-            return alreadyExist;
-        }
-
-        public boolean isPinned() {
-            return pinned;
-        }
-
-        public boolean isExpectedResult() {
-            return expectedResult;
-        }
     }
 
     @Before
     public void setUp(){
-        this.cacheMap = new CacheMap(true);
-        if (this.hasPreviousValue) {
-            this.cacheMap.put(this.key, this.value);
+    	this.cacheMap = new CacheMap(true);        
+        
+        if (this.entity.isAlreadyExist()) {
+            this.cacheMap.put(this.entity.getKey(), this.entity.getValue());
         }
 
-        if (this.pinned) {
-            this.cacheMap.pin(this.key);
+        if (this.entity.isPinned()) {
+            this.cacheMap.pin(this.entity.getKey());
         }
 
         this.cacheMap = spy(this.cacheMap);
+        
     }
-
     @Test
     public void pinTest() {
-        boolean result = this.cacheMap.pin(this.key);
+        boolean result = this.cacheMap.pin(this.entity.getKey());
+        
+        Assert.assertEquals(this.expectedResult, result);
+        //for mutation
+        Assert.assertEquals(this.expectedSize, this.cacheMap.size());
         verify(this.cacheMap).writeLock();
         verify(this.cacheMap).writeUnlock();
 
-        Assert.assertEquals(this.expectedResult, result);
 
     }
 

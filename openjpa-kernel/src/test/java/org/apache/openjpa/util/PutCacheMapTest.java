@@ -10,12 +10,9 @@ import org.junit.runners.Parameterized;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 
-import javax.security.auth.kerberos.KerberosKey;
 
 import static org.mockito.Mockito.*;
 /*
@@ -32,70 +29,73 @@ amount of memory is used by the cache.
 @RunWith(Parameterized.class)
 public class PutCacheMapTest {
 	
-//    private Object value;
-      //private Object previousValue;
 	  private CacheMap cacheMap;
 	  private Object expectedResult;
-//    private boolean hasPreviousValue;
-//    private boolean pinned;
-//    private Integer cachedMaxMapSize;
-//    private Integer numObjectToInsert;
       private CacheMapEntity entity;
+	  private Object expectedSize;
 
-    //@Rule
-    //public MockitoRule mockitoRule = MockitoJUnit.rule();
+    @Rule
+    public MockitoRule mockitoRule = MockitoJUnit.rule();
 
 
-    public PutCacheMapTest(CacheMapEntity entity, Object expectedResult) { //, Object expectedResult
+    public PutCacheMapTest(CacheMapEntity entity, Object expectedResult, int expectedSize) { 
     	this.entity = entity;
     	this.expectedResult = expectedResult;
-
-//        this.key = testInput.getKey();
-//        this.value = testInput.getValue();
-//        this.hasPreviousValue = testInput.isAlreadyExist();
-//        this.pinned = testInput.isPinned();
-//        this.cachedMaxMapSize = testInput.getCacheMaxMapSize();
-//        this.numObjectToInsert = testInput.getNumObjectToInsert();
-        /*if (entity.isAlreadyExist()) {
-            this.previousValue = new Object();
-        } else {
-            this.previousValue = null;
-        }*/
+    	this.expectedSize = expectedSize;
     }
 
 
     @Parameterized.Parameters
     public static Collection<?> getParameters(){
+    	
+    	/*CATEGORY PARTITION:
+    	 * 
+    	 * Key --> {valid, NonValid, null}
+    	 * Object --> {valid, nonValid, null}
+    	 * 
+    	 * L'oggetto nonValid non può essere considerato per via del fatto che 
+    	 * entrambi i paramentri sono classi di tipo Object.
+    	 * 
+    	 * put(valid, valid)
+    	 * put(null, null)
+    	 * put(null, valid)
+    	 * put(valid, null)
+    	 * 
+    	 * */
+    	
+    	/*MUTATION TESTING:
+    	 * 
+    	 * -Line 393: mutation equivalent (NO Weak mutation, Strong mutation)  --> Forse è anche weak 
+    	 * perché oltre al fattop che il metodo salta ad un altro metodo vuoyo lo stato non cambia
+    	 * -Line 395: mutation equivalent (NO Weak mutation, Strong mutation)-->(Entry removed not implemented??)
+    	 * -Line 396: mutation equivalent (NO Weak mutation, Strong mutation)-->(Entry added and entry removed nont implemented??)
+    	 * 
+    	 * -Line 410: mutation equivalent (NO Weak mutation, Strong mutation)
+    	 * -Line 411: mutation equivalent (NO Weak mutation, Strong mutation)-->(Entry added not implemented??)
+		 * -Line 413: mutation equivalent (NO Weak mutation, Strong mutation)-->(Entry removed not implemented??)
+    	 * -Line 414: mutation equivalent (NO Weak mutation, Strong mutation)-->(Entry added not implemented??)
+    	 * -Line 417: mutation equivalent (NO Weak mutation, Strong mutation)-->(Entry removed not implemented??)
+    	 * -Line 418: mutation equivalent (NO Weak mutation, Strong mutation)-->(Entry added not implemented??)
+    	 * 
+    	 * -Line 422: mutation survived & No coverage --> No tests that exercised the line of code 422: Mi sembra strano però essendo 
+    	 * la riga 422 dento un finally
+    	 * */
+    	
+    	Object objValue = new Object();
+
+    	
+    	
     	 return Arrays.asList(new Object[][] {
     		 //suite minimale
-    		 {new CacheMapEntity(null, null, false, false, 0, 1), null},
-    		 {new CacheMapEntity(new Object(), null, true, true, 1, 2), new Object()},//new object()
-    		 {new CacheMapEntity(null, new Object(), true, false, 1, 1), new Object()},//new object()
-    		 {new CacheMapEntity(new Object(), new Object(), false, true, 1, 1), null},
+    		 {new CacheMapEntity(null, null, false, false, 0, 1), null, 0},
+    		 {new CacheMapEntity(new Object(), null, true, true, 1, 0), null, 1},
+    		 {new CacheMapEntity(null, objValue, true, false, 1, 1), objValue, 2},
+    		 {new CacheMapEntity(new Object(), objValue, true, true, 1, 1), objValue, 2},
     		 
     		 //coverage
-    		 {new CacheMapEntity(new Object(), new Object(), true, false, 2,0), new Object()}
-             //{new WriteTestEntity(0, -1), null},
-             //{new WriteTestEntity(-1, 0), null}
+    		 {new CacheMapEntity(new Object(), objValue, true, false, 2,0),objValue,1},
+    		 {new CacheMapEntity(new Object(), objValue, false, false, 1,0), null,1},
          });
-        //List<CacheMapEntity> testInputs = new ArrayList<>();
-//      Object[][] matrix = new Object[5][2];
-//      matrix[0][0] = new CacheMapEntity(null, null, false, false, 0, 1);
-//      matrix[0][1] = null;
-//      return Arrays.asList(matrix);
-        
-        //suite minimale
-        //implementa l'expected results
-/*        testInputs.add(new CacheMapEntity(null, null, false, false, 0, 1)); //null
-        testInputs.add(new CacheMapEntity(new Object(), null, true, true, 1, 2)); //null
-        testInputs.add(new CacheMapEntity(null, new Object(), true, false, 1, 1)); //null
-        testInputs.add(new CacheMapEntity(new Object(), new Object(), false, true, 1, 1)); //null
-        
-        //coverage
-        testInputs.add(new CacheMapEntity(new Object(), new Object(), true, false, 2,0)); //Object*/
-        
-//        testInputs.add(new CacheMapEntity(new Object(), new Object(), true, false, 2, 1));
-//        testInputs.add(new CacheMapEntity(new Object(), new Object(), true, true, 1, 1));
         
 
     }
@@ -103,9 +103,8 @@ public class PutCacheMapTest {
     @Before
     public void setUp(){
         this.cacheMap = new CacheMap(true, entity.getCacheMaxMapSize(), entity.getCacheMaxMapSize() + 1, 1L, 1);
-        //if (haspreviousvalue)
         if (entity.isAlreadyExist()) {
-            this.cacheMap.put(entity.getKey(), this.expectedResult);
+            this.cacheMap.put(entity.getKey(), this.entity.getValue());
         }
         for (int i = 0; i < entity.getNumObjectToInsert(); i++) {
             this.cacheMap.put(new Object(), new Object());
@@ -115,30 +114,29 @@ public class PutCacheMapTest {
             this.cacheMap.pin(entity.getKey());
         }
 
-        //this.cacheMap = spy(this.cacheMap);
+        this.cacheMap = spy(this.cacheMap);
 
     }
 
     @Test
     public void putTest() {
         Object result = this.cacheMap.put(entity.getKey(), entity.getValue());
-        System.out.println(result+"\n");
-        //verify(this.cacheMap).writeLock();
-        //verify(this.cacheMap).writeUnlock();
         
+
         Assert.assertEquals(this.expectedResult, result);
         
-//        if (entity.isAlreadyExist() && entity.getCacheMaxMapSize() != 0) {
-//            Assert.assertEquals(this.expectedResult, result);
-//        } else {
-//            Assert.assertNull(result);
-//        }
-
-        //testa la get a sto punto
+        //for mutation
+        Assert.assertEquals(this.expectedSize, this.cacheMap.size());
         
-//        Object getValue = this.cacheMap.get(entity.getKey());
-//
-//        Assert.assertEquals(entity.getValue(), getValue);
+        if (this.entity.getCacheMaxMapSize() != 0)
+        	verify(this.cacheMap).entryAdded(entity.getKey(), entity.getValue()); 
+       
+        //TODO gestire entryadded ed entry removed
+        if (this.entity.isAlreadyExist() && this.entity.getValue()!= null)
+        	verify(this.cacheMap).entryRemoved(entity.getKey(), entity.getValue(), false);
+
+        verify(this.cacheMap).writeLock();
+        verify(this.cacheMap).writeUnlock();
 
 
     }

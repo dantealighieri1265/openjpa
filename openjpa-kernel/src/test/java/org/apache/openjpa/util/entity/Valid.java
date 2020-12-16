@@ -1,4 +1,4 @@
-package org.apache.openjpa.util.support;
+package org.apache.openjpa.util.entity;
 
 public class Valid {
     Integer value;

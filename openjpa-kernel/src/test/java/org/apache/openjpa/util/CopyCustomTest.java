@@ -25,18 +25,15 @@ public class CopyCustomTest {
     @Parameterized.Parameters
     public static Collection<?> getParameters(){
     	
+    	/*CATEGORY PARTIOTION:
+         * Object origin -->{Null, Valid, Invalid}
+         * 
+         * newCustomProxy(null)
+         * newCustomProxy(new Date())
+         * newCustomProxy(NonValid)
+         * */
     	
-    	
-        Random r = new Random();
-        //List<TestInput> testInputs = new ArrayList<>();
-        /*ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity(obj);
-        ProxyManagerImplEntity entityNonBean = new ProxyManagerImplEntity(r.nextInt(), r.nextInt());
-        ProxyManagerImplEntity entityBean = new ProxyManagerImplEntity(r.nextInt());
-        ProxyManagerImplEntity entityMap = new ProxyManagerImplEntity(r.nextInt(), r.nextInt(), r.nextInt(), r.nextInt());
-        ProxyManagerImplEntity entityDate = new ProxyManagerImplEntity(new Date());
-        ProxyManagerImplEntity entityGregorian = new ProxyManagerImplEntity(new GregorianCalendar());
-        ProxyManagerImplEntity entityProxyDate = new ProxyManagerImplEntity(new ProxyManagerImpl().newDateProxy(Date.class));
-        ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(r.nextInt(), r.nextInt(), r.nextInt());*/
+    	Random r = new Random();
         
         
         ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity();
@@ -51,37 +48,12 @@ public class CopyCustomTest {
         ProxyManagerImplEntity entityList = new ProxyManagerImplEntity();
         ProxyManagerImplEntity entityManageable = new ProxyManagerImplEntity();
         
-        
-        //BeanClass beanClass = new BeanClass();
-        //beanClass.setValue(r.nextInt());
-        //testInputs.add(new TestInput(beanClass, false), beanClass);
-
-        //Map<Integer, Integer> map = new HashMap<>();
-        //map.put(r.nextInt(), r.nextInt());
-        //map.put(r.nextInt(), r.nextInt());
-        //map.put(r.nextInt(), r.nextInt());
-
-        
-
-        
-
-        //Proxy proxy = new ProxyManagerImpl().newDateProxy(Date.class);
-        
-
-        //List<Integer> list = new ArrayList<>();
-
-        //list.add(r.nextInt());
-        //list.add(r.nextInt());
-        //list.add(r.nextInt());
-
-
-
 
         return Arrays.asList(new Object[][] {
     		
         	//Suite minimale
         	{entityNull.initializeEntityNull(null), null},
-            {entityNonValid.initializeEntityNonValid(r.nextInt(), r.nextInt()), null}, 
+            {entityNonValid.initializeEntityNonValid(), null}, 
             {entityDate.initializeEntityDate(new Date()), entityDate.getObject()},
 
             //line, branch and mutation coverage
@@ -111,15 +83,5 @@ public class CopyCustomTest {
       
 
     }
-    
-    public static void main(String[] args) {
-        /*ProxyManagerImplEntity proxyEntity = new ProxyManagerImplEntity();
-        ProxyManagerImplEntity proxyEntity1= new ProxyManagerImplEntity();
-        System.out.println(proxyEntity.createInt(5));
-        System.out.println(proxyEntity.createString("ciao"));
-        System.out.println(proxyEntity1.createInt(5));
-        System.out.println(proxyEntity1.createString("ciao"));*/
-
-	}
 
 }

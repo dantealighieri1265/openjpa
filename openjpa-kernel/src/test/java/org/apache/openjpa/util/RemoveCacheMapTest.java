@@ -1,5 +1,6 @@
 package org.apache.openjpa.util;
 
+import org.apache.openjpa.util.entity.CacheMapEntity;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -8,13 +9,11 @@ import org.junit.runner.RunWith;
 import org.junit.runners.Parameterized;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
-
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
-import java.util.List;
 
-import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.verify;
+
+import static org.mockito.Mockito.*;
 
 /*
 CacheMap maintains
@@ -30,121 +29,95 @@ amount of memory is used by the cache.
 @RunWith(Parameterized.class)
 public class RemoveCacheMapTest {
 
-    private Object key;
-    private Object value;
-    private CacheMap cacheMap;
-    private boolean hasPreviousValue;
-    private boolean pinned;
-    private Integer cachedMaxMapSize;
-    private Integer numObjectToInsert;
+	private CacheMap cacheMap;
+    private CacheMapEntity entity;
+    private Object expectedResult;
+    private int expectedSize;
 
     @Rule
     public MockitoRule mockitoRule = MockitoJUnit.rule();
 
 
-    public RemoveCacheMapTest(TestInput testInput) {
-        this.key = testInput.getKey();
-        this.value = testInput.getValue();
-        this.hasPreviousValue = testInput.isAlreadyExist();
-        this.pinned = testInput.isPinned();
-        this.cachedMaxMapSize = testInput.getCacheMaxMapSize();
-        this.numObjectToInsert = testInput.getNumObjectToInsert();
-        if (this.hasPreviousValue) {
-            this.value = new Object();
-        } else {
-            this.value = null;
-        }
+    public RemoveCacheMapTest(CacheMapEntity entity, Object expectedResult, int expectedSize) {
+    	this.entity = entity;
+    	this.expectedResult = expectedResult;
+    	this.expectedSize = expectedSize;
     }
 
 
     @Parameterized.Parameters
-    public static Collection<TestInput> getParameters(){
-        List<TestInput> testInputs = new ArrayList<>();
+    public static Collection<?> getParameters(){
+        
+        /*CATEGORY PARTITION:
+    	 * 
+    	 * Key --> {valid, NonValid, null}
+    	 * 
+    	 * L'oggetto nonValid non può essere considerato per via del fatto che 
+    	 * il paramentro è una classe di tipo Object.
+    	 * 
+    	 * remove(valid)
+    	 * remove(null)
+    	 * */
+    	
+    	/*MUTATION TESTING:
+    	 * -Line 457: mutation equivalent (NO Weak mutation, Strong mutation)  --> Forse è anche weak 
+    	 * perché oltre al fattop che il metodo salta ad un altro metodo vuoyo lo stato non cambia
+    	 * 
+    	 * -Line 465: mutation equivalent (NO Weak mutation, Strong mutation)
+    	 * -Line 466: mutation equivalent (NO Weak mutation, Strong mutation) stessa cosa a sopra
+    	 * 
+    	 * -Line 470: mutation survived & No coverage --> No tests that exercised the line of code 422:
+    	 * Mi sembra strano però essendo la riga 311 dentro un finally
+    	 * 
+    	 * */
+    	
+    	Object objValue = new Object();
+    	
+        
+        return Arrays.asList(new Object[][] {
+      		 //suite minimale
+             {new CacheMapEntity(new Object(), null, false, true), null, 0},
+      		 {new CacheMapEntity(null, null, false, false), null, 0},
+      		 
+      		 //coverage
+      		 {new CacheMapEntity(new Object(), objValue, true, true), objValue, 0},
+      		 {new CacheMapEntity(null, objValue, true, false), objValue, 0},
+           });
 
-        testInputs.add(new TestInput(null, null, false, false, 1, 0));
-        testInputs.add(new TestInput(new Object(), null, false, true, 1, 0));
-        testInputs.add(new TestInput(new Object(), new Object(), true, true, 0, 0));
-        testInputs.add(new TestInput(new Object(), new Object(), true, false, 1,1));
-        testInputs.add(new TestInput(new Object(), null, true, false, 2, 1));
-        return testInputs;
 
     }
 
-    private static class TestInput {
-        private Object key;
-        private Object value;
-        private boolean alreadyExist;
-        private boolean pinned;
-        private Integer cacheMaxMapSize;
-        private Integer numObjectToInsert;
-
-        public TestInput(Object key, Object value, boolean alreadyExist, boolean pinned, Integer cacheMaxMapSize, Integer numObjectToInsert) {
-            this.key = key;
-            this.value = value;
-            this.alreadyExist = alreadyExist;
-            this.pinned = pinned;
-            this.cacheMaxMapSize = cacheMaxMapSize;
-            this.numObjectToInsert = numObjectToInsert;
-        }
-
-        public Object getKey() {
-            return key;
-        }
-
-        public Object getValue() {
-            return value;
-        }
-
-        public boolean isAlreadyExist() {
-            return alreadyExist;
-        }
-
-        public boolean isPinned() {
-            return pinned;
-        }
-
-        public Integer getCacheMaxMapSize() {
-            return cacheMaxMapSize;
-        }
-
-        public Integer getNumObjectToInsert() {
-            return numObjectToInsert;
-        }
-    }
-
+   
     @Before
     public void setUp() {
-        this.cacheMap = new CacheMap(true, this.cachedMaxMapSize, this.cachedMaxMapSize + 1, 1L, 1);
-        if (this.pinned) {
-            this.cacheMap.pin(this.key);
+        this.cacheMap = new CacheMap(true);
+        if (this.entity.isPinned()) {
+            this.cacheMap.pin(this.entity.getKey());
         }
 
-        if (this.hasPreviousValue) {
-            this.cacheMap.put(this.key, this.value);
+        if (this.entity.isAlreadyExist()) {
+            this.cacheMap.put(this.entity.getKey(), this.entity.getValue());
         }
-        for (int i = 0; i < this.numObjectToInsert; i++) {
-            this.cacheMap.put(new Object(), new Object());
-        }
+        
         this.cacheMap = spy(this.cacheMap);
 
     }
 
     @Test
     public void removeTest() {
-        Object deletedValue = this.cacheMap.remove(this.key);
+    	
+    	Object result = this.cacheMap.remove(this.entity.getKey());
+        
+        
+        Assert.assertEquals(this.expectedResult, result);
+        
+        //for mutation
+        Assert.assertEquals(this.expectedSize, this.cacheMap.size()); 
+        if (entity.isAlreadyExist())
+        	verify(this.cacheMap).entryRemoved(entity.getKey(), entity.getValue(), false);
+        
         verify(this.cacheMap).writeLock();
         verify(this.cacheMap).writeUnlock();
 
-        if (this.hasPreviousValue) {
-            Assert.assertEquals(this.value, deletedValue);
-        } else {
-            Assert.assertNull(deletedValue);
-        }
-
-        Object value = this.cacheMap.get(this.key);
-
-        Assert.assertNull(value);
-
     }
-
 }

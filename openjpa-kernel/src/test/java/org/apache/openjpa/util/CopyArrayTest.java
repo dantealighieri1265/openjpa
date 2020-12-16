@@ -21,22 +21,12 @@ public class CopyArrayTest {
     public CopyArrayTest(ProxyManagerImplEntity entity, Object expectedResult) {
     	this.entity = entity;
     	this.expectedResult = expectedResult;
-        //this.object = testInput.getObject();
-        //if (testInput.getExpectedException() != null) {
-        //    this.expectedException.expect(testInput.getExpectedException());
-        //}
     }
 
     @Parameterized.Parameters
     public static Collection<?> getParameters(){
         
         Random r = new Random();
-        //List<TestInput> testInputs = new ArrayList<>();
-
-
-        /*ProxyManagerImplEntity entityNull = new ProxyManagerImplEntity(obj);
-        ProxyManagerImplEntity entityNonBean = new ProxyManagerImplEntity(r.nextInt(), r.nextInt());
-        ProxyManagerImplEntity entityList = new ProxyManagerImplEntity(r.nextFloat());*/
         
         /*CATEGORY PARTIOTION:
          * {Null, Valid, Invalid}
@@ -53,10 +43,9 @@ public class CopyArrayTest {
         	
         	//suite minimale
         	{entityNull.initializeEntityNull(null) , null},
-        	{entityNonValid.initializeEntityNonValid(r.nextInt(), r.nextInt()), UnsupportedException.class}, 
+        	{entityNonValid.initializeEntityNonValid(), UnsupportedException.class}, 
             {entityList.initializeEntityArray(r.nextFloat()), entityList.getObject()}
     	});
-
 
     }
 
@@ -77,9 +66,6 @@ public class CopyArrayTest {
     		Assert.assertEquals(this.expectedResult, e.getClass());
 		}
         
-    	
-        
-
     }
 
 }

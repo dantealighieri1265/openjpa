@@ -9,6 +9,13 @@ public class CacheMapEntity {
     private Integer cacheMaxMapSize;
     private Integer numObjectToInsert;
 
+    public CacheMapEntity(Object key, Object value, boolean alreadyExist, boolean pinned) {
+        this.key = key;
+        this.value = value;
+        this.alreadyExist = alreadyExist;
+        this.pinned = pinned;
+    }
+    
     public CacheMapEntity(Object key, Object value, boolean alreadyExist, boolean pinned, Integer cacheMaxMapSize, Integer numObjectToInsert) {
         this.key = key;
         this.value = value;
@@ -17,6 +24,7 @@ public class CacheMapEntity {
         this.cacheMaxMapSize = cacheMaxMapSize;
         this.numObjectToInsert = numObjectToInsert;
     }
+    
 
     public Object getKey() {
         return key;
